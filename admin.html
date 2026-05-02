@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Owner cabinet | NITKA Atelier</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <header class="topbar checkout-topbar" aria-label="Owner navigation">
+      <a class="brand" href="index.html" aria-label="NITKA Atelier">
+        <span class="brand-mark">N</span>
+        <span>NITKA Atelier</span>
+      </a>
+      <nav class="nav-links" aria-label="Sections">
+        <a href="index.html#catalog">Catalog</a>
+        <a href="checkout.html">Checkout</a>
+        <a href="account.html">Cabinet</a>
+      </nav>
+      <div class="top-actions">
+        <a class="account-pill login-link" href="auth.html" hidden>Login</a>
+        <a class="account-pill cabinet-link" href="account.html" hidden>Cabinet</a>
+        <a class="account-pill admin-link" href="admin.html" hidden>Owner</a>
+        <button class="account-pill as-button logout-button" type="button" hidden>Logout</button>
+      </div>
+    </header>
+
+    <main class="checkout-page admin-page">
+      <section class="checkout-hero admin-hero" aria-labelledby="admin-title">
+        <p class="eyebrow">inventory</p>
+        <h1 id="admin-title">Owner cabinet</h1>
+        <p>Manage product stocks, quickly correct availability and control positions with low stock.</p>
+      </section>
+
+      <section class="admin-locked checkout-panel" id="adminLocked" hidden>
+        <h2>Access denied</h2>
+        <p id="adminLockedText">This page is available only to the store owner.</p>
+        <a class="button primary" href="auth.html">Login as owner</a>
+      </section>
+
+      <section class="admin-dashboard" id="adminDashboard" hidden>
+        <div class="inventory-stats" aria-label="Warehouse summary">
+          <article class="stat-card">
+            <span>Products</span>
+            <strong id="adminProductsCount">0</strong>
+          </article>
+          <article class="stat-card">
+            <span>Units in stock</span>
+            <strong id="adminStockTotal">0</strong>
+          </article>
+          <article class="stat-card">
+            <span>Low stock</span>
+            <strong id="adminLowStock">0</strong>
+          </article>
+        </div>
+
+        <div class="checkout-panel inventory-panel">
+          <div class="inventory-head">
+            <div>
+              <h2>Product stocks</h2>
+              <p>Enter the actual quantity after recounting and save the row.</p>
+            </div>
+            <button class="button ghost dark" type="button" id="reloadInventory">Refresh</button>
+          </div>
+          <div class="inventory-list" id="inventoryList"></div>
+          <p class="form-note" id="adminNote" role="status" aria-live="polite"></p>
+        </div>
+
+        <div class="checkout-panel admin-reviews-panel">
+          <div class="inventory-head">
+            <div>
+              <h2>Customer reviews</h2>
+              <p>View comments on products and delete inappropriate reviews.</p>
+            </div>
+            <button class="button ghost dark" type="button" id="reloadReviews">Refresh</button>
+          </div>
+          <div class="admin-reviews-list" id="adminReviewsList"></div>
+          <div class="summary-empty" id="adminReviewsEmpty" hidden>No reviews yet.</div>
+          <p class="form-note" id="adminReviewsNote" role="status" aria-live="polite"></p>
+        </div>
+      </section>
+    </main>
+
+    <script src="products.js"></script>
+    <script src="session-nav.js"></script>
+    <script src="admin.js"></script>
+  </body>
+</html>

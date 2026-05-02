@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Product | NITKA Atelier</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <header class="topbar checkout-topbar" aria-label="Product navigation">
+      <a class="brand" href="index.html" aria-label="NITKA Atelier">
+        <span class="brand-mark">N</span>
+        <span>NITKA Atelier</span>
+      </a>
+      <nav class="nav-links" aria-label="Sections">
+        <a href="index.html#catalog">Catalog</a>
+        <a href="index.html#custom">Embroidery</a>
+        <a href="checkout.html">Checkout</a>
+      </nav>
+      <div class="top-actions">
+        <a class="account-pill login-link" href="auth.html" hidden>Login</a>
+        <a class="account-pill cabinet-link" href="account.html" hidden>Cabinet</a>
+        <a class="account-pill admin-link" href="admin.html" hidden>Owner</a>
+        <a class="account-pill" href="checkout.html" id="productCartLink">Cart 0</a>
+        <button class="account-pill as-button logout-button" type="button" hidden>Logout</button>
+      </div>
+    </header>
+
+    <main class="product-page">
+      <a class="back-link" href="index.html#catalog">Back to catalog</a>
+
+      <section class="product-page-layout" id="productContent" hidden>
+        <div class="product-gallery">
+          <button class="product-photo-main" id="mainPhoto" type="button" aria-label="Enlarge photo">
+            <span id="zoomHint">Click to enlarge</span>
+          </button>
+          <div class="carousel-controls" aria-label="Photo carousel">
+            <button class="icon-button" type="button" id="prevPhoto" aria-label="Previous photo">
+              <svg aria-hidden="true" viewBox="0 0 24 24">
+                <path d="M15 6l-6 6 6 6" />
+              </svg>
+            </button>
+            <button class="icon-button" type="button" id="nextPhoto" aria-label="Next photo">
+              <svg aria-hidden="true" viewBox="0 0 24 24">
+                <path d="M9 6l6 6-6 6" />
+              </svg>
+            </button>
+          </div>
+          <div class="thumbnail-row" id="thumbnailRow" aria-label="Product thumbnails"></div>
+        </div>
+
+        <div class="product-page-info">
+          <p class="eyebrow" id="productBadge">product</p>
+          <h1 id="productTitle">Product title</h1>
+          <p id="productDescription"></p>
+          <strong class="product-page-price" id="productPrice"></strong>
+          <div class="stock-pill product-stock" id="productStock">Checking availability</div>
+
+          <fieldset class="option-group">
+            <legend>Size</legend>
+            <div class="choice-row" id="productSizeChoices"></div>
+          </fieldset>
+
+          <fieldset class="option-group">
+            <legend>Color</legend>
+            <div class="color-choice-row" id="productColorChoices"></div>
+          </fieldset>
+
+          <div class="quantity-selector" aria-label="Product quantity">
+            <button class="icon-button" type="button" id="quantityMinus" aria-label="Decrease quantity">-</button>
+            <label>
+              Quantity
+              <input id="productQuantity" type="number" min="1" step="1" value="1" inputmode="numeric" />
+            </label>
+            <button class="icon-button" type="button" id="quantityPlus" aria-label="Increase quantity">+</button>
+          </div>
+
+          <button class="button primary wide" type="button" id="productAdd">Add to cart</button>
+          <p class="form-note" id="productNote" role="status" aria-live="polite"></p>
+        </div>
+      </section>
+
+      <section class="reviews-section" id="reviewsSection" hidden aria-labelledby="reviewsTitle">
+        <div>
+          <p class="eyebrow">customer opinion</p>
+          <h2 id="reviewsTitle">Reviews</h2>
+        </div>
+        <div class="reviews-list" id="reviewsList"></div>
+        <div class="review-empty" id="reviewsEmpty">No reviews yet.</div>
+        <form class="review-form checkout-panel" id="reviewForm" hidden>
+          <label>
+            Rating
+            <select name="rating" required>
+              <option value="5">5 - excellent</option>
+              <option value="4">4 - good</option>
+              <option value="3">3 - normal</option>
+              <option value="2">2 - there are remarks</option>
+              <option value="1">1 - did not fit</option>
+            </select>
+          </label>
+          <label>
+            Review
+            <textarea name="text" rows="3" placeholder="What did you like about the product?" required></textarea>
+          </label>
+          <button class="button primary" type="submit">Leave a review</button>
+        </form>
+        <p class="review-auth-note" id="reviewAuthNote">
+          Only registered customers can leave reviews.
+          <a href="auth.html">Login</a>
+        </p>
+        <p class="form-note" id="reviewNote" role="status" aria-live="polite"></p>
+      </section>
+
+      <section class="checkout-panel" id="productNotFound" hidden>
+        <h1>Product not found</h1>
+        <p>Return to the catalog and select a product from the current collection.</p>
+        <a class="button primary" href="index.html#catalog">To catalog</a>
+      </section>
+    </main>
+
+    <script src="products.js"></script>
+    <script src="session-nav.js"></script>
+    <script src="product.js"></script>
+  </body>
+</html>

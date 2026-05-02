@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Login and registration | NITKA Atelier</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <header class="topbar checkout-topbar" aria-label="Cabinet navigation">
+      <a class="brand" href="index.html" aria-label="NITKA Atelier">
+        <span class="brand-mark">N</span>
+        <span>NITKA Atelier</span>
+      </a>
+      <nav class="nav-links" aria-label="Sections">
+        <a href="index.html#catalog">Catalog</a>
+        <a href="checkout.html">Checkout</a>
+        <a href="index.html">Back to main</a>
+      </nav>
+      <div class="top-actions">
+        <a class="account-pill login-link" href="auth.html" hidden>Login</a>
+        <a class="account-pill cabinet-link" href="account.html" hidden>Cabinet</a>
+        <a class="account-pill admin-link" href="admin.html" hidden>Owner</a>
+        <button class="account-pill as-button logout-button" type="button" hidden>Logout</button>
+      </div>
+    </header>
+
+    <main class="checkout-page">
+      <section class="checkout-hero auth-hero" aria-labelledby="auth-title">
+        <p class="eyebrow">client profile</p>
+        <h1 id="auth-title">Login and registration</h1>
+        <p>Create a cabinet to save delivery address, orders and individual embroidery requests.</p>
+      </section>
+
+      <section class="auth-layout" aria-label="Authorization">
+        <form class="checkout-panel auth-form" id="registerForm">
+          <h2>Registration</h2>
+          <label>
+            Name
+            <input type="text" name="name" autocomplete="name" required />
+          </label>
+          <label>
+            Phone
+            <input type="tel" name="phone" autocomplete="tel" required />
+          </label>
+          <label>
+            Email
+            <input type="email" name="email" autocomplete="email" required />
+          </label>
+          <label>
+            Password
+            <input type="password" name="password" autocomplete="new-password" minlength="6" required />
+          </label>
+          <label>
+            Repeat password
+            <input type="password" name="passwordConfirm" autocomplete="new-password" minlength="6" required />
+          </label>
+          <button class="button primary wide" type="submit">Register</button>
+          <p class="form-note" id="registerNote" role="status" aria-live="polite"></p>
+        </form>
+
+        <form class="checkout-panel auth-form" id="loginForm">
+          <h2>Login</h2>
+          <label>
+            Email
+            <input type="email" name="email" autocomplete="email" required />
+          </label>
+          <label>
+            Password
+            <input type="password" name="password" autocomplete="current-password" required />
+          </label>
+          <button class="button primary wide" type="submit">Login</button>
+          <p class="form-note" id="loginNote" role="status" aria-live="polite"></p>
+        </form>
+      </section>
+    </main>
+
+    <script src="session-nav.js"></script>
+    <script src="auth.js"></script>
+  </body>
+</html>

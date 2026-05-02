@@ -1,0 +1,1282 @@
+const http = require("http");
+const https = require("https");
+const fs = require("fs");
+const path = require("path");
+const crypto = require("crypto");
+
+function loadLocalEnv() {
+  const envPath = path.resolve(__dirname, ".env");
+  if (!fs.existsSync(envPath)) return {};
+
+  return Object.fromEntries(
+    fs
+      .readFileSync(envPath, "utf8")
+      .split(/\r?\n/)
+      .map((line) => line.trim())
+      .filter((line) => line && !line.startsWith("#") && line.includes("="))
+      .map((line) => {
+        const [key, ...valueParts] = line.split("=");
+        const value = valueParts.join("=").trim().replace(/^["']|["']$/g, "");
+        return [key.trim(), value];
+      })
+  );
+}
+
+const localEnv = loadLocalEnv();
+const root = __dirname;
+const port = Number(process.env.PORT) || 8000;
+const adminEmail = process.env.NITKA_ADMIN_EMAIL || localEnv.NITKA_ADMIN_EMAIL || "owner@nitka.local";
+const adminPassword = process.env.NITKA_ADMIN_PASSWORD || localEnv.NITKA_ADMIN_PASSWORD || "owner123";
+const stripeSecretKey = process.env.STRIPE_SECRET_KEY || localEnv.STRIPE_SECRET_KEY || "";
+const stripeCurrency = String(process.env.STRIPE_CURRENCY || localEnv.STRIPE_CURRENCY || "usd").toLowerCase();
+const shippoApiKey = process.env.SHIPPO_API_KEY || localEnv.SHIPPO_API_KEY || "";
+const shippingOrigin = {
+  name: process.env.SHIPPING_FROM_NAME || localEnv.SHIPPING_FROM_NAME || "HOODYBOODY",
+  street1: process.env.SHIPPING_FROM_STREET1 || localEnv.SHIPPING_FROM_STREET1 || "417 Montgomery St",
+  street2: process.env.SHIPPING_FROM_STREET2 || localEnv.SHIPPING_FROM_STREET2 || "5th Floor",
+  city: process.env.SHIPPING_FROM_CITY || localEnv.SHIPPING_FROM_CITY || "San Francisco",
+  state: process.env.SHIPPING_FROM_STATE || localEnv.SHIPPING_FROM_STATE || "CA",
+  zip: process.env.SHIPPING_FROM_ZIP || localEnv.SHIPPING_FROM_ZIP || "94104",
+  country: "US",
+  phone: process.env.SHIPPING_FROM_PHONE || localEnv.SHIPPING_FROM_PHONE || "4153334444",
+  email: process.env.SHIPPING_FROM_EMAIL || localEnv.SHIPPING_FROM_EMAIL || adminEmail
+};
+const defaultInventory = {
+  "linen-jacket": 12,
+  "cotton-hoodie": 18,
+  "denim-shirt": 9,
+  "canvas-tote": 24,
+  "linen-shirt": 14,
+  "soft-bomber": 6
+};
+const productCatalog = [
+  {
+    id: "linen-jacket",
+    title: "Linen Jacket Iris",
+    description: "Loose silhouette, iris embroidery on the front and cuff.",
+    price: 12900
+  },
+  {
+    id: "cotton-hoodie",
+    title: "Hoodie Herbarium",
+    description: "Dense fleece, sage twig and small monogram.",
+    price: 7900
+  },
+  {
+    id: "denim-shirt",
+    title: "Shirt Indigo",
+    description: "Contrast stitches, embroidery on pocket and collar.",
+    price: 9200
+  },
+  {
+    id: "canvas-tote",
+    title: "Shopper Bloom",
+    description: "Dense shopper with botanical motif and initials.",
+    price: 4200
+  },
+  {
+    id: "linen-shirt",
+    title: "Shirt Meadow",
+    description: "Light linen shirt with embroidery along the placket line.",
+    price: 8700
+  },
+  {
+    id: "soft-bomber",
+    title: "Bomber Thread",
+    description: "Soft bomber with large motif on the back to order.",
+    price: 14800
+  }
+];
+const emptyDb = { users: [], sessions: [], orders: [], reviews: [], inventory: {}, inventoryLog: [], pendingStripeOrders: [] };
+const memoryDb = process.env.NITKA_DB_PATH === ":memory:" || process.env.VERCEL ? JSON.parse(JSON.stringify(emptyDb)) : null;
+const dbPath = memoryDb ? "" : path.resolve(root, process.env.NITKA_DB_PATH || "data/db.json");
+const dataDir = memoryDb ? "" : path.dirname(dbPath);
+const sessionCookie = "nitka_session";
+
+const types = {
+  ".html": "text/html; charset=utf-8",
+  ".css": "text/css; charset=utf-8",
+  ".js": "text/javascript; charset=utf-8",
+  ".png": "image/png",
+  ".jpg": "image/jpeg",
+  ".jpeg": "image/jpeg",
+  ".webp": "image/webp",
+  ".svg": "image/svg+xml"
+};
+
+function ensureDb() {
+  if (memoryDb) return;
+  if (!fs.existsSync(dataDir)) fs.mkdirSync(dataDir, { recursive: true });
+  if (!fs.existsSync(dbPath)) {
+    fs.writeFileSync(dbPath, JSON.stringify(emptyDb, null, 2));
+  }
+}
+
+function ensureDbDefaults(db) {
+  let changed = false;
+
+  db.users ||= [];
+  db.sessions ||= [];
+  db.orders ||= [];
+  db.reviews ||= [];
+  db.inventory ||= {};
+  db.inventoryLog ||= [];
+  db.pendingStripeOrders ||= [];
+
+  Object.entries(defaultInventory).forEach(([productId, stock]) => {
+    if (!db.inventory[productId]) {
+      db.inventory[productId] = {
+        stock,
+        updatedAt: new Date().toISOString(),
+        updatedBy: "system"
+      };
+      changed = true;
+    } else if (typeof db.inventory[productId] === "number") {
+      db.inventory[productId] = {
+        stock: db.inventory[productId],
+        updatedAt: new Date().toISOString(),
+        updatedBy: "migration"
+      };
+      changed = true;
+    }
+  });
+
+  const ownerEmail = normalizeEmail(adminEmail);
+  const owner = db.users.find((user) => user.email === ownerEmail);
+
+  if (owner) {
+    if (owner.role !== "admin") {
+      owner.role = "admin";
+      changed = true;
+    }
+  } else {
+    const salt = crypto.randomBytes(16).toString("hex");
+    db.users.push({
+      id: crypto.randomUUID(),
+      name: "Store Owner",
+      phone: "",
+      email: ownerEmail,
+      role: "admin",
+      passwordSalt: salt,
+      passwordHash: hashPassword(adminPassword, salt),
+      address: {},
+      createdAt: new Date().toISOString()
+    });
+    changed = true;
+  }
+
+  db.users.forEach((user) => {
+    if (!user.role) {
+      user.role = user.email === ownerEmail ? "admin" : "customer";
+      changed = true;
+    }
+  });
+
+  return changed;
+}
+
+function readDb() {
+  if (memoryDb) {
+    ensureDbDefaults(memoryDb);
+    return JSON.parse(JSON.stringify(memoryDb));
+  }
+  ensureDb();
+  const db = JSON.parse(fs.readFileSync(dbPath, "utf8"));
+  if (ensureDbDefaults(db)) {
+    fs.writeFileSync(dbPath, JSON.stringify(db, null, 2));
+  }
+  return db;
+}
+
+function writeDb(db) {
+  ensureDbDefaults(db);
+
+  if (memoryDb) {
+    memoryDb.users = db.users;
+    memoryDb.sessions = db.sessions;
+    memoryDb.orders = db.orders;
+    memoryDb.reviews = db.reviews;
+    memoryDb.inventory = db.inventory;
+    memoryDb.inventoryLog = db.inventoryLog;
+    memoryDb.pendingStripeOrders = db.pendingStripeOrders;
+    return;
+  }
+
+  ensureDb();
+  fs.writeFileSync(dbPath, JSON.stringify(db, null, 2));
+}
+
+function sendJson(res, status, payload, headers = {}) {
+  res.writeHead(status, {
+    "Content-Type": "application/json; charset=utf-8",
+    ...headers
+  });
+  res.end(JSON.stringify(payload));
+}
+
+function parseCookies(req) {
+  return Object.fromEntries(
+    (req.headers.cookie || "")
+      .split(";")
+      .map((item) => item.trim())
+      .filter(Boolean)
+      .map((item) => {
+        const [key, ...value] = item.split("=");
+        return [key, decodeURIComponent(value.join("="))];
+      })
+  );
+}
+
+function readJson(req) {
+  return new Promise((resolve, reject) => {
+    let body = "";
+
+    req.on("data", (chunk) => {
+      body += chunk;
+      if (body.length > 1_000_000) {
+        reject(new Error("Request body too large"));
+        req.destroy();
+      }
+    });
+
+    req.on("end", () => {
+      if (!body) {
+        resolve({});
+        return;
+      }
+
+      try {
+        resolve(JSON.parse(body));
+      } catch {
+        reject(new Error("Invalid JSON"));
+      }
+    });
+  });
+}
+
+function publicUser(user) {
+  if (!user) return null;
+
+  return {
+    id: user.id,
+    name: user.name,
+    email: user.email,
+    phone: user.phone,
+    role: user.role || "customer",
+    address: user.address || {},
+    createdAt: user.createdAt
+  };
+}
+
+function normalizeEmail(email) {
+  return String(email || "").trim().toLowerCase();
+}
+
+function hashPassword(password, salt) {
+  return crypto.scryptSync(password, salt, 64).toString("hex");
+}
+
+function makeSession(db, userId) {
+  const token = crypto.randomBytes(32).toString("hex");
+  const expiresAt = Date.now() + 1000 * 60 * 60 * 24 * 7;
+  db.sessions = db.sessions.filter((session) => session.expiresAt > Date.now());
+  db.sessions.push({ token, userId, expiresAt });
+  return token;
+}
+
+function sessionHeader(token) {
+  return {
+    "Set-Cookie": `${sessionCookie}=${encodeURIComponent(token)}; HttpOnly; SameSite=Lax; Path=/; Max-Age=604800`
+  };
+}
+
+function clearSessionHeader() {
+  return {
+    "Set-Cookie": `${sessionCookie}=; HttpOnly; SameSite=Lax; Path=/; Max-Age=0`
+  };
+}
+
+function getSessionUser(req, db) {
+  const token = parseCookies(req)[sessionCookie];
+  if (!token) return null;
+
+  const session = db.sessions.find((item) => item.token === token && item.expiresAt > Date.now());
+  if (!session) return null;
+
+  return db.users.find((user) => user.id === session.userId) || null;
+}
+
+function getOrderNumber() {
+  const stamp = new Date().toISOString().slice(0, 10).replaceAll("-", "");
+  return `NITKA-${stamp}-${crypto.randomBytes(2).toString("hex").toUpperCase()}`;
+}
+
+function getTrackingInfo(deliveryType) {
+  if (deliveryType === "pickup") {
+    return {
+      company: "Store pickup",
+      number: "",
+      url: "",
+      status: "Ready for pickup"
+    };
+  }
+
+  const number = `CDEK-${crypto.randomInt(100000000, 999999999)}`;
+
+  return {
+    company: "CDEK",
+    number,
+    url: `https://www.cdek.ru/ru/tracking?order_id=${encodeURIComponent(number)}`,
+    status: "Shipped"
+  };
+}
+
+function publicReview(review) {
+  if (!review) return null;
+
+  return {
+    id: review.id,
+    productId: review.productId,
+    userName: review.userName,
+    rating: review.rating,
+    text: review.text,
+    createdAt: review.createdAt
+  };
+}
+
+function getReviewSummary(reviews) {
+  const summary = {};
+
+  reviews.forEach((review) => {
+    if (!review.productId) return;
+
+    summary[review.productId] ||= { count: 0, total: 0, average: 0 };
+    summary[review.productId].count += 1;
+    summary[review.productId].total += Number(review.rating) || 0;
+  });
+
+  Object.values(summary).forEach((item) => {
+    item.average = item.count ? Number((item.total / item.count).toFixed(1)) : 0;
+    delete item.total;
+  });
+
+  return summary;
+}
+
+function isAdmin(user) {
+  return user?.role === "admin";
+}
+
+function publicInventory(inventory) {
+  return Object.fromEntries(
+    Object.entries(inventory || {}).map(([productId, item]) => {
+      const stock = typeof item === "number" ? item : item.stock;
+
+      return [
+        productId,
+        {
+          stock: Math.max(0, Number(stock) || 0),
+          updatedAt: item.updatedAt || "",
+          updatedBy: item.updatedBy || ""
+        }
+      ];
+    })
+  );
+}
+
+function getProduct(productId) {
+  return productCatalog.find((product) => product.id === productId) || null;
+}
+
+function getStripeUnitAmount(price) {
+  return Math.round(Number(price) || 0);
+}
+
+function getRequestOrigin(req) {
+  const proto = req.headers["x-forwarded-proto"] || "http";
+  return req.headers.origin || `${proto}://${req.headers.host}`;
+}
+
+function createStripeCheckoutSession(params) {
+  const payload = params.toString();
+
+  return new Promise((resolve, reject) => {
+    const stripeReq = https.request(
+      {
+        hostname: "api.stripe.com",
+        path: "/v1/checkout/sessions",
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${stripeSecretKey}`,
+          "Content-Type": "application/x-www-form-urlencoded",
+          "Content-Length": Buffer.byteLength(payload)
+        }
+      },
+      (stripeRes) => {
+        let body = "";
+
+        stripeRes.on("data", (chunk) => {
+          body += chunk;
+        });
+
+        stripeRes.on("end", () => {
+          const data = JSON.parse(body || "{}");
+
+          if (stripeRes.statusCode >= 200 && stripeRes.statusCode < 300) {
+            resolve(data);
+            return;
+          }
+
+          reject(new Error(data.error?.message || "Stripe could not create a payment session."));
+        });
+      }
+    );
+
+    stripeReq.on("error", reject);
+    stripeReq.write(payload);
+    stripeReq.end();
+  });
+}
+
+function getStripeCheckoutSession(sessionId) {
+  return new Promise((resolve, reject) => {
+    const stripeReq = https.request(
+      {
+        hostname: "api.stripe.com",
+        path: `/v1/checkout/sessions/${encodeURIComponent(sessionId)}`,
+        method: "GET",
+        headers: {
+          Authorization: `Bearer ${stripeSecretKey}`
+        }
+      },
+      (stripeRes) => {
+        let body = "";
+
+        stripeRes.on("data", (chunk) => {
+          body += chunk;
+        });
+
+        stripeRes.on("end", () => {
+          const data = JSON.parse(body || "{}");
+
+          if (stripeRes.statusCode >= 200 && stripeRes.statusCode < 300) {
+            resolve(data);
+            return;
+          }
+
+          reject(new Error(data.error?.message || "Stripe could not verify the payment session."));
+        });
+      }
+    );
+
+    stripeReq.on("error", reject);
+    stripeReq.end();
+  });
+}
+
+function shippoRequest(method, apiPath, payload = null) {
+  const body = payload ? JSON.stringify(payload) : "";
+
+  return new Promise((resolve, reject) => {
+    const shippoReq = https.request(
+      {
+        hostname: "api.goshippo.com",
+        path: apiPath,
+        method,
+        headers: {
+          Authorization: `ShippoToken ${shippoApiKey}`,
+          "Content-Type": "application/json",
+          "SHIPPO-API-VERSION": "2018-02-08",
+          ...(body ? { "Content-Length": Buffer.byteLength(body) } : {})
+        }
+      },
+      (shippoRes) => {
+        let responseBody = "";
+
+        shippoRes.on("data", (chunk) => {
+          responseBody += chunk;
+        });
+
+        shippoRes.on("end", () => {
+          const data = JSON.parse(responseBody || "{}");
+
+          if (shippoRes.statusCode >= 200 && shippoRes.statusCode < 300) {
+            resolve(data);
+            return;
+          }
+
+          reject(new Error(data.detail || data.message || data.error?.message || "Shippo could not calculate delivery."));
+        });
+      }
+    );
+
+    shippoReq.on("error", reject);
+    if (body) shippoReq.write(body);
+    shippoReq.end();
+  });
+}
+
+function getCartProductIdForShipping(item) {
+  return getCartProductId(item, Object.fromEntries(productCatalog.map((product) => [product.id, true])));
+}
+
+function getParcelForItems(items) {
+  const quantity = items.reduce((sum, item) => sum + Math.max(1, Number(item.quantity) || 1), 0);
+  const weight = items.reduce((sum, item) => {
+    const productId = getCartProductIdForShipping(item);
+    const baseWeight = productId === "canvas-tote" ? 10 : productId ? 18 : 16;
+    return sum + baseWeight * Math.max(1, Number(item.quantity) || 1);
+  }, 0);
+
+  return {
+    length: 15,
+    width: 12,
+    height: Math.min(12, Math.max(3, 2 + quantity)),
+    weight: Math.max(1, weight)
+  };
+}
+
+function publicShippoRates(data) {
+  const rates = data.results || data.rates || [];
+
+  return rates
+    .filter((rate) => String(rate.currency || "").toUpperCase() === "USD")
+    .map((rate) => ({
+      id: rate.object_id,
+      shipmentId: data.object_id || rate.shipment,
+      carrier: rate.provider,
+      service: rate.servicelevel?.name || rate.servicelevel?.token || "Shipping",
+      price: Math.round(Number(rate.amount || 0) * 100),
+      currency: rate.currency,
+      deliveryDays: rate.estimated_days || null
+    }))
+    .filter((rate) => rate.price >= 0)
+    .sort((a, b) => a.price - b.price);
+}
+
+async function createShippoShipment(body) {
+  if (!shippoApiKey) {
+    throw new Error("Shippo is not configured. Set SHIPPO_API_KEY before starting the server.");
+  }
+
+  const destination = body.destination || {};
+  const items = Array.isArray(body.items) ? body.items : [];
+  const street1 = String(destination.address || "").trim();
+  const city = String(destination.city || "").trim();
+  const state = String(destination.state || "").trim().toUpperCase();
+  const zip = String(destination.zip || "").trim();
+
+  if (!items.length) throw new Error("The cart is empty.");
+  if (!street1 || !city || !state || !zip) {
+    throw new Error("Enter a complete US delivery address before calculating shipping.");
+  }
+
+  const parcel = getParcelForItems(items);
+
+  return shippoRequest("POST", "/shipments/", {
+    address_to: {
+      name: String(destination.name || "Customer").trim(),
+      street1,
+      street2: String(destination.apartment || "").trim(),
+      city,
+      state,
+      zip,
+      country: "US",
+      phone: String(destination.phone || "").trim(),
+      email: String(destination.email || "").trim()
+    },
+    address_from: {
+      name: shippingOrigin.name,
+      street1: shippingOrigin.street1,
+      street2: shippingOrigin.street2,
+      city: shippingOrigin.city,
+      state: shippingOrigin.state,
+      zip: shippingOrigin.zip,
+      country: shippingOrigin.country,
+      phone: shippingOrigin.phone,
+      email: shippingOrigin.email
+    },
+    parcels: [
+      {
+        length: String(parcel.length),
+        width: String(parcel.width),
+        height: String(parcel.height),
+        distance_unit: "in",
+        weight: String(Math.max(1, Math.round(parcel.weight / 16))),
+        mass_unit: "lb"
+      }
+    ],
+    async: false
+  });
+}
+
+async function normalizeCheckoutBody(body) {
+  const normalized = {
+    ...body,
+    delivery: { ...(body.delivery || {}) },
+    totals: { ...(body.totals || {}) }
+  };
+  const subtotal = Array.isArray(normalized.items)
+    ? normalized.items.reduce((sum, item) => sum + Math.round(Number(item.price) || 0) * Math.max(1, Number(item.quantity) || 1), 0)
+    : 0;
+
+  let deliveryPrice = Math.max(0, Math.round(Number(normalized.delivery.price) || 0));
+  if (normalized.delivery.type === "shipping") {
+    if (!shippoApiKey) {
+      throw new Error("Shippo is not configured. Set SHIPPO_API_KEY before starting the server.");
+    }
+
+    const shipmentId = String(normalized.delivery.shippoShipmentId || normalized.delivery.easyPostShipmentId || "").trim();
+    const rateId = String(normalized.delivery.shippoRateId || normalized.delivery.easyPostRateId || "").trim();
+    if (!shipmentId || !rateId) {
+      throw new Error("Select a shipping rate before checkout.");
+    }
+
+    const shipmentRates = await shippoRequest("GET", `/shipments/${encodeURIComponent(shipmentId)}/rates/USD`);
+    const selectedRate = publicShippoRates(shipmentRates).find((rate) => rate.id === rateId);
+    if (!selectedRate) {
+      throw new Error("Selected Shippo shipping rate is no longer available.");
+    }
+
+    deliveryPrice = selectedRate.price;
+    normalized.delivery = {
+      ...normalized.delivery,
+      price: selectedRate.price,
+      carrier: selectedRate.carrier,
+      service: selectedRate.service,
+      deliveryDays: selectedRate.deliveryDays,
+      shippoShipmentId: shipmentId,
+      shippoRateId: rateId
+    };
+  }
+
+  normalized.totals = {
+    subtotal,
+    delivery: deliveryPrice,
+    total: subtotal + deliveryPrice
+  };
+
+  return normalized;
+}
+
+function getCartProductId(item, inventory) {
+  if (item.productId && inventory[item.productId]) return item.productId;
+  if (item.baseProductId && inventory[item.baseProductId]) return item.baseProductId;
+  if (item.id && inventory[item.id]) return item.id;
+
+  return Object.keys(inventory)
+    .sort((a, b) => b.length - a.length)
+    .find((productId) => String(item.id || "").startsWith(`${productId}-`));
+}
+
+function getStockStatus(stock) {
+  if (stock <= 0) return "out";
+  if (stock <= 5) return "low";
+  return "in";
+}
+
+function createOrderFromPayload(db, user, body, overrides = {}) {
+  const items = Array.isArray(body.items) ? body.items : [];
+
+  if (!items.length) {
+    return { status: 400, message: "The cart is empty." };
+  }
+
+  const requestedInventory = {};
+  items.forEach((item) => {
+    const productId = getCartProductId(item, db.inventory);
+    if (!productId) return;
+    requestedInventory[productId] ||= 0;
+    requestedInventory[productId] += Math.max(0, Number(item.quantity) || 0);
+  });
+
+  const shortage = Object.entries(requestedInventory).find(([productId, quantity]) => {
+    const stock = Number(db.inventory[productId]?.stock) || 0;
+    return quantity > stock;
+  });
+
+  if (shortage) {
+    const [productId, quantity] = shortage;
+    const stock = Number(db.inventory[productId]?.stock) || 0;
+    return {
+      status: 409,
+      message: `Not enough stock available: ${productId}. with ${quantity} in cart, ${stock} available.`
+    };
+  }
+
+  const delivery = body.delivery || {};
+  const paymentType = String(body.payment?.type || "").trim();
+  const isDeferredPayment = paymentType === "invoice" || paymentType === "sbp";
+  const orderStatus = overrides.status || (isDeferredPayment ? "Awaiting payment" : "Paid");
+  const paidAt = overrides.paidAt ?? (isDeferredPayment ? "" : new Date().toISOString());
+  const shouldDecrementStock = overrides.decrementStock ?? orderStatus === "Paid";
+  const tracking = getTrackingInfo(delivery.type);
+
+  const order = {
+    id: crypto.randomUUID(),
+    number: getOrderNumber(),
+    userId: user?.id || "",
+    items,
+    customer: body.customer || {},
+    delivery: {
+      ...delivery,
+      tracking
+    },
+    payment: {
+      ...(body.payment || {}),
+      ...(overrides.payment || {}),
+      status: orderStatus,
+      paidAt
+    },
+    totals: body.totals || {},
+    status: orderStatus,
+    createdAt: new Date().toISOString()
+  };
+
+  if (shouldDecrementStock) {
+    Object.entries(requestedInventory).forEach(([productId, quantity]) => {
+      db.inventory[productId].stock = Math.max(0, (Number(db.inventory[productId].stock) || 0) - quantity);
+      db.inventory[productId].updatedAt = new Date().toISOString();
+      db.inventory[productId].updatedBy = `order:${order.id}`;
+    });
+  }
+
+  db.orders.push(order);
+  return { order };
+}
+
+async function handleApi(req, res) {
+  const db = readDb();
+  const method = req.method;
+  const url = new URL(req.url, `http://${req.headers.host}`);
+
+  try {
+    if (url.pathname === "/api/register" && method === "POST") {
+      const body = await readJson(req);
+      const name = String(body.name || "").trim();
+      const phone = String(body.phone || "").trim();
+      const email = normalizeEmail(body.email);
+      const password = String(body.password || "");
+
+      if (!name || !phone || !email || password.length < 6) {
+        sendJson(res, 400, { message: "Please provide name, phone, email, and a password of at least 6 characters." });
+        return;
+      }
+
+      if (db.users.some((user) => user.email === email)) {
+        sendJson(res, 409, { message: "A customer with this email is already registered." });
+        return;
+      }
+
+      const salt = crypto.randomBytes(16).toString("hex");
+      const user = {
+        id: crypto.randomUUID(),
+        name,
+        phone,
+        email,
+        role: email === normalizeEmail(adminEmail) ? "admin" : "customer",
+        passwordSalt: salt,
+        passwordHash: hashPassword(password, salt),
+        address: {},
+        createdAt: new Date().toISOString()
+      };
+
+      db.users.push(user);
+      const token = makeSession(db, user.id);
+      writeDb(db);
+      sendJson(res, 201, { user: publicUser(user) }, sessionHeader(token));
+      return;
+    }
+
+    if (url.pathname === "/api/login" && method === "POST") {
+      const body = await readJson(req);
+      const email = normalizeEmail(body.email);
+      const password = String(body.password || "");
+      const user = db.users.find((item) => item.email === email);
+
+      if (!user || hashPassword(password, user.passwordSalt) !== user.passwordHash) {
+        sendJson(res, 401, { message: "Incorrect email or password." });
+        return;
+      }
+
+      const token = makeSession(db, user.id);
+      writeDb(db);
+      sendJson(res, 200, { user: publicUser(user) }, sessionHeader(token));
+      return;
+    }
+
+    if (url.pathname === "/api/logout" && method === "POST") {
+      const token = parseCookies(req)[sessionCookie];
+      db.sessions = db.sessions.filter((session) => session.token !== token);
+      writeDb(db);
+      sendJson(res, 200, { ok: true }, clearSessionHeader());
+      return;
+    }
+
+    if (url.pathname === "/api/me" && method === "GET") {
+      const user = getSessionUser(req, db);
+      if (!user) {
+        sendJson(res, 401, { message: "You must be logged in." });
+        return;
+      }
+
+      sendJson(res, 200, { user: publicUser(user) });
+      return;
+    }
+
+    if (url.pathname === "/api/session" && method === "GET") {
+      const user = getSessionUser(req, db);
+      sendJson(res, 200, { user: publicUser(user) });
+      return;
+    }
+
+    if (url.pathname === "/api/inventory" && method === "GET") {
+      sendJson(res, 200, { inventory: publicInventory(db.inventory) });
+      return;
+    }
+
+    if (url.pathname === "/api/shipping/rates" && method === "POST") {
+      const body = await readJson(req);
+      const shipment = await createShippoShipment(body);
+      const rates = publicShippoRates(shipment);
+
+      if (!rates.length) {
+        sendJson(res, 404, { message: "No Shippo shipping rates are available for this address." });
+        return;
+      }
+
+      sendJson(res, 200, { shipmentId: shipment.id, rates });
+      return;
+    }
+
+    if (url.pathname === "/api/stripe/checkout" && method === "POST") {
+      if (!stripeSecretKey) {
+        sendJson(res, 501, {
+          message: "Stripe is not configured. Set STRIPE_SECRET_KEY before starting the server."
+        });
+        return;
+      }
+
+      const body = await normalizeCheckoutBody(await readJson(req));
+      const items = Array.isArray(body.items) ? body.items : [];
+
+      if (!items.length) {
+        sendJson(res, 400, { message: "The cart is empty." });
+        return;
+      }
+
+      const origin = getRequestOrigin(req);
+      const params = new URLSearchParams();
+      params.append("mode", "payment");
+      params.append("success_url", `${origin}/checkout.html?stripe=success&session_id={CHECKOUT_SESSION_ID}`);
+      params.append("cancel_url", `${origin}/checkout.html?stripe=cancel`);
+      if (body.customer?.email) {
+        params.append("customer_email", String(body.customer.email));
+      }
+      params.append("phone_number_collection[enabled]", "true");
+      params.append("billing_address_collection", "required");
+
+      let lineIndex = 0;
+      const requestedInventory = {};
+
+      for (const item of items) {
+        const productId = getCartProductId(item, db.inventory);
+        const product = getProduct(productId);
+        const quantity = Math.max(1, Math.floor(Number(item.quantity) || 1));
+
+        if (!product) continue;
+
+        requestedInventory[productId] ||= 0;
+        requestedInventory[productId] += quantity;
+
+        params.append(`line_items[${lineIndex}][quantity]`, String(quantity));
+        params.append(`line_items[${lineIndex}][price_data][currency]`, stripeCurrency);
+        params.append(`line_items[${lineIndex}][price_data][unit_amount]`, String(getStripeUnitAmount(product.price)));
+        params.append(`line_items[${lineIndex}][price_data][product_data][name]`, product.title);
+        params.append(
+          `line_items[${lineIndex}][price_data][product_data][description]`,
+          item.description ? `${product.description} · ${item.description}` : product.description
+        );
+        lineIndex += 1;
+      }
+
+      if (!lineIndex) {
+        sendJson(res, 400, { message: "There are no items in the cart available for Stripe payment." });
+        return;
+      }
+
+      const deliveryPrice = Math.max(0, Math.round(Number(body.delivery?.price) || 0));
+      if (deliveryPrice > 0) {
+        params.append(`line_items[${lineIndex}][quantity]`, "1");
+        params.append(`line_items[${lineIndex}][price_data][currency]`, stripeCurrency);
+        params.append(`line_items[${lineIndex}][price_data][unit_amount]`, String(getStripeUnitAmount(deliveryPrice)));
+        params.append(`line_items[${lineIndex}][price_data][product_data][name]`, "Delivery");
+        params.append(`line_items[${lineIndex}][price_data][product_data][description]`, String(body.delivery?.type || "Delivery"));
+      }
+
+      const shortage = Object.entries(requestedInventory).find(([productId, quantity]) => {
+        const stock = Number(db.inventory[productId]?.stock) || 0;
+        return quantity > stock;
+      });
+
+      if (shortage) {
+        const [productId, quantity] = shortage;
+        const stock = Number(db.inventory[productId]?.stock) || 0;
+        sendJson(res, 409, { message: `Not enough stock available: ${productId}. with ${quantity} in cart, ${stock} available.` });
+        return;
+      }
+
+      params.append("metadata[source]", "cart");
+      params.append("metadata[customer_name]", String(body.customer?.name || ""));
+      params.append("metadata[customer_phone]", String(body.customer?.phone || ""));
+      params.append("metadata[delivery_type]", String(body.delivery?.type || ""));
+      params.append("metadata[delivery_city]", String(body.delivery?.city || ""));
+      params.append("metadata[delivery_zip]", String(body.delivery?.zip || ""));
+      params.append("metadata[delivery_address]", String(body.delivery?.address || ""));
+      params.append("metadata[total]", String(body.totals?.total || ""));
+
+      const session = await createStripeCheckoutSession(params);
+      const user = getSessionUser(req, db);
+      db.pendingStripeOrders = (db.pendingStripeOrders || []).filter((item) => {
+        return !item.createdAt || Date.now() - new Date(item.createdAt).getTime() < 1000 * 60 * 60 * 24;
+      });
+      db.pendingStripeOrders.push({
+        sessionId: session.id,
+        userId: user?.id || "",
+        payload: body,
+        createdAt: new Date().toISOString()
+      });
+      writeDb(db);
+      sendJson(res, 200, { id: session.id, url: session.url });
+      return;
+    }
+
+    if (url.pathname === "/api/stripe/complete" && method === "POST") {
+      if (!stripeSecretKey) {
+        sendJson(res, 501, {
+          message: "Stripe is not configured. Set STRIPE_SECRET_KEY before starting the server."
+        });
+        return;
+      }
+
+      const body = await readJson(req);
+      const sessionId = String(body.sessionId || "").trim();
+      const pending = db.pendingStripeOrders.find((item) => item.sessionId === sessionId);
+
+      if (!sessionId || !pending) {
+        sendJson(res, 404, { message: "Payment session was not found." });
+        return;
+      }
+
+      const existingOrder = db.orders.find((order) => order.payment?.stripeSessionId === sessionId);
+      if (existingOrder) {
+        sendJson(res, 200, { order: existingOrder });
+        return;
+      }
+
+      const stripeSession = await getStripeCheckoutSession(sessionId);
+      if (stripeSession.payment_status !== "paid") {
+        sendJson(res, 409, { message: "Stripe payment is not completed yet." });
+        return;
+      }
+
+      const user = db.users.find((item) => item.id === pending.userId) || null;
+      const result = createOrderFromPayload(db, user, pending.payload, {
+        status: "Paid",
+        paidAt: new Date().toISOString(),
+        payment: {
+          provider: "stripe",
+          stripeSessionId: sessionId
+        }
+      });
+
+      if (!result.order) {
+        sendJson(res, result.status, { message: result.message });
+        return;
+      }
+
+      db.pendingStripeOrders = db.pendingStripeOrders.filter((item) => item.sessionId !== sessionId);
+      writeDb(db);
+      sendJson(res, 201, { order: result.order });
+      return;
+    }
+
+    if (url.pathname === "/api/stripe/config" && method === "GET") {
+      sendJson(res, 200, { currency: stripeCurrency, configured: Boolean(stripeSecretKey) });
+      return;
+    }
+
+    if (url.pathname === "/api/admin/inventory" && method === "GET") {
+      const user = getSessionUser(req, db);
+      if (!user) {
+        sendJson(res, 401, { message: "You must be logged in as the store owner." });
+        return;
+      }
+
+      if (!isAdmin(user)) {
+        sendJson(res, 403, { message: "This page is only available to the store owner." });
+        return;
+      }
+
+      sendJson(res, 200, { inventory: publicInventory(db.inventory), user: publicUser(user) });
+      return;
+    }
+
+    if (url.pathname === "/api/admin/inventory" && method === "PATCH") {
+      const user = getSessionUser(req, db);
+      if (!user) {
+        sendJson(res, 401, { message: "You must be logged in as the store owner." });
+        return;
+      }
+
+      if (!isAdmin(user)) {
+        sendJson(res, 403, { message: "Only the store owner can update inventory levels." });
+        return;
+      }
+
+      const body = await readJson(req);
+      const productId = String(body.productId || "").trim();
+      const stock = Number(body.stock);
+
+      if (!db.inventory[productId] || !Number.isInteger(stock) || stock < 0) {
+        sendJson(res, 400, { message: "Select a product and enter a stock level as an integer from 0." });
+        return;
+      }
+
+      const previousStock = Number(db.inventory[productId].stock) || 0;
+      db.inventory[productId] = {
+        stock,
+        updatedAt: new Date().toISOString(),
+        updatedBy: user.id
+      };
+      db.inventoryLog.push({
+        id: crypto.randomUUID(),
+        productId,
+        previousStock,
+        stock,
+        delta: stock - previousStock,
+        userId: user.id,
+        userName: user.name,
+        createdAt: new Date().toISOString()
+      });
+
+      writeDb(db);
+      sendJson(res, 200, { inventory: publicInventory(db.inventory)[productId] });
+      return;
+    }
+
+    if (url.pathname === "/api/admin/reviews" && method === "GET") {
+      const user = getSessionUser(req, db);
+      if (!user) {
+        sendJson(res, 401, { message: "You must be logged in as the store owner." });
+        return;
+      }
+
+      if (!isAdmin(user)) {
+        sendJson(res, 403, { message: "Only the store owner can delete reviews." });
+        return;
+      }
+
+      const reviews = db.reviews
+        .slice()
+        .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
+        .map(publicReview);
+      sendJson(res, 200, { reviews });
+      return;
+    }
+
+    if (url.pathname === "/api/admin/reviews" && method === "DELETE") {
+      const user = getSessionUser(req, db);
+      if (!user) {
+        sendJson(res, 401, { message: "You must be logged in as the store owner." });
+        return;
+      }
+
+      if (!isAdmin(user)) {
+        sendJson(res, 403, { message: "Only the store owner can delete reviews." });
+        return;
+      }
+
+      const body = await readJson(req);
+      const reviewId = String(body.reviewId || "").trim();
+      const reviewIndex = db.reviews.findIndex((review) => review.id === reviewId);
+
+      if (reviewIndex === -1) {
+        sendJson(res, 404, { message: "Review not found." });
+        return;
+      }
+
+      const [review] = db.reviews.splice(reviewIndex, 1);
+      writeDb(db);
+      sendJson(res, 200, { ok: true, review: publicReview(review) });
+      return;
+    }
+
+    if (url.pathname === "/api/profile" && method === "PATCH") {
+      const user = getSessionUser(req, db);
+      if (!user) {
+        sendJson(res, 401, { message: "You must be logged in." });
+        return;
+      }
+
+      const body = await readJson(req);
+      user.name = String(body.name || user.name).trim();
+      user.phone = String(body.phone || user.phone).trim();
+      user.address = {
+        city: String(body.city || "").trim(),
+        state: String(body.state || "").trim().toUpperCase(),
+        zip: String(body.zip || "").trim(),
+        address: String(body.address || "").trim(),
+        apartment: String(body.apartment || "").trim(),
+        entrance: String(body.entrance || "").trim()
+      };
+
+      writeDb(db);
+      sendJson(res, 200, { user: publicUser(user) });
+      return;
+    }
+
+    if (url.pathname === "/api/orders" && method === "GET") {
+      const user = getSessionUser(req, db);
+      if (!user) {
+        sendJson(res, 401, { message: "You must be logged in." });
+        return;
+      }
+
+      const orders = db.orders
+        .filter((order) => order.userId === user.id)
+        .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+      sendJson(res, 200, { orders });
+      return;
+    }
+
+    if (url.pathname === "/api/orders" && method === "POST") {
+      const user = getSessionUser(req, db);
+      if (!user) {
+        sendJson(res, 401, { message: "Please log in or register to place an order." });
+        return;
+      }
+
+      const body = await normalizeCheckoutBody(await readJson(req));
+      const result = createOrderFromPayload(db, user, body);
+
+      if (!result.order) {
+        sendJson(res, result.status, { message: result.message });
+        return;
+      }
+
+      writeDb(db);
+      sendJson(res, 201, { order: result.order });
+      return;
+    }
+
+    if (url.pathname === "/api/reviews/summary" && method === "GET") {
+      sendJson(res, 200, { summary: getReviewSummary(db.reviews) });
+      return;
+    }
+
+    if (url.pathname === "/api/reviews" && method === "GET") {
+      const user = getSessionUser(req, db);
+      const productId = String(url.searchParams.get("productId") || "").trim();
+      const reviews = db.reviews
+        .filter((review) => !productId || review.productId === productId)
+        .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+      const userReview = productId && user ? reviews.find((review) => review.userId === user.id) : null;
+
+      sendJson(res, 200, {
+        reviews: reviews.map(publicReview),
+        summary: productId ? getReviewSummary(reviews)[productId] || { count: 0, average: 0 } : getReviewSummary(reviews),
+        userHasReviewed: Boolean(userReview),
+        userReview: publicReview(userReview)
+      });
+      return;
+    }
+
+    if (url.pathname === "/api/reviews" && method === "POST") {
+      const user = getSessionUser(req, db);
+      if (!user) {
+        sendJson(res, 401, { message: "Only registered customers can post reviews." });
+        return;
+      }
+
+      const body = await readJson(req);
+      const productId = String(body.productId || "").trim();
+      const text = String(body.text || "").trim();
+      const rating = Number(body.rating || 0);
+
+      if (!productId || text.length < 3 || rating < 1 || rating > 5) {
+        sendJson(res, 400, { message: "Choose a rating and write a review of at least 3 characters." });
+        return;
+      }
+
+      if (db.reviews.some((review) => review.productId === productId && review.userId === user.id)) {
+        sendJson(res, 409, { message: "You have already reviewed this product." });
+        return;
+      }
+
+      const review = {
+        id: crypto.randomUUID(),
+        productId,
+        userId: user.id,
+        userName: user.name,
+        rating,
+        text,
+        createdAt: new Date().toISOString()
+      };
+
+      db.reviews.push(review);
+      writeDb(db);
+      sendJson(res, 201, { review: publicReview(review) });
+      return;
+    }
+
+    sendJson(res, 404, { message: "API not found." });
+  } catch (error) {
+    sendJson(res, 400, { message: error.message || "Request error." });
+  }
+}
+
+function serveStatic(req, res) {
+  const urlPath = decodeURIComponent(req.url.split("?")[0]);
+  const requestedPath = urlPath === "/" ? "/index.html" : urlPath;
+  const filePath = path.resolve(root, `.${requestedPath}`);
+  const safeRoot = root.endsWith(path.sep) ? root : `${root}${path.sep}`;
+
+  if (filePath !== root && !filePath.startsWith(safeRoot)) {
+    res.writeHead(403);
+    res.end("Forbidden");
+    return;
+  }
+
+  fs.readFile(filePath, (error, content) => {
+    if (error) {
+      res.writeHead(404, { "Content-Type": "text/plain; charset=utf-8" });
+      res.end("File not found");
+      return;
+    }
+
+    const ext = path.extname(filePath).toLowerCase();
+    res.writeHead(200, { "Content-Type": types[ext] || "application/octet-stream" });
+    res.end(content);
+  });
+}
+
+function appHandler(req, res) {
+  if (req.url.startsWith("/api/")) {
+    handleApi(req, res);
+    return;
+  }
+
+  serveStatic(req, res);
+}
+
+const server = http.createServer(appHandler);
+
+if (require.main === module) {
+  server.listen(port, () => {
+    ensureDb();
+    console.log(`Site started: http://localhost:${port}`);
+  });
+}
+
+module.exports = appHandler;

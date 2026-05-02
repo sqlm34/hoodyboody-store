@@ -1,0 +1,221 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Order checkout | NITKA Atelier</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <header class="topbar checkout-topbar" aria-label="Checkout navigation">
+      <a class="brand" href="index.html" aria-label="NITKA Atelier">
+        <span class="brand-mark">N</span>
+        <span>NITKA Atelier</span>
+      </a>
+      <nav class="nav-links" aria-label="Sections">
+        <a href="index.html#catalog">Catalog</a>
+        <a href="index.html#custom">Embroidery</a>
+        <a href="index.html">Back to main</a>
+      </nav>
+      <div class="top-actions">
+        <a class="account-pill login-link" href="auth.html" hidden>Login</a>
+        <a class="account-pill cabinet-link" href="account.html" hidden>Cabinet</a>
+        <a class="account-pill admin-link" href="admin.html" hidden>Owner</a>
+        <button class="account-pill as-button logout-button" type="button" hidden>Logout</button>
+      </div>
+    </header>
+
+    <main class="checkout-page">
+      <section class="checkout-hero" aria-labelledby="checkout-title">
+        <p class="eyebrow">checkout</p>
+        <h1 id="checkout-title">Order checkout</h1>
+        <p>
+          Check the order composition, specify the delivery address and choose the payment method.
+          Bank payment is connected through a secure bank page or payment provider.
+        </p>
+      </section>
+
+      <section class="checkout-layout" aria-label="Order data">
+        <form class="checkout-form" id="checkoutForm">
+          <div class="account-inline" id="accountStatus" hidden>
+            <div class="account-guest" id="accountGuest">
+              <span>Log in to the cabinet to save the order and delivery address.</span>
+              <a href="auth.html">Login or register</a>
+            </div>
+            <div class="account-user" id="accountUser" hidden>
+              <span class="account-avatar" aria-hidden="true">N</span>
+              <span>
+                <strong id="checkoutUserName">Client</strong>
+                <small id="checkoutUserMeta">Profile loading</small>
+              </span>
+              <a href="account.html">Edit profile</a>
+            </div>
+          </div>
+          <div class="checkout-panel">
+            <h2>Buyer</h2>
+            <div class="form-grid">
+              <label>
+                Name
+                <input type="text" name="name" autocomplete="name" minlength="2" maxlength="60" pattern="[A-Za-z -]{2,60}" title="Only letters, space and hyphen, from 2 characters." required />
+              </label>
+              <label>
+                Phone
+                <input type="tel" name="phone" autocomplete="tel" inputmode="numeric" minlength="10" pattern="[0-9]{10}" title="Enter 10 digits without spaces and symbols." required />
+              </label>
+              <label class="span-2">
+                Email
+                <input type="email" name="email" autocomplete="email" required />
+              </label>
+            </div>
+          </div>
+
+          <div class="checkout-panel">
+            <h2>Delivery</h2>
+            <div class="delivery-options" aria-label="Delivery method">
+              <label class="option-tile">
+                <input type="radio" name="delivery" value="shipping" checked />
+                <span>
+                  <strong>US shipping</strong>
+                  <small>calculated by Shippo</small>
+                </span>
+              </label>
+              <label class="option-tile">
+                <input type="radio" name="delivery" value="pickup" />
+                <span>
+                  <strong>Pickup</strong>
+                  <small>no shipping charge</small>
+                </span>
+              </label>
+            </div>
+            <div class="form-grid">
+              <label>
+                City
+                <input type="text" name="city" autocomplete="address-level2" minlength="2" maxlength="60" pattern="[A-Za-z -]{2,60}" title="Only letters, space and hyphen, from 2 characters." required />
+              </label>
+              <label>
+                State
+                <input type="text" name="state" autocomplete="address-level1" minlength="2" maxlength="2" pattern="[A-Za-z]{2}" title="Enter the two-letter US state code." required />
+              </label>
+              <label>
+                ZIP
+                <input type="text" name="zip" autocomplete="postal-code" inputmode="numeric" minlength="5" pattern="[0-9]{5}" title="Enter 5 digits." required />
+              </label>
+              <label class="span-2">
+                Delivery address
+                <input type="text" name="address" autocomplete="street-address" minlength="5" maxlength="120" title="Enter street, house and other address data." required />
+              </label>
+              <label>
+                Apartment / office
+                <input type="text" name="apartment" maxlength="20" pattern="[A-Za-z0-9 /-]*" />
+              </label>
+              <label>
+                Entrance / floor
+                <input type="text" name="entrance" maxlength="20" pattern="[A-Za-z0-9 /-]*" />
+              </label>
+              <label class="span-2">
+                Comment for courier
+                <textarea name="deliveryComment" rows="3" maxlength="240" placeholder="Intercom, delivery time, wishes"></textarea>
+              </label>
+              <label class="span-2">
+                Shipping rate
+                <select id="shippingRateSelect" disabled required>
+                  <option value="">Enter address to calculate shipping</option>
+                </select>
+              </label>
+              <p class="form-note span-2" id="shippingRateNote" role="status" aria-live="polite"></p>
+            </div>
+          </div>
+
+          <div class="checkout-panel">
+            <h2>Payment</h2>
+            <div class="payment-options" aria-label="Payment method">
+              <label class="option-tile">
+                <input type="radio" name="payment" value="card" checked />
+                <span>
+                  <strong>Bank card</strong>
+                  <small>through secure payment page</small>
+                </span>
+              </label>
+              <label class="option-tile">
+                <input type="radio" name="payment" value="sbp" />
+                <span>
+                  <strong>SBP</strong>
+                  <small>by QR code or link</small>
+                </span>
+              </label>
+              <label class="option-tile">
+                <input type="radio" name="payment" value="invoice" />
+                <span>
+                  <strong>Invoice from atelier</strong>
+                  <small>for additional payment after agreement</small>
+                </span>
+              </label>
+            </div>
+            <div class="bank-payment-box">
+              <strong>Secure bank payment</strong>
+              <p>
+                On the working site, this button will create an order on the server and
+                open the bank's payment page. Card number, expiration date and CVV are entered
+                only on the bank's side or payment provider.
+              </p>
+            </div>
+          </div>
+
+          <button class="button primary wide checkout-submit" type="submit" disabled>Continue</button>
+          <p class="form-note checkout-note" role="status" aria-live="polite"></p>
+        </form>
+
+        <aside class="summary-panel" aria-label="Order composition">
+          <h2>Your order</h2>
+          <div class="summary-items" id="summaryItems"></div>
+          <div class="summary-empty" id="summaryEmpty">
+            Cart is empty. Return to the catalog to select items.
+          </div>
+          <div class="free-delivery-notice" id="checkoutDeliveryNotice" aria-live="polite" hidden></div>
+          <div class="summary-row">
+            <span>Items</span>
+            <strong id="itemsTotal">$0.00</strong>
+          </div>
+          <div class="summary-row">
+            <span>Delivery</span>
+            <strong id="deliveryTotal">$0.00</strong>
+          </div>
+          <div class="summary-total">
+            <span>To pay</span>
+            <strong id="checkoutTotal">$0.00</strong>
+          </div>
+          <a class="button ghost dark wide" href="index.html#catalog">Return to catalog</a>
+        </aside>
+      </section>
+    </main>
+
+    <div class="modal-scrim" id="thankYouModal" hidden>
+      <section class="thank-you-dialog" role="dialog" aria-modal="true" aria-labelledby="thanksTitle">
+        <button class="icon-button modal-close" type="button" id="thanksClose" aria-label="Close window">
+          <svg aria-hidden="true" viewBox="0 0 24 24">
+            <path d="M6 6l12 12" />
+            <path d="M18 6L6 18" />
+          </svg>
+        </button>
+        <p class="eyebrow">order created</p>
+        <h2 id="thanksTitle">Thank you for your order!</h2>
+        <p class="thanks-copy">
+          We have received the order and will confirm payment details before preparing it for shipment.
+        </p>
+        <div class="thanks-details">
+          <div>
+            <span>Order number</span>
+            <strong id="thanksOrderNumber">-</strong>
+          </div>
+          <div>
+            <span>Payment amount</span>
+            <strong id="thanksOrderTotal">-</strong>
+          </div>
+        </div>
+      </section>
+    </div>
+
+    <script src="session-nav.js"></script>
+    <script src="checkout.js"></script>
+  </body>
+</html>

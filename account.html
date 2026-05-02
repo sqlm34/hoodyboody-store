@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Personal cabinet | NITKA Atelier</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <header class="topbar checkout-topbar" aria-label="Cabinet navigation">
+      <a class="brand" href="index.html" aria-label="NITKA Atelier">
+        <span class="brand-mark">N</span>
+        <span>NITKA Atelier</span>
+      </a>
+      <nav class="nav-links" aria-label="Sections">
+        <a href="index.html#catalog">Catalog</a>
+        <a href="checkout.html">Checkout</a>
+        <a href="index.html">Back to main</a>
+      </nav>
+      <div class="top-actions">
+        <a class="account-pill login-link" href="auth.html" hidden>Login</a>
+        <a class="account-pill cabinet-link" href="account.html" hidden>Cabinet</a>
+        <a class="account-pill admin-link" href="admin.html" hidden>Owner</a>
+        <button class="account-pill as-button logout-button" type="button" hidden>Logout</button>
+      </div>
+    </header>
+
+    <main class="checkout-page">
+      <section class="checkout-hero account-hero" aria-labelledby="account-title">
+        <p class="eyebrow">personal cabinet</p>
+        <h1 id="account-title">Your profile</h1>
+        <p id="accountWelcome">Contacts, delivery address and order history are stored here.</p>
+      </section>
+
+      <section class="account-layout" aria-label="Personal cabinet">
+        <form class="checkout-panel account-form" id="profileForm">
+          <h2>Contacts and delivery</h2>
+          <div class="form-grid">
+            <label>
+              Name
+              <input type="text" name="name" autocomplete="name" required />
+            </label>
+            <label>
+              Phone
+              <input type="tel" name="phone" autocomplete="tel" required />
+            </label>
+            <label class="span-2">
+              Email
+              <input type="email" name="email" autocomplete="email" disabled />
+            </label>
+            <label>
+              City
+              <input type="text" name="city" autocomplete="address-level2" />
+            </label>
+            <label>
+              Index
+              <input type="text" name="zip" autocomplete="postal-code" />
+            </label>
+            <label class="span-2">
+              Delivery address
+              <input type="text" name="address" autocomplete="street-address" />
+            </label>
+            <label>
+              Apartment / office
+              <input type="text" name="apartment" />
+            </label>
+            <label>
+              Entrance / floor
+              <input type="text" name="entrance" />
+            </label>
+          </div>
+          <div class="profile-actions">
+            <button class="button primary wide" type="button" id="editProfileButton">Edit</button>
+            <div class="edit-confirm" id="editConfirm" hidden>
+              <strong>Save changes?</strong>
+              <p>You have changed profile data. You can continue saving or return everything as it was before editing.</p>
+              <div class="confirm-actions">
+                <button class="button primary" type="button" id="confirmSaveIntent">Yes, I want to save</button>
+                <button class="button ghost dark" type="button" id="cancelProfileChanges">Leave as it was</button>
+              </div>
+            </div>
+            <button class="button primary wide" type="submit" id="saveProfileButton" hidden>Save profile</button>
+          </div>
+          <p class="form-note" id="profileNote" role="status" aria-live="polite"></p>
+        </form>
+
+        <aside class="summary-panel account-orders" aria-label="Order history">
+          <h2>Order history</h2>
+          <div class="orders-list" id="ordersList"></div>
+          <div class="summary-empty" id="ordersEmpty">No orders yet.</div>
+        </aside>
+      </section>
+    </main>
+
+    <script src="session-nav.js"></script>
+    <script src="account.js"></script>
+  </body>
+</html>

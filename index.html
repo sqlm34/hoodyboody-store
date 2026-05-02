@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>HOODYBOODY | Embroidery clothes</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <header class="topbar" aria-label="Main navigation">
+      <a class="brand" href="#home" aria-label="NITKA Atelier">
+        <span class="brand-mark">HB</span>
+        <span>HOODYBOODY</span>
+      </a>
+      <nav class="nav-links" aria-label="Site sections">
+        <a href="#catalog">Catalog</a>
+        <a href="#custom">Embroidery</a>
+        <a href="#order">Order</a>
+      </nav>
+      <div class="top-actions">
+        <a class="account-pill login-link" href="auth.html" hidden>Login</a>
+        <a class="account-pill cabinet-link" href="account.html" hidden>Cabinet</a>
+        <a class="account-pill admin-link" href="admin.html" hidden>Owner</a>
+        <button class="account-pill as-button logout-button" type="button" hidden>Logout</button>
+        <button class="icon-button cart-toggle" type="button" aria-label="Open cart">
+          <svg aria-hidden="true" viewBox="0 0 24 24">
+            <path d="M6.5 8.5h11l-.9 9.1a2 2 0 0 1-2 1.8H9.4a2 2 0 0 1-2-1.8L6.5 8.5Z" />
+            <path d="M9 8.5a3 3 0 0 1 6 0" />
+          </svg>
+          <span class="cart-count" aria-live="polite">0</span>
+        </button>
+      </div>
+    </header>
+
+    <main id="home">
+      <section class="hero" aria-label="Collection of embroidered clothing">
+        <div class="hero-media" role="img" aria-label="Clothing with botanical embroidery"></div>
+        <div class="hero-overlay"></div>
+        <div class="hero-content">
+          <p class="eyebrow">hand and machine embroidery</p>
+          <h1>Embroidered clothing by Irina</h1>
+          <p class="hero-copy">
+            Linen jackets, hoodies, shirts and accessories with neat stitches,
+            personal monograms and seasonal motifs.
+          </p>
+          <div class="hero-actions">
+            <a class="button primary" href="#catalog">View catalog</a>
+            <a class="button ghost" href="#custom">Make your own design</a>
+          </div>
+        </div>
+      </section>
+
+      <section class="shop-band" id="catalog" aria-labelledby="catalog-title">
+        <div class="section-head">
+          <div>
+            <p class="eyebrow">ready models</p>
+            <h2 id="catalog-title">Catalog</h2>
+          </div>
+          <div class="filters" aria-label="Catalog filter">
+            <button class="filter active" type="button" data-filter="all">All</button>
+            <button class="filter" type="button" data-filter="outerwear">Jackets</button>
+            <button class="filter" type="button" data-filter="tops">Tops</button>
+            <button class="filter" type="button" data-filter="accessories">Accessories</button>
+          </div>
+        </div>
+        <div class="catalog-grid" id="catalogGrid" aria-live="polite"></div>
+      </section>
+
+      <section class="custom-band" id="custom" aria-labelledby="custom-title">
+        <div class="custom-inner">
+          <div class="custom-copy">
+            <p class="eyebrow">custom order</p>
+            <h2 id="custom-title">Embroidery for your wardrobe</h2>
+            <p>
+              Choose the base, threads and motif. We will prepare a sketch, agree on the embroidery size and show a sample of stitches before starting.
+            </p>
+          </div>
+          <div class="custom-panel" aria-label="Order setup">
+            <label>
+              Base
+              <select id="baseSelect">
+                <option>Hoodie from dense cotton</option>
+                <option>Linen shirt</option>
+                <option>Denim jacket</option>
+                <option>Canvas shopper</option>
+              </select>
+            </label>
+            <fieldset>
+              <legend>Thread palette</legend>
+              <div class="swatches" aria-label="Thread colors">
+                <button class="swatch active" type="button" data-color="Pine" style="--swatch: #1f6b5a" aria-label="Pine"></button>
+                <button class="swatch" type="button" data-color="Terracotta" style="--swatch: #c65a43" aria-label="Terracotta"></button>
+                <button class="swatch" type="button" data-color="Indigo" style="--swatch: #263b73" aria-label="Indigo"></button>
+                <button class="swatch" type="button" data-color="Milky" style="--swatch: #f3eadb" aria-label="Milky"></button>
+              </div>
+            </fieldset>
+            <label>
+              Motif
+              <input id="motifInput" type="text" placeholder="for example: wildflowers" />
+            </label>
+            <fieldset class="upload-field">
+              <legend>Files for sketch</legend>
+              <input
+                class="visually-hidden"
+                id="customFiles"
+                type="file"
+                multiple
+                accept="image/*,.pdf,.ai,.eps,.psd,.svg,.doc,.docx"
+              />
+              <label class="upload-box" for="customFiles">
+                <span class="upload-icon" aria-hidden="true">
+                  <svg viewBox="0 0 24 24">
+                    <path d="M12 16V4" />
+                    <path d="M7 9l5-5 5 5" />
+                    <path d="M5 20h14" />
+                  </svg>
+                </span>
+                <span>
+                  <strong>Upload images or files</strong>
+                  <small>PNG, JPG, PDF, AI, PSD, SVG, DOC</small>
+                </span>
+              </label>
+              <div class="file-preview" id="filePreview" aria-live="polite"></div>
+            </fieldset>
+            <button class="button primary wide" type="button" id="customAdd">Add estimate to cart</button>
+          </div>
+        </div>
+      </section>
+
+      <section class="order-band" id="order" aria-labelledby="order-title">
+        <div class="order-inner">
+          <div class="order-copy">
+            <p class="eyebrow">checkout</p>
+            <h2 id="order-title">Order and fitting</h2>
+            <p>
+              Leave your contacts, and we will confirm availability, embroidery deadlines and convenient delivery method or pickup.
+            </p>
+          </div>
+          <form class="order-form">
+            <label>
+              Name
+              <input type="text" name="name" autocomplete="name" required />
+            </label>
+            <label>
+              Phone
+              <input type="tel" name="phone" autocomplete="tel" required />
+            </label>
+            <label>
+              Comment
+              <textarea name="message" rows="4" placeholder="Size, color, desired date"></textarea>
+            </label>
+            <button class="button primary wide" type="submit">Send application</button>
+            <p class="form-note" role="status" aria-live="polite"></p>
+          </form>
+        </div>
+      </section>
+    </main>
+
+    <aside class="cart-drawer" aria-label="Cart" aria-hidden="true">
+      <div class="cart-head">
+        <h2>Cart</h2>
+        <button class="icon-button cart-close" type="button" aria-label="Close cart">
+          <svg aria-hidden="true" viewBox="0 0 24 24">
+            <path d="M6 6l12 12" />
+            <path d="M18 6L6 18" />
+          </svg>
+        </button>
+      </div>
+      <div class="cart-items" id="cartItems"></div>
+      <div class="cart-empty" id="cartEmpty">Empty for now</div>
+      <div class="free-delivery-notice" id="cartDeliveryNotice" aria-live="polite" hidden></div>
+      <div class="cart-total">
+        <span>Total</span>
+        <strong id="cartTotal">$0.00</strong>
+      </div>
+      <div class="cart-actions">
+        <button class="button ghost dark wide add-more-link" type="button">Add more items</button>
+        <a class="button primary wide checkout-link" href="checkout.html">Checkout</a>
+      </div>
+    </aside>
+    <div class="scrim" hidden></div>
+
+    <script src="session-nav.js"></script>
+    <script src="script.js"></script>
+  </body>
+</html>
