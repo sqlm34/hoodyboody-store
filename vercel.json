@@ -4,11 +4,22 @@
     {
       "source": "/api/(.*)",
       "destination": "/api"
+    },
+    {
+      "source": "/(.*)",
+      "destination": "/api"
     }
   ],
   "functions": {
     "api/index.js": {
-      "maxDuration": 30
+      "maxDuration": 30,
+      "includeFiles": [
+        "*.html",
+        "*.css",
+        "*.js",
+        "assets/**",
+        "package.json"
+      ]
     }
   }
 }
