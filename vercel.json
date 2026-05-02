@@ -13,13 +13,7 @@
   "functions": {
     "api/index.js": {
       "maxDuration": 30,
-      "includeFiles": [
-        "*.html",
-        "*.css",
-        "*.js",
-        "assets/**",
-        "package.json"
-      ]
+      "includeFiles": "{*.html,*.css,*.js,assets/**,package.json}"
     }
   }
 }
