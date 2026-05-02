@@ -36,8 +36,7 @@
         nationalMode: true,
         strictMode: true,
         autoPlaceholder: "aggressive",
-        allowedNumberTypes: ["MOBILE", "FIXED_LINE"],
-        loadUtils: () => import("https://cdn.jsdelivr.net/npm/intl-tel-input@28.0.4/build/js/utils.js")
+        allowedNumberTypes: ["MOBILE", "FIXED_LINE"]
       });
 
       instances.set(input, instance);
@@ -50,7 +49,10 @@
         else setPhoneValidity(input);
         input.dispatchEvent(new CustomEvent("phonevalidationchange", { bubbles: true }));
       });
-      input.addEventListener("countrychange", () => setPhoneValidity(input));
+      input.addEventListener("countrychange", () => {
+        setPhoneValidity(input);
+        input.dispatchEvent(new CustomEvent("phonevalidationchange", { bubbles: true }));
+      });
       input.addEventListener("blur", () => {
         if (!input.value.trim()) {
           setPhoneValidity(input);
@@ -59,6 +61,10 @@
         }
 
         setPhoneValidity(input, instance.isValidNumber() ? "" : getPhoneMessage(instance));
+        input.dispatchEvent(new CustomEvent("phonevalidationchange", { bubbles: true }));
+      });
+
+      queueMicrotask(() => {
         input.dispatchEvent(new CustomEvent("phonevalidationchange", { bubbles: true }));
       });
 
