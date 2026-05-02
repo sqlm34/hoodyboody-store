@@ -532,9 +532,18 @@ document.querySelector("#customAdd").addEventListener("click", () => {
 
 document.querySelector(".order-form").addEventListener("submit", (event) => {
   event.preventDefault();
+  const phoneInput = event.currentTarget.elements.phone;
+
+  if (!window.NITKA_PHONE.validate(phoneInput)) {
+    phoneInput.reportValidity();
+    document.querySelector(".form-note").textContent = phoneInput.validationMessage;
+    document.querySelector(".form-note").classList.add("error");
+    return;
+  }
+
   event.currentTarget.reset();
-  document.querySelector(".form-note").textContent =
-    "Thank you! We will contact you to confirm your order details.";
+  document.querySelector(".form-note").classList.remove("error");
+  document.querySelector(".form-note").textContent = "Thank you! We will contact you to confirm your order details.";
 });
 
 renderCatalog();

@@ -37,12 +37,18 @@ document.querySelector("#registerForm").addEventListener("submit", async (event)
     return;
   }
 
+  if (!window.NITKA_PHONE.validate(form.elements.phone)) {
+    setNote(note, form.elements.phone.validationMessage, true);
+    form.elements.phone.reportValidity();
+    return;
+  }
+
   try {
     await api("/api/register", {
       method: "POST",
       body: JSON.stringify({
         name: data.name,
-        phone: data.phone,
+        phone: window.NITKA_PHONE.getNumber(form.elements.phone),
         email: data.email,
         password: data.password
       })

@@ -83,10 +83,6 @@ function getItemsTotal() {
 }
 
 function sanitizeField(input) {
-  if (input.name === "phone") {
-    input.value = input.value.replace(/\D/g, "").slice(0, 10);
-  }
-
   if (input.name === "zip") {
     input.value = input.value.replace(/\D/g, "").slice(0, 5);
   }
@@ -158,8 +154,8 @@ function showUserAccount(user) {
   accountInline.hidden = false;
   accountGuest.hidden = true;
   accountUser.hidden = false;
-  checkoutUserName.textContent = user.name || "Client";
-  checkoutUserMeta.textContent = `${user.email || ""}${user.phone ? ` · ${user.phone}` : ""}`;
+    checkoutUserName.textContent = user.name || "Client";
+    checkoutUserMeta.textContent = `${user.email || ""}${user.phone ? ` · ${user.phone}` : ""}`;
 }
 
 function showThankYou(order) {
@@ -288,7 +284,8 @@ async function loadCustomer() {
     currentUser = user;
     showUserAccount(user);
     checkoutForm.elements.name.value = user.name || "";
-    checkoutForm.elements.phone.value = String(user.phone || "").replace(/\D/g, "").slice(0, 10);
+    checkoutForm.elements.phone.value = user.phone || "";
+    window.NITKA_PHONE.getInstance(checkoutForm.elements.phone)?.setNumber(user.phone || "");
     checkoutForm.elements.email.value = user.email || "";
     checkoutForm.elements.city.value = address.city || "";
     if (checkoutForm.elements.state) checkoutForm.elements.state.value = address.state || "";
@@ -318,7 +315,7 @@ function getCheckoutPayload() {
     items: cart,
     customer: {
       name: formData.name,
-      phone: formData.phone,
+      phone: window.NITKA_PHONE.getNumber(checkoutForm.elements.phone),
       email: formData.email
     },
     delivery: {
@@ -388,6 +385,14 @@ checkoutForm.addEventListener("submit", async (event) => {
     checkoutNote.textContent = "Fill in all required fields correctly.";
     checkoutNote.classList.add("error");
     checkoutForm.reportValidity();
+    updateSubmitState();
+    return;
+  }
+
+  if (!window.NITKA_PHONE.validate(checkoutForm.elements.phone)) {
+    checkoutNote.textContent = checkoutForm.elements.phone.validationMessage;
+    checkoutNote.classList.add("error");
+    checkoutForm.elements.phone.reportValidity();
     updateSubmitState();
     return;
   }

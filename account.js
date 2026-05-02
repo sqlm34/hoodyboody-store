@@ -107,6 +107,7 @@ function fillProfile(user) {
   const address = user.address || {};
   profileForm.elements.name.value = user.name || "";
   profileForm.elements.phone.value = user.phone || "";
+  window.NITKA_PHONE.getInstance(profileForm.elements.phone)?.setNumber(user.phone || "");
   profileForm.elements.email.value = user.email || "";
   profileForm.elements.city.value = address.city || "";
   profileForm.elements.zip.value = address.zip || "";
@@ -193,6 +194,15 @@ profileForm.addEventListener("submit", async (event) => {
   }
 
   const data = Object.fromEntries(new FormData(profileForm));
+
+  if (!window.NITKA_PHONE.validate(profileForm.elements.phone)) {
+    profileNote.textContent = profileForm.elements.phone.validationMessage;
+    profileNote.classList.add("error");
+    profileForm.elements.phone.reportValidity();
+    return;
+  }
+
+  data.phone = window.NITKA_PHONE.getNumber(profileForm.elements.phone);
 
   try {
     const { user } = await api("/api/profile", {

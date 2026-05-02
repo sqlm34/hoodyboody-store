@@ -603,6 +603,14 @@ textarea {
   background: var(--white);
 }
 
+.iti {
+  width: 100%;
+}
+
+label.phone-error input[type="tel"] {
+  border-color: var(--coral);
+}
+
 input:focus,
 select:focus,
 textarea:focus {
