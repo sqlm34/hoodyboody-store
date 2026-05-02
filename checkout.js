@@ -106,7 +106,8 @@ function sanitizeField(input) {
 
 function updateSubmitState() {
   const shippingReady = getDeliveryType() !== "shipping" || Boolean(selectedShippingRate);
-  submitButton.disabled = !(cart.length > 0 && checkoutForm.checkValidity() && shippingReady);
+  const phoneReady = window.NITKA_PHONE.validate(checkoutForm.elements.phone, { quiet: true });
+  submitButton.disabled = !(cart.length > 0 && checkoutForm.checkValidity() && phoneReady && shippingReady);
 }
 
 function renderSummary() {
@@ -370,6 +371,8 @@ checkoutForm.querySelectorAll("input, textarea").forEach((field) => {
   });
 });
 
+checkoutForm.elements.phone.addEventListener("phonevalidationchange", updateSubmitState);
+
 checkoutForm.addEventListener("submit", async (event) => {
   event.preventDefault();
   checkoutForm.querySelectorAll("input, textarea").forEach(sanitizeField);
@@ -381,18 +384,18 @@ checkoutForm.addEventListener("submit", async (event) => {
     return;
   }
 
-  if (!checkoutForm.checkValidity()) {
-    checkoutNote.textContent = "Fill in all required fields correctly.";
-    checkoutNote.classList.add("error");
-    checkoutForm.reportValidity();
-    updateSubmitState();
-    return;
-  }
-
   if (!window.NITKA_PHONE.validate(checkoutForm.elements.phone)) {
     checkoutNote.textContent = checkoutForm.elements.phone.validationMessage;
     checkoutNote.classList.add("error");
     checkoutForm.elements.phone.reportValidity();
+    updateSubmitState();
+    return;
+  }
+
+  if (!checkoutForm.checkValidity()) {
+    checkoutNote.textContent = "Fill in all required fields correctly.";
+    checkoutNote.classList.add("error");
+    checkoutForm.reportValidity();
     updateSubmitState();
     return;
   }

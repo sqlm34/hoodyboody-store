@@ -12,6 +12,13 @@
     input.closest("label")?.classList.toggle("phone-error", Boolean(message));
   }
 
+  function normalizePhoneTyping(input) {
+    const value = input.value;
+    const hasLeadingPlus = value.trim().startsWith("+");
+    const digits = value.replace(/\D/g, "").slice(0, 15);
+    input.value = hasLeadingPlus ? `+${digits}` : digits;
+  }
+
   function getPhoneMessage(instance) {
     if (!instance) return "Phone validation is not ready yet.";
     const errorCode = instance.getValidationError?.();
@@ -34,16 +41,25 @@
       });
 
       instances.set(input, instance);
+      input.setAttribute("maxlength", "18");
+      input.setAttribute("inputmode", "tel");
 
-      input.addEventListener("input", () => setPhoneValidity(input));
+      input.addEventListener("input", () => {
+        normalizePhoneTyping(input);
+        if (input.value.trim()) validatePhoneInput(input, { quiet: true });
+        else setPhoneValidity(input);
+        input.dispatchEvent(new CustomEvent("phonevalidationchange", { bubbles: true }));
+      });
       input.addEventListener("countrychange", () => setPhoneValidity(input));
       input.addEventListener("blur", () => {
         if (!input.value.trim()) {
           setPhoneValidity(input);
+          input.dispatchEvent(new CustomEvent("phonevalidationchange", { bubbles: true }));
           return;
         }
 
         setPhoneValidity(input, instance.isValidNumber() ? "" : getPhoneMessage(instance));
+        input.dispatchEvent(new CustomEvent("phonevalidationchange", { bubbles: true }));
       });
 
       return instance;
@@ -54,15 +70,15 @@
     return input ? instances.get(input) || null : null;
   }
 
-  function validatePhoneInput(input) {
+  function validatePhoneInput(input, options = {}) {
     const instance = getPhoneInstance(input);
     if (!input || !input.value.trim()) {
-      setPhoneValidity(input, input?.required ? "Enter a phone number." : "");
+      if (!options.quiet) setPhoneValidity(input, input?.required ? "Enter a phone number." : "");
       return !input?.required;
     }
 
     if (!instance || !instance.isValidNumber()) {
-      setPhoneValidity(input, getPhoneMessage(instance));
+      if (!options.quiet) setPhoneValidity(input, getPhoneMessage(instance));
       return false;
     }
 
