@@ -11,6 +11,10 @@
     }
   ],
   "functions": {
+    "server.js": {
+      "maxDuration": 30,
+      "includeFiles": "{*.html,*.css,*.js,assets/**,package.json}"
+    },
     "api/index.js": {
       "maxDuration": 30,
       "includeFiles": "{*.html,*.css,*.js,assets/**,package.json}"
