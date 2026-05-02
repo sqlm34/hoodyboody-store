@@ -12,13 +12,6 @@
     input.closest("label")?.classList.toggle("phone-error", Boolean(message));
   }
 
-  function normalizePhoneTyping(input) {
-    const value = input.value;
-    const hasLeadingPlus = value.trim().startsWith("+");
-    const digits = value.replace(/\D/g, "").slice(0, 15);
-    input.value = hasLeadingPlus ? `+${digits}` : digits;
-  }
-
   function getPhoneMessage(instance) {
     if (!instance) return "Phone validation is not ready yet.";
     const errorCode = instance.getValidationError?.();
@@ -40,11 +33,10 @@
       });
 
       instances.set(input, instance);
-      input.setAttribute("maxlength", "18");
+      input.setAttribute("maxlength", "24");
       input.setAttribute("inputmode", "tel");
 
       input.addEventListener("input", () => {
-        normalizePhoneTyping(input);
         if (input.value.trim()) validatePhoneInput(input, { quiet: true });
         else setPhoneValidity(input);
         input.dispatchEvent(new CustomEvent("phonevalidationchange", { bubbles: true }));

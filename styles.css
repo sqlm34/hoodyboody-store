@@ -926,6 +926,10 @@ textarea:focus {
   margin-bottom: 18px;
 }
 
+.payment-options {
+  grid-template-columns: 1fr;
+}
+
 .option-tile {
   display: flex;
   min-height: 82px;
