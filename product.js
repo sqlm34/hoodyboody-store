@@ -326,24 +326,30 @@ async function loadInventory() {
 }
 
 function renderPhoto() {
-  const gallery = product.gallery || [{ label: "Photo", focus: product.focus }];
+  const gallery = product.gallery?.length
+    ? product.gallery
+    : [{ label: "Photo", focus: product.focus, image: product.image }];
   const photo = gallery[selectedPhoto];
-  const imageUrl = product.image || DEFAULT_IMAGE_URL;
+  const imageUrl = photo?.image || product.image || DEFAULT_IMAGE_URL;
   isZoomed = false;
   mainPhoto.classList.remove("zoomed");
   mainPhoto.style.backgroundImage = `url("${imageUrl}")`;
-  mainPhoto.style.backgroundPosition = photo.focus;
+  mainPhoto.style.backgroundPosition = photo?.focus || product.focus || "center";
   zoomHint.textContent = "Click to zoom";
 
   thumbnailRow.innerHTML = gallery
-    .map(
-      (item, index) => `
-        <button class="thumbnail ${index === selectedPhoto ? "active" : ""}" type="button" data-photo="${index}" aria-label="${escapeHtml(item.label)}">
-          <span class="thumbnail-image" style="--focus: ${item.focus}; --product-image: url('${imageUrl}')"></span>
-          <span class="visually-hidden">${escapeHtml(item.label)}</span>
+    .map((item, index) => {
+      const itemImage = item.image || product.image || DEFAULT_IMAGE_URL;
+      const itemFocus = item.focus || product.focus || "center";
+      const itemLabel = item.label || `Photo ${index + 1}`;
+
+      return `
+        <button class="thumbnail ${index === selectedPhoto ? "active" : ""}" type="button" data-photo="${index}" aria-label="${escapeHtml(itemLabel)}">
+          <span class="thumbnail-image" style="--focus: ${itemFocus}; --product-image: url('${itemImage}')"></span>
+          <span class="visually-hidden">${escapeHtml(itemLabel)}</span>
         </button>
-      `
-    )
+      `;
+    })
     .join("");
 }
 

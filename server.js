@@ -885,6 +885,47 @@ function createStripeCheckoutSession(params) {
   });
 }
 
+function createStripeCustomer(params) {
+  const payload = params.toString();
+
+  return new Promise((resolve, reject) => {
+    const stripeReq = https.request(
+      {
+        hostname: "api.stripe.com",
+        path: "/v1/customers",
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${stripeSecretKey}`,
+          "Content-Type": "application/x-www-form-urlencoded",
+          "Content-Length": Buffer.byteLength(payload)
+        }
+      },
+      (stripeRes) => {
+        let body = "";
+
+        stripeRes.on("data", (chunk) => {
+          body += chunk;
+        });
+
+        stripeRes.on("end", () => {
+          const data = JSON.parse(body || "{}");
+
+          if (stripeRes.statusCode >= 200 && stripeRes.statusCode < 300) {
+            resolve(data);
+            return;
+          }
+
+          reject(new Error(data.error?.message || "Stripe could not prepare customer details."));
+        });
+      }
+    );
+
+    stripeReq.on("error", reject);
+    stripeReq.write(payload);
+    stripeReq.end();
+  });
+}
+
 function getStripeCheckoutSession(sessionId) {
   return new Promise((resolve, reject) => {
     const stripeReq = https.request(
@@ -919,6 +960,35 @@ function getStripeCheckoutSession(sessionId) {
     stripeReq.on("error", reject);
     stripeReq.end();
   });
+}
+
+function getStripeCustomerParams(body) {
+  const params = new URLSearchParams();
+  const customer = body.customer || {};
+  const delivery = body.delivery || {};
+  const name = String(customer.name || "").trim();
+  const email = String(customer.email || "").trim();
+  const phone = String(customer.phone || "").trim();
+  const city = String(delivery.city || "").trim();
+  const state = String(delivery.state || "").trim().toUpperCase();
+  const zip = String(delivery.zip || "").trim();
+  const address = String(delivery.address || "").trim();
+  const line2 = [delivery.apartment, delivery.entrance]
+    .map((item) => String(item || "").trim())
+    .filter(Boolean)
+    .join(", ");
+
+  if (email) params.append("email", email);
+  if (name) params.append("name", name);
+  if (phone) params.append("phone", phone);
+  if (address) params.append("address[line1]", address);
+  if (line2) params.append("address[line2]", line2);
+  if (city) params.append("address[city]", city);
+  if (state) params.append("address[state]", state);
+  if (zip) params.append("address[postal_code]", zip);
+  if (address || city || state || zip) params.append("address[country]", "US");
+
+  return params;
 }
 
 function shippoRequest(method, apiPath, payload = null) {
@@ -1379,9 +1449,6 @@ async function handleApi(req, res) {
       params.append("mode", "payment");
       params.append("success_url", `${origin}/checkout.html?stripe=success&session_id={CHECKOUT_SESSION_ID}`);
       params.append("cancel_url", `${origin}/checkout.html?stripe=cancel`);
-      if (body.customer?.email) {
-        params.append("customer_email", String(body.customer.email));
-      }
       params.append("phone_number_collection[enabled]", "true");
       params.append("billing_address_collection", "required");
 
@@ -1434,6 +1501,16 @@ async function handleApi(req, res) {
         const stock = Number(db.inventory[productId]?.stock) || 0;
         sendJson(res, 409, { message: `Not enough stock available: ${productId}. with ${quantity} in cart, ${stock} available.` });
         return;
+      }
+
+      const customerParams = getStripeCustomerParams(body);
+      const stripeCustomer = customerParams.toString() ? await createStripeCustomer(customerParams) : null;
+      if (stripeCustomer?.id) {
+        params.append("customer", stripeCustomer.id);
+        params.append("customer_update[address]", "auto");
+        params.append("customer_update[name]", "auto");
+      } else if (body.customer?.email) {
+        params.append("customer_email", String(body.customer.email));
       }
 
       params.append("metadata[source]", "cart");
@@ -1659,7 +1736,31 @@ async function handleApi(req, res) {
       const extension = getImageExtension(parsed.mimeType);
       const imageId = `${productId}-${Date.now().toString(36)}-${hash}.${extension}`;
       const fileName = safeFileName(body.fileName, extension);
-      const previousImageId = getProductImageIdFromUrl(db.products[productIndex].image);
+      const product = db.products[productIndex];
+      const imageUrl = `/api/product-images/${encodeURIComponent(imageId)}`;
+      const currentGallery = Array.isArray(product.gallery) ? product.gallery : [];
+      const hasGalleryImages = currentGallery.some((item) => item?.image);
+      const currentImageId = getProductImageIdFromUrl(product.image);
+      const galleryBase =
+        hasGalleryImages
+          ? currentGallery
+          : currentImageId
+            ? [
+                {
+                  label: product.imageName || "Photo 1",
+                  focus: product.focus || "center",
+                  image: product.image
+                }
+              ]
+            : [];
+      const nextGallery = [
+        ...galleryBase,
+        {
+          label: fileName.replace(/\.[^.]+$/, ""),
+          focus: product.focus || "center",
+          image: imageUrl
+        }
+      ].slice(0, 20);
 
       db.productImages[imageId] = {
         id: imageId,
@@ -1672,14 +1773,11 @@ async function handleApi(req, res) {
         updatedBy: user.id
       };
 
-      if (previousImageId && previousImageId !== imageId) {
-        delete db.productImages[previousImageId];
-      }
-
       db.products[productIndex] = {
-        ...db.products[productIndex],
-        image: `/api/product-images/${encodeURIComponent(imageId)}`,
+        ...product,
+        image: hasGalleryImages || currentImageId ? product.image : imageUrl,
         imageName: fileName,
+        gallery: nextGallery,
         updatedAt: new Date().toISOString(),
         updatedBy: user.id
       };

@@ -1,4 +1,7 @@
 let products = window.NITKA_PRODUCTS || [];
+
+const DEFAULT_IMAGE_URL = "assets/embroidered-collection.png";
+const DEFAULT_SIZE_OPTIONS = ["XXS", "XS", "S", "M", "L", "XL", "XXL", "One size"];
 const maxUploadSourceBytes = 12 * 1024 * 1024;
 const maxImageEdge = 1600;
 
@@ -41,12 +44,103 @@ function csv(value) {
   return Array.isArray(value) ? value.join(", ") : "";
 }
 
-function galleryLabels(product) {
-  return Array.isArray(product.gallery) ? product.gallery.map((item) => item.label).join(", ") : "";
+function setProductsStatus(message, isError = false) {
+  adminProductsNote.textContent = message;
+  adminProductsNote.classList.toggle("error", isError);
+  adminProductsNote.classList.toggle("success", Boolean(message) && !isError);
 }
 
-function galleryFocus(product) {
-  return Array.isArray(product.gallery) ? product.gallery.map((item) => item.focus).join(", ") : "";
+function getSizeOptions(product) {
+  return Array.from(new Set([...DEFAULT_SIZE_OPTIONS, ...(Array.isArray(product.sizes) ? product.sizes : [])]));
+}
+
+function getProductPhotos(product) {
+  const gallery = Array.isArray(product.gallery) ? product.gallery : [];
+  const photos = [];
+  const seen = new Set();
+
+  function addPhoto(image, label, focus) {
+    const url = image || DEFAULT_IMAGE_URL;
+    if (seen.has(url)) return;
+    seen.add(url);
+    photos.push({
+      image: url,
+      label: label || `Photo ${photos.length + 1}`,
+      focus: focus || product.focus || "center",
+      isCover: url === product.image
+    });
+  }
+
+  if (product.image) {
+    addPhoto(product.image, product.imageName || "Cover photo", product.focus);
+  }
+
+  gallery
+    .filter((item) => item?.image)
+    .forEach((item) => {
+      addPhoto(item.image, item.label, item.focus);
+    });
+
+  if (!photos.length) {
+    addPhoto(DEFAULT_IMAGE_URL, "Default photo", product.focus);
+  }
+
+  return photos;
+}
+
+function renderPhotoTiles(product) {
+  return `
+    <div class="admin-photo-grid" aria-label="Product photos">
+      ${getProductPhotos(product)
+        .map(
+          (photo) => `
+            <button
+              class="admin-photo-tile ${photo.isCover ? "active" : ""}"
+              type="button"
+              data-cover-photo="${escapeHtml(photo.image)}"
+              title="Use as cover photo"
+            >
+              <span
+                class="admin-photo-thumb"
+                style="--product-image: url('${escapeHtml(photo.image)}'); --focus: ${escapeHtml(photo.focus)}"
+              ></span>
+              <small>${escapeHtml(photo.isCover ? "Cover" : photo.label)}</small>
+            </button>
+          `
+        )
+        .join("")}
+    </div>
+  `;
+}
+
+function renderSizePicker(product) {
+  const selectedSizes = new Set(Array.isArray(product.sizes) ? product.sizes : []);
+
+  return `
+    <div class="admin-size-picker full-span" data-size-picker>
+      <input type="hidden" name="sizes" value="${escapeHtml(csv(product.sizes))}" />
+      <div>
+        <span>Sizes shown on product cards</span>
+        <small>Click a size to show or hide it.</small>
+      </div>
+      <div class="admin-size-options">
+        ${getSizeOptions(product)
+          .map(
+            (size) => `
+              <button
+                class="admin-size-button ${selectedSizes.has(size) ? "active" : ""}"
+                type="button"
+                data-size-option="${escapeHtml(size)}"
+                aria-pressed="${selectedSizes.has(size) ? "true" : "false"}"
+              >
+                ${escapeHtml(size)}
+              </button>
+            `
+          )
+          .join("")}
+      </div>
+    </div>
+  `;
 }
 
 function showLocked(message) {
@@ -65,7 +159,10 @@ function renderProductsEditor() {
     .map(
       (product) => `
         <form class="admin-product-form" data-product-id="${escapeHtml(product.id)}">
-          <div class="admin-product-preview" style="--product-image: url('${escapeHtml(product.image || "assets/embroidered-collection.png")}'); --focus: ${escapeHtml(product.focus || "center")}"></div>
+          <div
+            class="admin-product-preview"
+            style="--product-image: url('${escapeHtml(product.image || DEFAULT_IMAGE_URL)}'); --focus: ${escapeHtml(product.focus || "center")}"
+          ></div>
           <div class="admin-product-fields">
             <div class="admin-product-title">
               <strong>${escapeHtml(product.title)}</strong>
@@ -92,31 +189,24 @@ function renderProductsEditor() {
                 Badge
                 <input name="badge" value="${escapeHtml(product.badge || "")}" />
               </label>
-              <div class="admin-photo-upload">
+              <div class="admin-photo-upload full-span">
                 <input name="image" type="hidden" value="${escapeHtml(product.image || "")}" />
-                <input type="file" accept="image/jpeg,image/png,image/webp" data-photo-input hidden />
-                <span>Фото товара</span>
+                <input type="file" accept="image/jpeg,image/png,image/webp" data-photo-input multiple hidden />
+                <div class="admin-photo-header">
+                  <span>Product photos</span>
+                  <small>Choose one or more JPG, PNG or WEBP photos.</small>
+                </div>
+                ${renderPhotoTiles(product)}
                 <div class="admin-photo-actions">
-                  <button class="button ghost dark" type="button" data-upload-photo>Загрузить фото</button>
-                  <small>${escapeHtml(product.imageName || "Фото ещё не загружено")}</small>
+                  <button class="button ghost dark" type="button" data-upload-photo>Upload photos</button>
+                  <small>${escapeHtml(product.imageName || "No uploaded photos yet")}</small>
                 </div>
               </div>
               <label>
                 Photo focus
                 <input name="focus" value="${escapeHtml(product.focus || "center")}" placeholder="50% 50%" />
               </label>
-              <label>
-                Sizes
-                <input name="sizes" value="${escapeHtml(csv(product.sizes))}" placeholder="S, M, L" />
-              </label>
-              <label>
-                Gallery labels
-                <input name="galleryLabels" value="${escapeHtml(galleryLabels(product))}" placeholder="General view, Detail, Back" />
-              </label>
-              <label class="full-span">
-                Gallery focus points
-                <input name="galleryFocus" value="${escapeHtml(galleryFocus(product))}" placeholder="50% 50%, 40% 60%, 70% 30%" />
-              </label>
+              ${renderSizePicker(product)}
               <label class="full-span">
                 Card description
                 <textarea name="description" rows="2" required>${escapeHtml(product.description || "")}</textarea>
@@ -206,39 +296,54 @@ async function prepareProductImage(file) {
   };
 }
 
-async function uploadProductPhoto(form, file) {
+async function uploadProductPhotos(form, files) {
   const productId = form.dataset.productId;
+  const selectedFiles = Array.from(files || []);
   const note = form.querySelector(".admin-photo-actions small");
-  note.textContent = "Загрузка фото...";
-  adminProductsNote.textContent = "";
-  adminProductsNote.classList.remove("error");
+  const uploadButton = form.querySelector("[data-upload-photo]");
+  let latestResponse = null;
 
-  const prepared = await prepareProductImage(file);
-  const response = await api("/api/admin/products/photo", {
-    method: "POST",
-    body: JSON.stringify({
-      productId,
-      fileName: prepared.fileName,
-      dataUrl: prepared.dataUrl
-    })
-  });
+  if (!selectedFiles.length) return;
 
-  products = response.products || products;
-  form.querySelector('input[name="image"]').value = response.product.image;
-  form.querySelector(".admin-product-preview").style.setProperty("--product-image", `url('${response.product.image}')`);
-  note.textContent = response.product.imageName || prepared.fileName;
-  adminProductsNote.textContent = "Фото загружено и сохранено для этого товара.";
-  adminProductsNote.classList.remove("error");
+  uploadButton.disabled = true;
+  note.textContent = `Uploading ${selectedFiles.length} photo${selectedFiles.length === 1 ? "" : "s"}...`;
+  setProductsStatus("");
+
+  for (const [index, file] of selectedFiles.entries()) {
+    note.textContent = `Uploading ${index + 1} of ${selectedFiles.length}: ${file.name}`;
+    const prepared = await prepareProductImage(file);
+    latestResponse = await api("/api/admin/products/photo", {
+      method: "POST",
+      body: JSON.stringify({
+        productId,
+        fileName: prepared.fileName,
+        dataUrl: prepared.dataUrl
+      })
+    });
+    products = latestResponse.products || products;
+  }
+
+  uploadButton.disabled = false;
+  products = latestResponse?.products || products;
+  renderProductsEditor();
+  setProductsStatus(`${selectedFiles.length} photo${selectedFiles.length === 1 ? "" : "s"} uploaded and saved.`);
 }
 
-async function loadProducts() {
-  adminProductsNote.textContent = "";
+function updateSizePicker(picker) {
+  const activeSizes = Array.from(picker.querySelectorAll(".admin-size-button.active")).map((button) => button.dataset.sizeOption);
+  picker.querySelector('input[name="sizes"]').value = activeSizes.join(", ");
+  return activeSizes;
+}
+
+async function loadProducts(options = {}) {
+  if (!options.silent) setProductsStatus("");
 
   try {
     const data = await api("/api/admin/products");
     products = data.products || [];
     showDashboard();
     renderProductsEditor();
+    if (!options.silent) setProductsStatus("Product cards refreshed.");
   } catch (error) {
     showLocked(error.message);
   }
@@ -248,9 +353,19 @@ adminProductsList.addEventListener("submit", (event) => {
   event.preventDefault();
 
   const form = event.target.closest("[data-product-id]");
+  const submitButton = form.querySelector('button[type="submit"]');
   const data = Object.fromEntries(new FormData(form));
   data.productId = form.dataset.productId;
   data.price = Number(data.price);
+
+  if (!String(data.sizes || "").trim()) {
+    setProductsStatus("Select at least one size before saving.", true);
+    return;
+  }
+
+  submitButton.disabled = true;
+  submitButton.textContent = "Saving...";
+  setProductsStatus("");
 
   api("/api/admin/products", {
     method: "PATCH",
@@ -259,21 +374,50 @@ adminProductsList.addEventListener("submit", (event) => {
     .then((response) => {
       products = response.products || products;
       renderProductsEditor();
-      adminProductsNote.textContent = "Product saved. SEO tags will update automatically.";
-      adminProductsNote.classList.remove("error");
+      setProductsStatus("Product card saved successfully. SEO tags updated automatically.");
     })
     .catch((error) => {
-      adminProductsNote.textContent = error.message;
-      adminProductsNote.classList.add("error");
+      setProductsStatus(error.message, true);
+    })
+    .finally(() => {
+      submitButton.disabled = false;
+      submitButton.textContent = "Save product";
     });
 });
 
 adminProductsList.addEventListener("click", (event) => {
-  const button = event.target.closest("[data-upload-photo]");
-  if (!button) return;
+  const uploadButton = event.target.closest("[data-upload-photo]");
+  if (uploadButton) {
+    uploadButton.closest("[data-product-id]").querySelector("[data-photo-input]").click();
+    return;
+  }
 
-  const form = button.closest("[data-product-id]");
-  form.querySelector("[data-photo-input]").click();
+  const sizeButton = event.target.closest("[data-size-option]");
+  if (sizeButton) {
+    const picker = sizeButton.closest("[data-size-picker]");
+    const activeCount = picker.querySelectorAll(".admin-size-button.active").length;
+    if (sizeButton.classList.contains("active") && activeCount === 1) {
+      setProductsStatus("At least one size must stay active.", true);
+      return;
+    }
+
+    sizeButton.classList.toggle("active");
+    sizeButton.setAttribute("aria-pressed", sizeButton.classList.contains("active") ? "true" : "false");
+    updateSizePicker(picker);
+    setProductsStatus("Size selection updated. Click Save product to save.");
+    return;
+  }
+
+  const photoTile = event.target.closest("[data-cover-photo]");
+  if (photoTile) {
+    const form = photoTile.closest("[data-product-id]");
+    const image = photoTile.dataset.coverPhoto;
+    form.querySelector('input[name="image"]').value = image;
+    form.querySelector(".admin-product-preview").style.setProperty("--product-image", `url('${image}')`);
+    form.querySelectorAll(".admin-photo-tile").forEach((tile) => tile.classList.remove("active"));
+    photoTile.classList.add("active");
+    setProductsStatus("Cover photo selected. Click Save product to save.");
+  }
 });
 
 adminProductsList.addEventListener("change", (event) => {
@@ -281,13 +425,17 @@ adminProductsList.addEventListener("change", (event) => {
   if (!input || !input.files.length) return;
 
   const form = input.closest("[data-product-id]");
-  uploadProductPhoto(form, input.files[0]).catch((error) => {
-    adminProductsNote.textContent = error.message;
-    adminProductsNote.classList.add("error");
-    input.value = "";
-  });
+  uploadProductPhotos(form, input.files)
+    .catch((error) => {
+      const uploadButton = form.querySelector("[data-upload-photo]");
+      uploadButton.disabled = false;
+      setProductsStatus(error.message, true);
+    })
+    .finally(() => {
+      input.value = "";
+    });
 });
 
-reloadProducts.addEventListener("click", loadProducts);
+reloadProducts.addEventListener("click", () => loadProducts());
 
-loadProducts();
+loadProducts({ silent: true });

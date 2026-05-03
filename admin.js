@@ -45,6 +45,18 @@ const escapeHtml = (value) =>
     return entities[char];
   });
 
+function setAdminStatus(message, isError = false) {
+  adminNote.textContent = message;
+  adminNote.classList.toggle("error", isError);
+  adminNote.classList.toggle("success", Boolean(message) && !isError);
+}
+
+function setReviewsStatus(message, isError = false) {
+  adminReviewsNote.textContent = message;
+  adminReviewsNote.classList.toggle("error", isError);
+  adminReviewsNote.classList.toggle("success", Boolean(message) && !isError);
+}
+
 function getStock(productId) {
   return Number(inventory[productId]?.stock || 0);
 }
@@ -136,7 +148,7 @@ function showDashboard() {
 }
 
 async function loadInventory() {
-  adminNote.textContent = "";
+  setAdminStatus("");
 
   try {
     const data = await api("/api/admin/inventory");
@@ -145,6 +157,7 @@ async function loadInventory() {
     renderInventory();
     loadProducts();
     loadReviews();
+    setAdminStatus("Inventory refreshed successfully.");
   } catch (error) {
     showLocked(error.message);
   }
@@ -157,21 +170,20 @@ async function loadProducts() {
     renderStats();
     renderInventory();
   } catch (error) {
-    adminNote.textContent = error.message;
-    adminNote.classList.add("error");
+    setAdminStatus(error.message, true);
   }
 }
 
 async function loadReviews() {
-  adminReviewsNote.textContent = "";
+  setReviewsStatus("");
 
   try {
     const data = await api("/api/admin/reviews");
     reviews = data.reviews || [];
     renderReviews();
+    setReviewsStatus("Reviews refreshed successfully.");
   } catch (error) {
-    adminReviewsNote.textContent = error.message;
-    adminReviewsNote.classList.add("error");
+    setReviewsStatus(error.message, true);
   }
 }
 
@@ -183,8 +195,7 @@ async function saveStock(productId, stock, noteElement) {
 
   inventory[productId] = data.inventory;
   renderInventory();
-  adminNote.textContent = "Stock saved.";
-  adminNote.classList.remove("error");
+  setAdminStatus("Stock saved successfully.");
   if (noteElement) noteElement.textContent = "";
 }
 
@@ -196,6 +207,7 @@ inventoryList.addEventListener("click", (event) => {
   const input = row.querySelector('input[name="stock"]');
   const nextValue = Math.max(0, Number(input.value || 0) + Number(button.dataset.adjust));
   input.value = nextValue;
+  setAdminStatus("Stock value changed. Click Save to apply.");
 });
 
 inventoryList.addEventListener("submit", (event) => {
@@ -206,14 +218,12 @@ inventoryList.addEventListener("submit", (event) => {
   const stock = Number(row.elements.stock.value);
 
   if (!Number.isInteger(stock) || stock < 0) {
-    adminNote.textContent = "Stock must be an integer from 0.";
-    adminNote.classList.add("error");
+    setAdminStatus("Stock must be an integer from 0.", true);
     return;
   }
 
   saveStock(productId, stock).catch((error) => {
-    adminNote.textContent = error.message;
-    adminNote.classList.add("error");
+    setAdminStatus(error.message, true);
   });
 });
 
@@ -234,12 +244,10 @@ adminReviewsList.addEventListener("click", (event) => {
     .then(() => {
       reviews = reviews.filter((review) => review.id !== reviewId);
       renderReviews();
-      adminReviewsNote.textContent = "Review deleted.";
-      adminReviewsNote.classList.remove("error");
+      setReviewsStatus("Review deleted successfully.");
     })
     .catch((error) => {
-      adminReviewsNote.textContent = error.message;
-      adminReviewsNote.classList.add("error");
+      setReviewsStatus(error.message, true);
     });
 });
 

@@ -810,6 +810,10 @@ textarea:focus {
   color: var(--coral);
 }
 
+.form-note.success {
+  color: var(--pine);
+}
+
 .checkout-topbar {
   color: var(--ink);
   background: rgba(251, 251, 248, 0.9);
@@ -943,6 +947,7 @@ textarea:focus {
 
 .checkout-panel,
 .summary-panel {
+  min-width: 0;
   border: 1px solid var(--line);
   border-radius: 8px;
   background: var(--white);
@@ -960,6 +965,11 @@ textarea:focus {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 16px;
+}
+
+.form-grid > label,
+.form-grid > div {
+  min-width: 0;
 }
 
 .span-2 {
@@ -1645,21 +1655,24 @@ textarea:focus {
 
 .admin-product-form {
   display: grid;
-  grid-template-columns: minmax(160px, 0.28fr) 1fr;
-  gap: 18px;
+  grid-template-columns: minmax(220px, 0.34fr) minmax(0, 1fr);
+  align-items: start;
+  gap: 20px;
   border: 1px solid var(--line);
   border-radius: 8px;
-  padding: 14px;
+  padding: 16px;
   background: #fff;
 }
 
 .admin-product-preview {
-  min-height: 190px;
+  aspect-ratio: 4 / 5;
+  min-height: 0;
   border-radius: 8px;
   border: 1px solid var(--line);
   background-image: var(--product-image, url("assets/embroidered-collection.png"));
   background-position: var(--focus, center);
-  background-size: 195%;
+  background-repeat: no-repeat;
+  background-size: cover;
   background-color: #f8faf8;
 }
 
@@ -1682,12 +1695,70 @@ textarea:focus {
 
 .admin-photo-upload {
   display: grid;
-  gap: 8px;
+  gap: 10px;
 }
 
-.admin-photo-upload > span {
+.admin-photo-header {
+  display: grid;
+  gap: 3px;
+}
+
+.admin-photo-header span,
+.admin-size-picker > div:first-child span {
   color: var(--muted);
   font-size: 0.94rem;
+  font-weight: 760;
+}
+
+.admin-photo-header small,
+.admin-size-picker small {
+  color: var(--muted);
+  font-size: 0.82rem;
+  font-weight: 650;
+}
+
+.admin-photo-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(86px, 1fr));
+  gap: 10px;
+}
+
+.admin-photo-tile {
+  display: grid;
+  gap: 6px;
+  width: 100%;
+  min-width: 0;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 7px;
+  color: var(--muted);
+  background: #f8faf8;
+  cursor: pointer;
+}
+
+.admin-photo-tile.active {
+  border-color: var(--pine);
+  box-shadow: inset 0 0 0 1px var(--pine);
+  color: var(--pine);
+  background: #eef7f3;
+}
+
+.admin-photo-thumb {
+  display: block;
+  aspect-ratio: 1 / 1;
+  border-radius: 6px;
+  background-image: var(--product-image, url("assets/embroidered-collection.png"));
+  background-position: var(--focus, center);
+  background-repeat: no-repeat;
+  background-size: cover;
+}
+
+.admin-photo-tile small {
+  overflow: hidden;
+  font-size: 0.74rem;
+  font-weight: 760;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .admin-photo-actions {
@@ -1699,6 +1770,39 @@ textarea:focus {
 
 .admin-photo-actions small {
   color: var(--muted);
+}
+
+.admin-size-picker {
+  display: grid;
+  gap: 10px;
+}
+
+.admin-size-options {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.admin-size-button {
+  min-height: 38px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 8px 12px;
+  color: var(--muted);
+  background: #f8faf8;
+  cursor: pointer;
+  font-weight: 800;
+}
+
+.admin-size-button.active {
+  border-color: var(--pine);
+  color: var(--pine);
+  background: #edf8f4;
+}
+
+.admin-product-fields > .button {
+  justify-self: end;
+  min-width: 170px;
 }
 
 .full-span {
