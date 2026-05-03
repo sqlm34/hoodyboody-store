@@ -184,6 +184,35 @@ const checkoutLink = document.querySelector(".checkout-link");
 const scrim = document.querySelector(".scrim");
 const customFiles = document.querySelector("#customFiles");
 const filePreview = document.querySelector("#filePreview");
+let catalogHeightFrame = 0;
+
+function syncCatalogCardHeights() {
+  if (!catalogGrid) return;
+
+  if (catalogHeightFrame) {
+    cancelAnimationFrame(catalogHeightFrame);
+  }
+
+  catalogHeightFrame = requestAnimationFrame(() => {
+    catalogHeightFrame = 0;
+    const cards = Array.from(catalogGrid.querySelectorAll(".product-card"));
+    if (!cards.length) return;
+
+    cards.forEach((card) => {
+      card.style.height = "auto";
+    });
+
+    const tallestCard = cards.reduce(
+      (height, card) =>
+        Math.max(height, Math.ceil(card.getBoundingClientRect().height)),
+      0
+    );
+
+    cards.forEach((card) => {
+      card.style.height = `${tallestCard}px`;
+    });
+  });
+}
 
 function renderCatalog() {
   const visibleProducts =
@@ -220,6 +249,8 @@ function renderCatalog() {
       `
     )
     .join("");
+
+  syncCatalogCardHeights();
 }
 
 function addToCart(item) {
@@ -348,6 +379,12 @@ catalogGrid.addEventListener("keydown", (event) => {
   event.preventDefault();
   window.location.href = card.dataset.productUrl;
 });
+
+window.addEventListener("resize", syncCatalogCardHeights);
+
+if (document.fonts && document.fonts.ready) {
+  document.fonts.ready.then(syncCatalogCardHeights).catch(() => {});
+}
 
 cartItems.addEventListener("click", (event) => {
   const quantityButton = event.target.closest("[data-qty]");

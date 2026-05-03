@@ -420,8 +420,9 @@ h3 {
 .product-card {
   display: grid;
   grid-template-rows: 238px 1fr;
-  min-height: 520px;
-  height: 520px;
+  width: 100%;
+  min-width: 0;
+  height: auto;
   overflow: hidden;
   border: 1px solid var(--line);
   border-radius: 8px;
@@ -442,6 +443,7 @@ h3 {
 .product-image {
   position: relative;
   min-height: 238px;
+  border-radius: 7px 7px 0 0;
   background-image: var(--product-image, url("assets/embroidered-collection.png"));
   background-position: var(--focus, center);
   background-repeat: no-repeat;
@@ -462,22 +464,20 @@ h3 {
 
 .product-body {
   display: grid;
-  grid-template-rows: auto minmax(68px, auto) auto auto 1fr;
+  grid-template-rows: auto auto auto auto auto;
   align-content: start;
   gap: 14px;
   min-height: 0;
+  min-width: 0;
   padding: 22px;
 }
 
 .product-body p {
-  display: -webkit-box;
   margin: 0;
-  overflow: hidden;
   color: var(--muted);
   font-size: 0.95rem;
   line-height: 1.45;
-  -webkit-box-orient: vertical;
-  -webkit-line-clamp: 3;
+  overflow-wrap: anywhere;
 }
 
 .product-rating {
@@ -563,13 +563,10 @@ h3 {
 }
 
 .product-meta h3 {
-  display: -webkit-box;
   min-width: 0;
   margin: 0;
-  overflow: hidden;
   line-height: 1.22;
-  -webkit-box-orient: vertical;
-  -webkit-line-clamp: 2;
+  overflow-wrap: anywhere;
 }
 
 .price {
@@ -582,7 +579,8 @@ h3 {
   display: flex;
   flex-wrap: wrap;
   gap: 7px;
-  align-self: end;
+  align-self: start;
+  padding-bottom: 2px;
 }
 
 .size-pill {
@@ -1974,8 +1972,6 @@ textarea:focus {
 
   .product-card {
     grid-template-rows: 220px 1fr;
-    min-height: 500px;
-    height: 500px;
   }
 
   .product-image {
@@ -2056,8 +2052,6 @@ textarea:focus {
 
   .product-card {
     grid-template-rows: 240px 1fr;
-    min-height: 500px;
-    height: 500px;
   }
 
   .product-image {
