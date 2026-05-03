@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="robots" content="noindex, nofollow, noarchive" />
     <title>Owner cabinet | NITKA Atelier</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css" />
     <link rel="stylesheet" href="styles.css" />
   </head>
   <body>
@@ -28,9 +29,9 @@
 
     <main class="checkout-page admin-page">
       <section class="checkout-hero admin-hero" aria-labelledby="admin-title">
-        <p class="eyebrow">inventory</p>
+        <p class="eyebrow">owner dashboard</p>
         <h1 id="admin-title">Owner cabinet</h1>
-        <p>Manage product stocks, quickly correct availability and control positions with low stock.</p>
+        <p>Open product cards to manage photos, sizes, stock and customer reviews in one place.</p>
       </section>
 
       <section class="admin-locked checkout-panel" id="adminLocked" hidden>
@@ -57,36 +58,12 @@
 
         <div class="checkout-panel admin-catalog-shortcut">
           <div>
-            <h2>Product cards and SEO</h2>
-            <p>Open a separate page to change product names, descriptions, photos and SEO snippets.</p>
+            <h2>Edit product cards</h2>
+            <p>Manage product names, descriptions, photos, SEO, stock and reviews by product.</p>
           </div>
           <a class="button primary" href="admin-products.html">Edit product cards</a>
         </div>
-
-        <div class="checkout-panel inventory-panel">
-          <div class="inventory-head">
-            <div>
-              <h2>Product stocks</h2>
-              <p>Enter the actual quantity after recounting and save the row.</p>
-            </div>
-            <button class="button ghost dark" type="button" id="reloadInventory">Refresh</button>
-          </div>
-          <div class="inventory-list" id="inventoryList"></div>
-          <p class="form-note" id="adminNote" role="status" aria-live="polite"></p>
-        </div>
-
-        <div class="checkout-panel admin-reviews-panel">
-          <div class="inventory-head">
-            <div>
-              <h2>Customer reviews</h2>
-              <p>View comments on products and delete inappropriate reviews.</p>
-            </div>
-            <button class="button ghost dark" type="button" id="reloadReviews">Refresh</button>
-          </div>
-          <div class="admin-reviews-list" id="adminReviewsList"></div>
-          <div class="summary-empty" id="adminReviewsEmpty" hidden>No reviews yet.</div>
-          <p class="form-note" id="adminReviewsNote" role="status" aria-live="polite"></p>
-        </div>
+        <p class="form-note" id="adminNote" role="status" aria-live="polite"></p>
       </section>
     </main>
 

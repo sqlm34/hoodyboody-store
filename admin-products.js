@@ -12,6 +12,10 @@ const adminProductsList = document.querySelector("#adminProductsList");
 const adminProductsNote = document.querySelector("#adminProductsNote");
 const reloadProducts = document.querySelector("#reloadProducts");
 
+let inventory = {};
+let reviews = [];
+let statusTimer = 0;
+
 async function api(path, options = {}) {
   const response = await fetch(path, {
     headers: { "Content-Type": "application/json", ...(options.headers || {}) },
@@ -44,10 +48,18 @@ function csv(value) {
   return Array.isArray(value) ? value.join(", ") : "";
 }
 
-function setProductsStatus(message, isError = false) {
+function setProductsStatus(message, isError = false, options = {}) {
+  clearTimeout(statusTimer);
   adminProductsNote.textContent = message;
   adminProductsNote.classList.toggle("error", isError);
   adminProductsNote.classList.toggle("success", Boolean(message) && !isError);
+
+  if (message && !options.persist) {
+    statusTimer = setTimeout(() => {
+      adminProductsNote.textContent = "";
+      adminProductsNote.classList.remove("error", "success");
+    }, 2600);
+  }
 }
 
 function getSizeOptions(product) {
@@ -86,6 +98,20 @@ function getProductPhotos(product) {
   }
 
   return photos;
+}
+
+function getStock(productId) {
+  return Number(inventory[productId]?.stock || 0);
+}
+
+function getStockStatus(stock) {
+  if (stock <= 0) return { className: "out", text: "Out of stock" };
+  if (stock <= 5) return { className: "low", text: "Low stock" };
+  return { className: "in", text: "In stock" };
+}
+
+function getProductReviews(productId) {
+  return reviews.filter((review) => review.productId === productId);
 }
 
 function renderPhotoTiles(product) {
@@ -140,6 +166,73 @@ function renderSizePicker(product) {
           .join("")}
       </div>
     </div>
+  `;
+}
+
+function renderStockEditor(product) {
+  const stock = getStock(product.id);
+  const status = getStockStatus(stock);
+  const updatedAt = inventory[product.id]?.updatedAt
+    ? new Date(inventory[product.id].updatedAt).toLocaleString("en-US")
+    : "no data";
+
+  return `
+    <section class="admin-product-stock full-span" data-stock-editor>
+      <div class="admin-inline-head">
+        <div>
+          <strong>Product stock</strong>
+          <small>Updated: ${escapeHtml(updatedAt)}</small>
+        </div>
+        <span class="stock-pill ${status.className}">${status.text}</span>
+      </div>
+      <div class="admin-stock-controls">
+        <button class="icon-button" type="button" data-adjust-stock="-1" aria-label="Decrease stock">-</button>
+        <input type="number" name="stock" min="0" step="1" value="${stock}" aria-label="Product stock" />
+        <button class="icon-button" type="button" data-adjust-stock="1" aria-label="Increase stock">+</button>
+        <button class="button primary" type="button" data-save-stock>Save stock</button>
+      </div>
+    </section>
+  `;
+}
+
+function renderProductReviews(product) {
+  const productReviews = getProductReviews(product.id);
+
+  return `
+    <section class="admin-product-reviews full-span">
+      <div class="admin-inline-head">
+        <div>
+          <strong>Customer reviews</strong>
+          <small>${productReviews.length ? `${productReviews.length} review${productReviews.length === 1 ? "" : "s"}` : "No reviews yet"}</small>
+        </div>
+      </div>
+      ${
+        productReviews.length
+          ? `<div class="admin-review-grid">
+              ${productReviews
+                .map((review) => {
+                  const rating = Math.max(1, Math.min(5, Number(review.rating) || 1));
+                  const createdAt = review.createdAt ? new Date(review.createdAt).toLocaleString("en-US") : "";
+
+                  return `
+                    <article class="admin-review-card" data-review-id="${escapeHtml(review.id)}">
+                      <div>
+                        <strong>${escapeHtml(review.userName || "Client")}</strong>
+                        <span>${rating}/5</span>
+                      </div>
+                      <p>${escapeHtml(review.text)}</p>
+                      <footer>
+                        <span>${escapeHtml(createdAt)}</span>
+                        <button class="button ghost dark" type="button" data-delete-review="${escapeHtml(review.id)}">Delete</button>
+                      </footer>
+                    </article>
+                  `;
+                })
+                .join("")}
+            </div>`
+          : `<div class="summary-empty admin-product-empty">No reviews for this product.</div>`
+      }
+    </section>
   `;
 }
 
@@ -207,6 +300,8 @@ function renderProductsEditor() {
                 <input name="focus" value="${escapeHtml(product.focus || "center")}" placeholder="50% 50%" />
               </label>
               ${renderSizePicker(product)}
+              ${renderStockEditor(product)}
+              ${renderProductReviews(product)}
               <label class="full-span">
                 Card description
                 <textarea name="description" rows="2" required>${escapeHtml(product.description || "")}</textarea>
@@ -335,15 +430,22 @@ function updateSizePicker(picker) {
   return activeSizes;
 }
 
-async function loadProducts(options = {}) {
-  if (!options.silent) setProductsStatus("");
+async function loadEditorData(options = {}) {
+  if (!options.silent) setProductsStatus("Refreshing owner data...");
 
   try {
-    const data = await api("/api/admin/products");
-    products = data.products || [];
+    const [productsData, inventoryData, reviewsData] = await Promise.all([
+      api("/api/admin/products"),
+      api("/api/admin/inventory"),
+      api("/api/admin/reviews")
+    ]);
+
+    products = productsData.products || [];
+    inventory = inventoryData.inventory || {};
+    reviews = reviewsData.reviews || [];
     showDashboard();
     renderProductsEditor();
-    if (!options.silent) setProductsStatus("Product cards refreshed.");
+    if (!options.silent) setProductsStatus("Owner product data refreshed successfully.");
   } catch (error) {
     showLocked(error.message);
   }
@@ -365,7 +467,7 @@ adminProductsList.addEventListener("submit", (event) => {
 
   submitButton.disabled = true;
   submitButton.textContent = "Saving...";
-  setProductsStatus("");
+  setProductsStatus("Saving product card...", false, { persist: true });
 
   api("/api/admin/products", {
     method: "PATCH",
@@ -388,6 +490,7 @@ adminProductsList.addEventListener("submit", (event) => {
 adminProductsList.addEventListener("click", (event) => {
   const uploadButton = event.target.closest("[data-upload-photo]");
   if (uploadButton) {
+    setProductsStatus("Choose photos from your computer.");
     uploadButton.closest("[data-product-id]").querySelector("[data-photo-input]").click();
     return;
   }
@@ -417,6 +520,72 @@ adminProductsList.addEventListener("click", (event) => {
     form.querySelectorAll(".admin-photo-tile").forEach((tile) => tile.classList.remove("active"));
     photoTile.classList.add("active");
     setProductsStatus("Cover photo selected. Click Save product to save.");
+    return;
+  }
+
+  const stockButton = event.target.closest("[data-adjust-stock]");
+  if (stockButton) {
+    const editor = stockButton.closest("[data-stock-editor]");
+    const input = editor.querySelector('input[name="stock"]');
+    input.value = Math.max(0, Number(input.value || 0) + Number(stockButton.dataset.adjustStock));
+    setProductsStatus("Stock value changed. Click Save stock to apply.");
+    return;
+  }
+
+  const saveStockButton = event.target.closest("[data-save-stock]");
+  if (saveStockButton) {
+    const form = saveStockButton.closest("[data-product-id]");
+    const productId = form.dataset.productId;
+    const input = form.querySelector('[data-stock-editor] input[name="stock"]');
+    const stock = Number(input.value);
+
+    if (!Number.isInteger(stock) || stock < 0) {
+      setProductsStatus("Stock must be an integer from 0.", true);
+      return;
+    }
+
+    saveStockButton.disabled = true;
+    setProductsStatus("Saving stock...", false, { persist: true });
+    api("/api/admin/inventory", {
+      method: "PATCH",
+      body: JSON.stringify({ productId, stock })
+    })
+      .then((data) => {
+        inventory[productId] = data.inventory;
+        renderProductsEditor();
+        setProductsStatus("Product stock saved successfully.");
+      })
+      .catch((error) => {
+        setProductsStatus(error.message, true);
+      })
+      .finally(() => {
+        saveStockButton.disabled = false;
+      });
+    return;
+  }
+
+  const deleteReviewButton = event.target.closest("[data-delete-review]");
+  if (deleteReviewButton) {
+    const reviewId = deleteReviewButton.dataset.deleteReview;
+    if (!window.confirm("Delete this review?")) return;
+
+    deleteReviewButton.disabled = true;
+    setProductsStatus("Deleting review...", false, { persist: true });
+    api("/api/admin/reviews", {
+      method: "DELETE",
+      body: JSON.stringify({ reviewId })
+    })
+      .then(() => {
+        reviews = reviews.filter((review) => review.id !== reviewId);
+        renderProductsEditor();
+        setProductsStatus("Review deleted successfully.");
+      })
+      .catch((error) => {
+        setProductsStatus(error.message, true);
+      })
+      .finally(() => {
+        deleteReviewButton.disabled = false;
+      });
   }
 });
 
@@ -436,6 +605,6 @@ adminProductsList.addEventListener("change", (event) => {
     });
 });
 
-reloadProducts.addEventListener("click", () => loadProducts());
+reloadProducts.addEventListener("click", () => loadEditorData());
 
-loadProducts({ silent: true });
+loadEditorData({ silent: true });
