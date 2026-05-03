@@ -958,14 +958,15 @@ function shippoRequest(method, apiPath, payload = null) {
   });
 }
 
-function getCartProductIdForShipping(item) {
-  return getCartProductId(item, Object.fromEntries(productCatalog.map((product) => [product.id, true])));
+function getCartProductIdForShipping(item, db) {
+  const productLookup = Object.fromEntries(publicProducts(db).map((product) => [product.id, true]));
+  return getCartProductId(item, productLookup);
 }
 
-function getParcelForItems(items) {
+function getParcelForItems(items, db) {
   const quantity = items.reduce((sum, item) => sum + Math.max(1, Number(item.quantity) || 1), 0);
   const weight = items.reduce((sum, item) => {
-    const productId = getCartProductIdForShipping(item);
+    const productId = getCartProductIdForShipping(item, db);
     const baseWeight = productId === "canvas-tote" ? 10 : productId ? 18 : 16;
     return sum + baseWeight * Math.max(1, Number(item.quantity) || 1);
   }, 0);
@@ -996,7 +997,7 @@ function publicShippoRates(data) {
     .sort((a, b) => a.price - b.price);
 }
 
-async function createShippoShipment(body) {
+async function createShippoShipment(body, db) {
   if (!shippoApiKey) {
     throw new Error("Shippo is not configured. Set SHIPPO_API_KEY before starting the server.");
   }
@@ -1013,7 +1014,7 @@ async function createShippoShipment(body) {
     throw new Error("Enter a complete US delivery address before calculating shipping.");
   }
 
-  const parcel = getParcelForItems(items);
+  const parcel = getParcelForItems(items, db);
 
   return shippoRequest("POST", "/shipments/", {
     address_to: {
@@ -1322,7 +1323,7 @@ async function handleApi(req, res) {
 
     if (url.pathname === "/api/shipping/rates" && method === "POST") {
       const body = await readJson(req);
-      const shipment = await createShippoShipment(body);
+      const shipment = await createShippoShipment(body, db);
       const rates = publicShippoRates(shipment);
 
       if (!rates.length) {
