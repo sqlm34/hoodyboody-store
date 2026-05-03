@@ -272,6 +272,7 @@ const cartEmpty = document.querySelector("#cartEmpty");
 const cartTotal = document.querySelector("#cartTotal");
 const cartCount = document.querySelector(".cart-count");
 const cartDeliveryNotice = document.querySelector("#cartDeliveryNotice");
+const checkoutLink = document.querySelector(".checkout-link");
 const scrim = document.querySelector(".scrim");
 const customFiles = document.querySelector("#customFiles");
 const filePreview = document.querySelector("#filePreview");
@@ -354,6 +355,7 @@ function renderCart() {
   cartCount.textContent = itemCount;
   cartTotal.textContent = formatPrice(total);
   cartEmpty.classList.toggle("visible", state.cart.length === 0);
+  checkoutLink.setAttribute("aria-disabled", state.cart.length === 0 ? "true" : "false");
   cartDeliveryNotice.hidden = state.cart.length === 0;
   cartDeliveryNotice.classList.toggle("success", state.cart.length > 0 && remainingForFreeDelivery === 0);
   cartDeliveryNotice.textContent =
@@ -452,8 +454,10 @@ document.querySelector(".add-more-link").addEventListener("click", () => {
   history.pushState(null, "", "#catalog");
 });
 
-document.querySelector(".checkout-link").addEventListener("click", (event) => {
+checkoutLink.addEventListener("click", (event) => {
   event.preventDefault();
+  if (state.cart.length === 0) return;
+
   persistCart();
   window.location.href = "checkout.html";
 });
