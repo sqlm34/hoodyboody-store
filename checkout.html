@@ -31,8 +31,7 @@
         <p class="eyebrow">checkout</p>
         <h1 id="checkout-title">Order checkout</h1>
         <p>
-          Check the order composition, specify the delivery address and choose the payment method.
-          Bank payment is connected through a secure bank page or payment provider.
+          Check the order composition, specify the delivery address and continue to secure card payment.
         </p>
       </section>
 
@@ -126,28 +125,7 @@
               <p class="form-note span-2" id="shippingRateNote" role="status" aria-live="polite"></p>
             </div>
           </div>
-
-          <div class="checkout-panel">
-            <h2>Payment</h2>
-            <div class="payment-options" aria-label="Payment method">
-              <label class="option-tile">
-                <input type="radio" name="payment" value="card" checked />
-                <span>
-                  <strong>Bank card</strong>
-                  <small>through secure payment page</small>
-                </span>
-              </label>
-            </div>
-            <div class="bank-payment-box">
-              <strong>Secure bank payment</strong>
-              <p>
-                On the working site, this button will create an order on the server and
-                open the bank's payment page. Card number, expiration date and CVV are entered
-                only on the bank's side or payment provider.
-              </p>
-            </div>
-          </div>
-
+          <input type="hidden" name="payment" value="card" />
           <button class="button primary wide checkout-submit" type="submit" disabled>Continue</button>
           <p class="form-note checkout-note" role="status" aria-live="polite"></p>
         </form>

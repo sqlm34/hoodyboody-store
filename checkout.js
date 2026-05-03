@@ -307,7 +307,7 @@ async function loadCustomer() {
 function getCheckoutPayload() {
   const formData = Object.fromEntries(new FormData(checkoutForm));
   const deliveryInput = document.querySelector('input[name="delivery"]:checked');
-  const paymentInput = document.querySelector('input[name="payment"]:checked');
+  const paymentInput = checkoutForm.elements.payment;
   const subtotal = getItemsTotal();
   const delivery = getDeliveryPrice();
   const total = subtotal + delivery;
@@ -336,7 +336,7 @@ function getCheckoutPayload() {
       shippoRateId: selectedShippingRate?.id || ""
     },
     payment: {
-      type: paymentInput.value,
+      type: paymentInput?.value || "card",
       provider: "stripe"
     },
     totals: { subtotal, delivery, total }

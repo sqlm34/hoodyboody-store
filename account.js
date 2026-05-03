@@ -42,8 +42,8 @@ const editConfirm = document.querySelector("#editConfirm");
 const confirmSaveIntent = document.querySelector("#confirmSaveIntent");
 const cancelProfileChanges = document.querySelector("#cancelProfileChanges");
 
-const editableInputs = Array.from(profileForm.querySelectorAll("input")).filter(
-  (input) => input.name !== "email"
+const editableInputs = Array.from(profileForm.querySelectorAll("input, select")).filter(
+  (field) => field.name !== "email"
 );
 let originalProfile = null;
 let isEditing = false;
@@ -55,6 +55,7 @@ function getProfileValues() {
     phone: profileForm.elements.phone.value,
     email: profileForm.elements.email.value,
     city: profileForm.elements.city.value,
+    state: profileForm.elements.state.value,
     zip: profileForm.elements.zip.value,
     address: profileForm.elements.address.value,
     apartment: profileForm.elements.apartment.value,
@@ -110,6 +111,7 @@ function fillProfile(user) {
   window.NITKA_PHONE.getInstance(profileForm.elements.phone)?.setNumber(user.phone || "");
   profileForm.elements.email.value = user.email || "";
   profileForm.elements.city.value = address.city || "";
+  profileForm.elements.state.value = address.state || "";
   profileForm.elements.zip.value = address.zip || "";
   profileForm.elements.address.value = address.address || "";
   profileForm.elements.apartment.value = address.apartment || "";
