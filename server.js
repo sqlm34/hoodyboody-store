@@ -1016,7 +1016,17 @@ async function handleApi(req, res) {
       sendJson(res, 200, {
         ok: true,
         storage: hasPostgresDb ? "postgres" : hasRedisDb ? "redis" : memoryDb ? "memory" : "file",
-        vercel: Boolean(process.env.VERCEL)
+        vercel: Boolean(process.env.VERCEL),
+        databaseEnv: {
+          redis: hasRedisDb,
+          postgresUrl: Boolean(postgresUrl),
+          pgHost: Boolean(process.env.PGHOST || localEnv.PGHOST),
+          pgDatabase: Boolean(process.env.PGDATABASE || localEnv.PGDATABASE),
+          pgUser: Boolean(process.env.PGUSER || localEnv.PGUSER),
+          pgPassword: Boolean(postgresPassword),
+          awsIam: hasAwsIamPostgres,
+          oidc: Boolean(process.env.VERCEL_OIDC_TOKEN)
+        }
       });
       return;
     }
