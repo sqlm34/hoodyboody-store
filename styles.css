@@ -1557,6 +1557,31 @@ textarea:focus {
   gap: 18px;
 }
 
+.admin-catalog-shortcut {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+}
+
+.admin-catalog-shortcut h2,
+.admin-catalog-shortcut p {
+  margin: 0;
+}
+
+.admin-catalog-shortcut p {
+  color: var(--muted);
+  margin-top: 6px;
+}
+
+.admin-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
 .admin-products-list {
   display: grid;
   gap: 14px;
@@ -1828,7 +1853,8 @@ textarea:focus {
   }
 
   .inventory-actions,
-  .inventory-head {
+  .inventory-head,
+  .admin-catalog-shortcut {
     align-items: flex-start;
     flex-direction: column;
   }
