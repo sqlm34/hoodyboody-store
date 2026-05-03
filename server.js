@@ -39,6 +39,8 @@ const redisRestToken =
   process.env.UPSTASH_REDIS_REST_TOKEN || process.env.KV_REST_API_TOKEN || localEnv.UPSTASH_REDIS_REST_TOKEN || localEnv.KV_REST_API_TOKEN || "";
 const redisDbKey = process.env.NITKA_REDIS_DB_KEY || localEnv.NITKA_REDIS_DB_KEY || "nitka:db";
 const hasRedisDb = Boolean(redisRestUrl && redisRestToken);
+const maxJsonBodyBytes = 6_500_000;
+const maxProductImageBytes = 2_500_000;
 const postgresUrl = process.env.DATABASE_URL || process.env.POSTGRES_URL || localEnv.DATABASE_URL || localEnv.POSTGRES_URL || "";
 const postgresPassword = process.env.PGPASSWORD || process.env.POSTGRES_PASSWORD || localEnv.PGPASSWORD || localEnv.POSTGRES_PASSWORD || "";
 const hasAwsIamPostgres = Boolean(
@@ -216,7 +218,7 @@ const defaultProducts = [
     ]
   }
 ];
-const emptyDb = { users: [], sessions: [], orders: [], reviews: [], inventory: {}, inventoryLog: [], pendingStripeOrders: [], products: [] };
+const emptyDb = { users: [], sessions: [], orders: [], reviews: [], inventory: {}, inventoryLog: [], pendingStripeOrders: [], products: [], productImages: {} };
 const memoryDb = process.env.NITKA_DB_PATH === ":memory:" || (process.env.VERCEL && !hasRedisDb && !hasPostgresDb) ? JSON.parse(JSON.stringify(emptyDb)) : null;
 const dbPath = memoryDb ? "" : path.resolve(root, process.env.NITKA_DB_PATH || "data/db.json");
 const dataDir = memoryDb ? "" : path.dirname(dbPath);
@@ -252,6 +254,7 @@ function ensureDbDefaults(db) {
   db.inventoryLog ||= [];
   db.pendingStripeOrders ||= [];
   db.products ||= [];
+  db.productImages ||= {};
 
   if (!db.products.length) {
     db.products = JSON.parse(JSON.stringify(defaultProducts));
@@ -351,6 +354,7 @@ function writeDb(db) {
     memoryDb.inventoryLog = db.inventoryLog;
     memoryDb.pendingStripeOrders = db.pendingStripeOrders;
     memoryDb.products = db.products;
+    memoryDb.productImages = db.productImages;
     return;
   }
 
@@ -536,13 +540,15 @@ function parseCookies(req) {
   );
 }
 
-function readJson(req) {
+function readJson(req, maxBytes = 1_000_000) {
   return new Promise((resolve, reject) => {
     let body = "";
+    let bodyBytes = 0;
 
     req.on("data", (chunk) => {
       body += chunk;
-      if (body.length > 1_000_000) {
+      bodyBytes += chunk.length;
+      if (bodyBytes > maxBytes) {
         reject(new Error("Request body too large"));
         req.destroy();
       }
@@ -704,6 +710,7 @@ function publicProduct(product) {
     sizes: Array.isArray(product.sizes) ? product.sizes : [],
     focus: product.focus || "center",
     image: product.image || "assets/embroidered-collection.png",
+    imageName: product.imageName || "",
     colors: Array.isArray(product.colors) ? product.colors : [],
     longDescription: product.longDescription || product.description,
     gallery: Array.isArray(product.gallery) ? product.gallery : [],
@@ -765,6 +772,41 @@ function sanitizeProductPatch(body, currentProduct) {
 
 function nextFocusFallback(focus) {
   return String(focus || "center").trim().slice(0, 40) || "center";
+}
+
+function parseProductImageDataUrl(value) {
+  const match = String(value || "").match(/^data:(image\/(?:jpeg|png|webp));base64,([a-z0-9+/=]+)$/i);
+  if (!match) return null;
+
+  const buffer = Buffer.from(match[2], "base64");
+  if (!buffer.length || buffer.length > maxProductImageBytes) return null;
+
+  return {
+    mimeType: match[1].toLowerCase(),
+    buffer
+  };
+}
+
+function getImageExtension(mimeType) {
+  if (mimeType === "image/png") return "png";
+  if (mimeType === "image/webp") return "webp";
+  return "jpg";
+}
+
+function getProductImageIdFromUrl(imageUrl) {
+  const prefix = "/api/product-images/";
+  const value = String(imageUrl || "");
+  if (!value.startsWith(prefix)) return "";
+  return decodeURIComponent(value.slice(prefix.length).split(/[?#]/)[0]);
+}
+
+function safeFileName(value, extension) {
+  const base = String(value || "product-photo")
+    .replace(/\.[^.]+$/, "")
+    .replace(/[^a-z0-9_-]+/gi, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 80);
+  return `${base || "product-photo"}.${extension}`;
 }
 
 function getStripeUnitAmount(price) {
@@ -1258,6 +1300,25 @@ async function handleApi(req, res) {
       return;
     }
 
+    if (url.pathname.startsWith("/api/product-images/") && method === "GET") {
+      const imageId = decodeURIComponent(url.pathname.slice("/api/product-images/".length));
+      const image = db.productImages?.[imageId];
+
+      if (!image?.data || !image?.mimeType) {
+        sendJson(res, 404, { message: "Product image not found." });
+        return;
+      }
+
+      const buffer = Buffer.from(image.data, "base64");
+      res.writeHead(200, {
+        "Content-Type": image.mimeType,
+        "Content-Length": buffer.length,
+        "Cache-Control": "public, max-age=31536000, immutable"
+      });
+      res.end(buffer);
+      return;
+    }
+
     if (url.pathname === "/api/shipping/rates" && method === "POST") {
       const body = await readJson(req);
       const shipment = await createShippoShipment(body);
@@ -1538,6 +1599,67 @@ async function handleApi(req, res) {
 
       await writeDbAsync(db);
       sendJson(res, 200, { product: publicProduct(nextProduct), products: publicProducts(db) });
+      return;
+    }
+
+    if (url.pathname === "/api/admin/products/photo" && method === "POST") {
+      const user = getSessionUser(req, db);
+      if (!user) {
+        sendJson(res, 401, { message: "You must be logged in as the store owner." });
+        return;
+      }
+
+      if (!isAdmin(user)) {
+        sendJson(res, 403, { message: "Only the store owner can upload product photos." });
+        return;
+      }
+
+      const body = await readJson(req, maxJsonBodyBytes);
+      const productId = String(body.productId || "").trim();
+      const productIndex = db.products.findIndex((product) => product.id === productId);
+
+      if (productIndex === -1) {
+        sendJson(res, 404, { message: "Product not found." });
+        return;
+      }
+
+      const parsed = parseProductImageDataUrl(body.dataUrl);
+      if (!parsed) {
+        sendJson(res, 400, { message: "Upload JPG, PNG, or WEBP up to 2.5 MB after compression." });
+        return;
+      }
+
+      const hash = crypto.createHash("sha256").update(parsed.buffer).digest("hex").slice(0, 16);
+      const extension = getImageExtension(parsed.mimeType);
+      const imageId = `${productId}-${Date.now().toString(36)}-${hash}.${extension}`;
+      const fileName = safeFileName(body.fileName, extension);
+      const previousImageId = getProductImageIdFromUrl(db.products[productIndex].image);
+
+      db.productImages[imageId] = {
+        id: imageId,
+        productId,
+        fileName,
+        mimeType: parsed.mimeType,
+        data: parsed.buffer.toString("base64"),
+        size: parsed.buffer.length,
+        createdAt: new Date().toISOString(),
+        updatedBy: user.id
+      };
+
+      if (previousImageId && previousImageId !== imageId) {
+        delete db.productImages[previousImageId];
+      }
+
+      db.products[productIndex] = {
+        ...db.products[productIndex],
+        image: `/api/product-images/${encodeURIComponent(imageId)}`,
+        imageName: fileName,
+        updatedAt: new Date().toISOString(),
+        updatedBy: user.id
+      };
+
+      await writeDbAsync(db);
+      sendJson(res, 200, { product: publicProduct(db.products[productIndex]), products: publicProducts(db) });
       return;
     }
 

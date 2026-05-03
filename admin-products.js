@@ -1,4 +1,6 @@
 let products = window.NITKA_PRODUCTS || [];
+const maxUploadSourceBytes = 12 * 1024 * 1024;
+const maxImageEdge = 1600;
 
 const adminProductsLocked = document.querySelector("#adminProductsLocked");
 const adminProductsLockedText = document.querySelector("#adminProductsLockedText");
@@ -90,10 +92,15 @@ function renderProductsEditor() {
                 Badge
                 <input name="badge" value="${escapeHtml(product.badge || "")}" />
               </label>
-              <label>
-                Photo URL or path
-                <input name="image" value="${escapeHtml(product.image || "")}" placeholder="assets/product-photo.jpg" />
-              </label>
+              <div class="admin-photo-upload">
+                <input name="image" type="hidden" value="${escapeHtml(product.image || "")}" />
+                <input type="file" accept="image/jpeg,image/png,image/webp" data-photo-input hidden />
+                <span>Фото товара</span>
+                <div class="admin-photo-actions">
+                  <button class="button ghost dark" type="button" data-upload-photo>Загрузить фото</button>
+                  <small>${escapeHtml(product.imageName || "Фото ещё не загружено")}</small>
+                </div>
+              </div>
               <label>
                 Photo focus
                 <input name="focus" value="${escapeHtml(product.focus || "center")}" placeholder="50% 50%" />
@@ -135,6 +142,95 @@ function renderProductsEditor() {
     .join("");
 }
 
+function readFileAsDataUrl(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.addEventListener("load", () => resolve(reader.result));
+    reader.addEventListener("error", () => reject(new Error("Could not read this image.")));
+    reader.readAsDataURL(file);
+  });
+}
+
+function loadImage(dataUrl) {
+  return new Promise((resolve, reject) => {
+    const image = new Image();
+    image.addEventListener("load", () => resolve(image));
+    image.addEventListener("error", () => reject(new Error("Could not prepare this image.")));
+    image.src = dataUrl;
+  });
+}
+
+function canvasToBlob(canvas) {
+  return new Promise((resolve, reject) => {
+    canvas.toBlob(
+      (blob) => {
+        if (!blob) {
+          reject(new Error("Could not compress this image."));
+          return;
+        }
+        resolve(blob);
+      },
+      "image/jpeg",
+      0.86
+    );
+  });
+}
+
+async function prepareProductImage(file) {
+  if (!file || !file.type.startsWith("image/")) {
+    throw new Error("Choose an image file.");
+  }
+
+  if (file.size > maxUploadSourceBytes) {
+    throw new Error("Choose an image up to 12 MB.");
+  }
+
+  const sourceDataUrl = await readFileAsDataUrl(file);
+  const image = await loadImage(sourceDataUrl);
+  const scale = Math.min(1, maxImageEdge / Math.max(image.naturalWidth, image.naturalHeight));
+  const width = Math.max(1, Math.round(image.naturalWidth * scale));
+  const height = Math.max(1, Math.round(image.naturalHeight * scale));
+  const canvas = document.createElement("canvas");
+  const context = canvas.getContext("2d");
+  canvas.width = width;
+  canvas.height = height;
+  context.drawImage(image, 0, 0, width, height);
+
+  const blob = await canvasToBlob(canvas);
+  const dataUrl = await readFileAsDataUrl(blob);
+  const baseName = file.name.replace(/\.[^.]+$/, "") || "product-photo";
+
+  return {
+    dataUrl,
+    fileName: `${baseName}.jpg`
+  };
+}
+
+async function uploadProductPhoto(form, file) {
+  const productId = form.dataset.productId;
+  const note = form.querySelector(".admin-photo-actions small");
+  note.textContent = "Загрузка фото...";
+  adminProductsNote.textContent = "";
+  adminProductsNote.classList.remove("error");
+
+  const prepared = await prepareProductImage(file);
+  const response = await api("/api/admin/products/photo", {
+    method: "POST",
+    body: JSON.stringify({
+      productId,
+      fileName: prepared.fileName,
+      dataUrl: prepared.dataUrl
+    })
+  });
+
+  products = response.products || products;
+  form.querySelector('input[name="image"]').value = response.product.image;
+  form.querySelector(".admin-product-preview").style.setProperty("--product-image", `url('${response.product.image}')`);
+  note.textContent = response.product.imageName || prepared.fileName;
+  adminProductsNote.textContent = "Фото загружено и сохранено для этого товара.";
+  adminProductsNote.classList.remove("error");
+}
+
 async function loadProducts() {
   adminProductsNote.textContent = "";
 
@@ -170,6 +266,26 @@ adminProductsList.addEventListener("submit", (event) => {
       adminProductsNote.textContent = error.message;
       adminProductsNote.classList.add("error");
     });
+});
+
+adminProductsList.addEventListener("click", (event) => {
+  const button = event.target.closest("[data-upload-photo]");
+  if (!button) return;
+
+  const form = button.closest("[data-product-id]");
+  form.querySelector("[data-photo-input]").click();
+});
+
+adminProductsList.addEventListener("change", (event) => {
+  const input = event.target.closest("[data-photo-input]");
+  if (!input || !input.files.length) return;
+
+  const form = input.closest("[data-product-id]");
+  uploadProductPhoto(form, input.files[0]).catch((error) => {
+    adminProductsNote.textContent = error.message;
+    adminProductsNote.classList.add("error");
+    input.value = "";
+  });
 });
 
 reloadProducts.addEventListener("click", loadProducts);

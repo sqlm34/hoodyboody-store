@@ -1624,6 +1624,27 @@ textarea:focus {
   font-size: 0.88rem;
 }
 
+.admin-photo-upload {
+  display: grid;
+  gap: 8px;
+}
+
+.admin-photo-upload > span {
+  color: var(--muted);
+  font-size: 0.94rem;
+}
+
+.admin-photo-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.admin-photo-actions small {
+  color: var(--muted);
+}
+
 .full-span {
   grid-column: 1 / -1;
 }
