@@ -3,6 +3,7 @@ const https = require("https");
 const fs = require("fs");
 const path = require("path");
 const crypto = require("crypto");
+let PgPool = null;
 
 function loadLocalEnv() {
   const envPath = path.resolve(__dirname, ".env");
@@ -35,6 +36,16 @@ const redisRestToken =
   process.env.UPSTASH_REDIS_REST_TOKEN || process.env.KV_REST_API_TOKEN || localEnv.UPSTASH_REDIS_REST_TOKEN || localEnv.KV_REST_API_TOKEN || "";
 const redisDbKey = process.env.NITKA_REDIS_DB_KEY || localEnv.NITKA_REDIS_DB_KEY || "nitka:db";
 const hasRedisDb = Boolean(redisRestUrl && redisRestToken);
+const postgresUrl = process.env.DATABASE_URL || process.env.POSTGRES_URL || localEnv.DATABASE_URL || localEnv.POSTGRES_URL || "";
+const postgresPassword = process.env.PGPASSWORD || process.env.POSTGRES_PASSWORD || localEnv.PGPASSWORD || localEnv.POSTGRES_PASSWORD || "";
+const hasPostgresDb = Boolean(
+  postgresUrl ||
+    (process.env.PGHOST &&
+      process.env.PGDATABASE &&
+      process.env.PGUSER &&
+      postgresPassword)
+);
+const postgresDbKey = process.env.NITKA_POSTGRES_DB_KEY || localEnv.NITKA_POSTGRES_DB_KEY || "default";
 const shippingOrigin = {
   name: process.env.SHIPPING_FROM_NAME || localEnv.SHIPPING_FROM_NAME || "HOODYBOODY",
   street1: process.env.SHIPPING_FROM_STREET1 || localEnv.SHIPPING_FROM_STREET1 || "417 Montgomery St",
@@ -93,7 +104,7 @@ const productCatalog = [
   }
 ];
 const emptyDb = { users: [], sessions: [], orders: [], reviews: [], inventory: {}, inventoryLog: [], pendingStripeOrders: [] };
-const memoryDb = process.env.NITKA_DB_PATH === ":memory:" || (process.env.VERCEL && !hasRedisDb) ? JSON.parse(JSON.stringify(emptyDb)) : null;
+const memoryDb = process.env.NITKA_DB_PATH === ":memory:" || (process.env.VERCEL && !hasRedisDb && !hasPostgresDb) ? JSON.parse(JSON.stringify(emptyDb)) : null;
 const dbPath = memoryDb ? "" : path.resolve(root, process.env.NITKA_DB_PATH || "data/db.json");
 const dataDir = memoryDb ? "" : path.dirname(dbPath);
 const sessionCookie = "nitka_session";
@@ -230,6 +241,7 @@ async function redisCommand(command) {
 }
 
 async function readDbAsync() {
+  if (hasPostgresDb) return readPgDb();
   if (!hasRedisDb) return readDb();
 
   const stored = await redisCommand(["GET", redisDbKey]);
@@ -243,6 +255,11 @@ async function readDbAsync() {
 }
 
 async function writeDbAsync(db) {
+  if (hasPostgresDb) {
+    await writePgDb(db);
+    return;
+  }
+
   if (!hasRedisDb) {
     writeDb(db);
     return;
@@ -250,6 +267,68 @@ async function writeDbAsync(db) {
 
   ensureDbDefaults(db);
   await redisCommand(["SET", redisDbKey, JSON.stringify(db)]);
+}
+
+let pgPool = null;
+let pgReady = false;
+
+function getPgPool() {
+  if (pgPool) return pgPool;
+  if (!PgPool) PgPool = require("pg").Pool;
+
+  pgPool = postgresUrl
+    ? new PgPool({
+        connectionString: postgresUrl,
+        ssl: { rejectUnauthorized: false }
+      })
+    : new PgPool({
+        host: process.env.PGHOST || localEnv.PGHOST,
+        port: Number(process.env.PGPORT || localEnv.PGPORT || 5432),
+        database: process.env.PGDATABASE || localEnv.PGDATABASE,
+        user: process.env.PGUSER || localEnv.PGUSER,
+        password: postgresPassword,
+        ssl: String(process.env.PGSSLMODE || localEnv.PGSSLMODE || "").toLowerCase() === "disable" ? false : { rejectUnauthorized: false }
+      });
+
+  return pgPool;
+}
+
+async function ensurePgDb() {
+  if (pgReady) return;
+  await getPgPool().query(`
+    create table if not exists nitka_store_db (
+      key text primary key,
+      data jsonb not null,
+      updated_at timestamptz not null default now()
+    )
+  `);
+  pgReady = true;
+}
+
+async function readPgDb() {
+  await ensurePgDb();
+  const result = await getPgPool().query("select data from nitka_store_db where key = $1", [postgresDbKey]);
+  const db = result.rows[0]?.data || JSON.parse(JSON.stringify(emptyDb));
+
+  if (ensureDbDefaults(db) || !result.rows[0]) {
+    await writePgDb(db);
+  }
+
+  return db;
+}
+
+async function writePgDb(db) {
+  await ensurePgDb();
+  ensureDbDefaults(db);
+  await getPgPool().query(
+    `
+      insert into nitka_store_db (key, data, updated_at)
+      values ($1, $2::jsonb, now())
+      on conflict (key)
+      do update set data = excluded.data, updated_at = now()
+    `,
+    [postgresDbKey, JSON.stringify(db)]
+  );
 }
 
 function sendJson(res, status, payload, headers = {}) {
@@ -879,7 +958,7 @@ async function handleApi(req, res) {
     if (url.pathname === "/api/health" && method === "GET") {
       sendJson(res, 200, {
         ok: true,
-        storage: hasRedisDb ? "redis" : memoryDb ? "memory" : "file",
+        storage: hasPostgresDb ? "postgres" : hasRedisDb ? "redis" : memoryDb ? "memory" : "file",
         vercel: Boolean(process.env.VERCEL)
       });
       return;
