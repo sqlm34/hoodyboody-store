@@ -6,6 +6,7 @@
     <meta name="robots" content="noindex, nofollow, noarchive" />
     <title>HOODYBOODY | Embroidery clothes</title>
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/intl-tel-input@28.0.4/dist/css/intlTelInput.css" />
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css" />
     <link rel="stylesheet" href="styles.css" />
   </head>
   <body>
@@ -25,10 +26,7 @@
         <a class="account-pill admin-link" href="admin.html" hidden>Owner</a>
         <button class="account-pill as-button logout-button" type="button" hidden>Logout</button>
         <button class="icon-button cart-toggle" type="button" aria-label="Open cart">
-          <svg aria-hidden="true" viewBox="0 0 24 24">
-            <path d="M6.5 8.5h11l-.9 9.1a2 2 0 0 1-2 1.8H9.4a2 2 0 0 1-2-1.8L6.5 8.5Z" />
-            <path d="M9 8.5a3 3 0 0 1 6 0" />
-          </svg>
+          <i class="fa-solid fa-bag-shopping" aria-hidden="true"></i>
           <span class="cart-count" aria-live="polite">0</span>
         </button>
       </div>
@@ -162,10 +160,7 @@
       <div class="cart-head">
         <h2>Cart</h2>
         <button class="icon-button cart-close" type="button" aria-label="Close cart">
-          <svg aria-hidden="true" viewBox="0 0 24 24">
-            <path d="M6 6l12 12" />
-            <path d="M18 6L6 18" />
-          </svg>
+          <i class="fa-solid fa-xmark" aria-hidden="true"></i>
         </button>
       </div>
       <div class="cart-items" id="cartItems"></div>
@@ -176,8 +171,14 @@
         <strong id="cartTotal">$0.00</strong>
       </div>
       <div class="cart-actions">
-        <button class="button ghost dark wide add-more-link" type="button">Add more items</button>
-        <a class="button primary wide checkout-link" href="checkout.html" aria-disabled="true">Checkout</a>
+        <button class="button ghost dark wide icon-only add-more-link" type="button" aria-label="Add more items" title="Add more items">
+          <i class="fa-solid fa-plus" aria-hidden="true"></i>
+          <span class="visually-hidden">Add more items</span>
+        </button>
+        <a class="button primary wide icon-only checkout-link" href="checkout.html" aria-disabled="true" aria-label="Checkout" title="Checkout">
+          <i class="fa-solid fa-credit-card" aria-hidden="true"></i>
+          <span class="visually-hidden">Checkout</span>
+        </a>
       </div>
     </aside>
     <div class="scrim" hidden></div>

@@ -28,6 +28,7 @@ const productQuantity = document.querySelector("#productQuantity");
 const productAdd = document.querySelector("#productAdd");
 const productNote = document.querySelector("#productNote");
 const productCartLink = document.querySelector("#productCartLink");
+const productCartCount = document.querySelector("#productCartCount");
 const cartDrawer = document.querySelector(".cart-drawer");
 const cartItems = document.querySelector("#cartItems");
 const cartEmpty = document.querySelector("#cartEmpty");
@@ -112,7 +113,7 @@ function saveCart(cart) {
 
 function updateCartLink() {
   const count = loadCart().reduce((sum, item) => sum + item.quantity, 0);
-  productCartLink.textContent = `Cart ${count}`;
+  if (productCartCount) productCartCount.textContent = count;
   productCartLink.setAttribute("aria-label", `Open cart, ${count} item${count === 1 ? "" : "s"}`);
 }
 
@@ -168,7 +169,9 @@ function renderCartDrawer() {
             ${item.description ? `<span class="cart-note">${escapeHtml(item.description)}</span>` : ""}
           </div>
           <div class="quantity" aria-label="Quantity">
-            <button type="button" aria-label="Decrease quantity" data-qty="${escapeHtml(item.id)}" data-delta="-1">-</button>
+            <button type="button" aria-label="Decrease quantity" data-qty="${escapeHtml(item.id)}" data-delta="-1">
+              <i class="fa-solid fa-minus" aria-hidden="true"></i>
+            </button>
             <strong>${item.quantity}</strong>
             <button
               type="button"
@@ -176,7 +179,9 @@ function renderCartDrawer() {
               data-qty="${escapeHtml(item.id)}"
               data-delta="1"
               ${isAtStockLimit ? "disabled" : ""}
-            >+</button>
+            >
+              <i class="fa-solid fa-plus" aria-hidden="true"></i>
+            </button>
           </div>
         </div>
       `;

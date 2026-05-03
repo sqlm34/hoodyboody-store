@@ -281,7 +281,9 @@ function renderCart() {
             ${item.description ? `<span class="cart-note">${escapeHtml(item.description)}</span>` : ""}
           </div>
           <div class="quantity" aria-label="Quantity">
-            <button type="button" aria-label="Decrease quantity" data-qty="${item.id}" data-delta="-1">-</button>
+            <button type="button" aria-label="Decrease quantity" data-qty="${item.id}" data-delta="-1">
+              <i class="fa-solid fa-minus" aria-hidden="true"></i>
+            </button>
             <strong>${item.quantity}</strong>
             <button
               type="button"
@@ -293,7 +295,9 @@ function renderCart() {
                 const stock = productId ? getProductStock(productId) : null;
                 return stock !== null && getCartQuantityForProduct(productId) >= stock ? "disabled" : "";
               })()}
-            >+</button>
+            >
+              <i class="fa-solid fa-plus" aria-hidden="true"></i>
+            </button>
           </div>
         </div>
       `
