@@ -338,9 +338,9 @@ function renderPhoto() {
   thumbnailRow.innerHTML = gallery
     .map(
       (item, index) => `
-        <button class="thumbnail ${index === selectedPhoto ? "active" : ""}" type="button" data-photo="${index}">
-          <span style="--focus: ${item.focus}; --product-image: url('${imageUrl}')"></span>
-          ${escapeHtml(item.label)}
+        <button class="thumbnail ${index === selectedPhoto ? "active" : ""}" type="button" data-photo="${index}" aria-label="${escapeHtml(item.label)}">
+          <span class="thumbnail-image" style="--focus: ${item.focus}; --product-image: url('${imageUrl}')"></span>
+          <span class="visually-hidden">${escapeHtml(item.label)}</span>
         </button>
       `
     )

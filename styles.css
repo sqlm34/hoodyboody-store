@@ -413,11 +413,15 @@ h3 {
 .catalog-grid {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
+  align-items: stretch;
   gap: 18px;
 }
 
 .product-card {
   display: grid;
+  grid-template-rows: 238px 1fr;
+  min-height: 520px;
+  height: 520px;
   overflow: hidden;
   border: 1px solid var(--line);
   border-radius: 8px;
@@ -437,10 +441,11 @@ h3 {
 
 .product-image {
   position: relative;
-  aspect-ratio: 4 / 3;
+  min-height: 238px;
   background-image: var(--product-image, url("assets/embroidered-collection.png"));
   background-position: var(--focus, center);
-  background-size: 195%;
+  background-repeat: no-repeat;
+  background-size: cover;
 }
 
 .product-badge {
@@ -457,14 +462,22 @@ h3 {
 
 .product-body {
   display: grid;
-  gap: 12px;
-  padding: 16px;
+  grid-template-rows: auto minmax(68px, auto) auto auto 1fr;
+  align-content: start;
+  gap: 14px;
+  min-height: 0;
+  padding: 22px;
 }
 
 .product-body p {
+  display: -webkit-box;
   margin: 0;
+  overflow: hidden;
   color: var(--muted);
   font-size: 0.95rem;
+  line-height: 1.45;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
 }
 
 .product-rating {
@@ -544,12 +557,23 @@ h3 {
 
 .product-meta {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   justify-content: space-between;
   gap: 12px;
 }
 
+.product-meta h3 {
+  display: -webkit-box;
+  min-width: 0;
+  margin: 0;
+  overflow: hidden;
+  line-height: 1.22;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+
 .price {
+  flex: 0 0 auto;
   font-size: 1.12rem;
   font-weight: 850;
 }
@@ -558,6 +582,7 @@ h3 {
   display: flex;
   flex-wrap: wrap;
   gap: 7px;
+  align-self: end;
 }
 
 .size-pill {
@@ -1746,15 +1771,16 @@ textarea:focus {
 .product-photo-main {
   position: relative;
   display: block;
-  min-height: 560px;
   width: 100%;
+  aspect-ratio: 4 / 5;
   overflow: hidden;
   border: 1px solid var(--line);
   border-radius: 8px;
   background-color: #f8faf8;
   background-image: url("assets/embroidered-collection.png");
   background-position: center;
-  background-size: 175%;
+  background-repeat: no-repeat;
+  background-size: cover;
   cursor: zoom-in;
 }
 
@@ -1795,31 +1821,34 @@ textarea:focus {
 }
 
 .thumbnail-row {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  display: flex;
   gap: 10px;
+  overflow-x: auto;
+  padding-bottom: 2px;
 }
 
 .thumbnail {
-  display: grid;
-  gap: 7px;
+  flex: 0 0 112px;
+  display: block;
   border: 1px solid var(--line);
   border-radius: 8px;
-  padding: 8px;
+  padding: 7px;
   color: var(--muted);
   background: var(--white);
   cursor: pointer;
-  font-size: 0.78rem;
+  font-size: 0.74rem;
   font-weight: 750;
+  text-align: left;
 }
 
-.thumbnail span {
+.thumbnail-image {
   display: block;
-  aspect-ratio: 5 / 3;
+  aspect-ratio: 1 / 1;
   border-radius: 6px;
   background-image: var(--product-image, url("assets/embroidered-collection.png"));
   background-position: var(--focus, center);
-  background-size: 220%;
+  background-repeat: no-repeat;
+  background-size: cover;
 }
 
 .thumbnail.active {
@@ -1942,6 +1971,16 @@ textarea:focus {
   .catalog-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
+
+  .product-card {
+    grid-template-rows: 220px 1fr;
+    min-height: 500px;
+    height: 500px;
+  }
+
+  .product-image {
+    min-height: 220px;
+  }
 }
 
 @media (max-width: 620px) {
@@ -2015,6 +2054,16 @@ textarea:focus {
     grid-template-columns: 1fr;
   }
 
+  .product-card {
+    grid-template-rows: 240px 1fr;
+    min-height: 500px;
+    height: 500px;
+  }
+
+  .product-image {
+    min-height: 240px;
+  }
+
   .cart-drawer {
     width: 100%;
     height: 100dvh;
@@ -2023,7 +2072,7 @@ textarea:focus {
   }
 
   .product-photo-main {
-    min-height: 390px;
+    aspect-ratio: 4 / 5;
   }
 
   .product-page-info {
@@ -2034,7 +2083,7 @@ textarea:focus {
     font-size: 2.15rem;
   }
 
-  .thumbnail-row {
-    grid-template-columns: 1fr;
+  .thumbnail {
+    flex-basis: 96px;
   }
 }
