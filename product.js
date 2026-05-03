@@ -1,11 +1,11 @@
 const CART_STORAGE_KEY = "nitka-cart";
-const IMAGE_URL = "assets/embroidered-collection.png";
+const DEFAULT_IMAGE_URL = "assets/embroidered-collection.png";
 const FREE_DELIVERY_THRESHOLD = 10000;
 const FREE_DELIVERY_LABEL = "$100";
 
-const products = window.NITKA_PRODUCTS || [];
+let products = window.NITKA_PRODUCTS || [];
 const params = new URLSearchParams(window.location.search);
-const product = products.find((item) => item.id === params.get("id"));
+let product = products.find((item) => item.id === params.get("id"));
 
 const productContent = document.querySelector("#productContent");
 const productNotFound = document.querySelector("#productNotFound");
@@ -84,6 +84,16 @@ async function api(path, options = {}) {
   }
 
   return data;
+}
+
+async function loadProducts() {
+  try {
+    const data = await api("/api/products");
+    products = Array.isArray(data.products) ? data.products : products;
+    product = products.find((item) => item.id === params.get("id"));
+  } catch {
+    product = products.find((item) => item.id === params.get("id"));
+  }
 }
 
 function loadCart() {
@@ -313,9 +323,10 @@ async function loadInventory() {
 function renderPhoto() {
   const gallery = product.gallery || [{ label: "Photo", focus: product.focus }];
   const photo = gallery[selectedPhoto];
+  const imageUrl = product.image || DEFAULT_IMAGE_URL;
   isZoomed = false;
   mainPhoto.classList.remove("zoomed");
-  mainPhoto.style.backgroundImage = `url("${IMAGE_URL}")`;
+  mainPhoto.style.backgroundImage = `url("${imageUrl}")`;
   mainPhoto.style.backgroundPosition = photo.focus;
   zoomHint.textContent = "Click to zoom";
 
@@ -323,12 +334,36 @@ function renderPhoto() {
     .map(
       (item, index) => `
         <button class="thumbnail ${index === selectedPhoto ? "active" : ""}" type="button" data-photo="${index}">
-          <span style="--focus: ${item.focus}"></span>
+          <span style="--focus: ${item.focus}; --product-image: url('${imageUrl}')"></span>
           ${escapeHtml(item.label)}
         </button>
       `
     )
     .join("");
+}
+
+function setMeta(name, content, property = false) {
+  if (!content) return;
+  const selector = property ? `meta[property="${name}"]` : `meta[name="${name}"]`;
+  let tag = document.head.querySelector(selector);
+  if (!tag) {
+    tag = document.createElement("meta");
+    tag.setAttribute(property ? "property" : "name", name);
+    document.head.append(tag);
+  }
+  tag.setAttribute("content", content);
+}
+
+function updateSeo() {
+  const seoTitle = product.seoTitle || `${product.title} | HOODYBOODY`;
+  const seoDescription = product.seoDescription || product.longDescription || product.description;
+  document.title = seoTitle;
+  setMeta("description", seoDescription);
+  setMeta("og:title", seoTitle, true);
+  setMeta("og:description", seoDescription, true);
+  setMeta("og:type", "product", true);
+  setMeta("og:url", window.location.href, true);
+  if (product.image) setMeta("og:image", new URL(product.image, window.location.href).href, true);
 }
 
 function setPhoto(index) {
@@ -504,7 +539,7 @@ function renderProduct() {
     return;
   }
 
-  document.title = `${product.title} | NITKA Atelier`;
+  updateSeo();
   selectedSize = product.sizes[0];
   selectedColor = product.colors[0];
   productBadge.textContent = product.badge;
@@ -613,4 +648,4 @@ reviewForm.addEventListener("submit", async (event) => {
   }
 });
 
-renderProduct();
+loadProducts().finally(renderProduct);

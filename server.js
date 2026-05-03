@@ -76,45 +76,147 @@ const defaultInventory = {
   "linen-shirt": 14,
   "soft-bomber": 6
 };
-const productCatalog = [
+const defaultProducts = [
   {
     id: "linen-jacket",
     title: "Linen Jacket Iris",
+    type: "outerwear",
+    badge: "linen",
     description: "Loose silhouette, iris embroidery on the front and cuff.",
-    price: 12900
+    price: 12900,
+    sizes: ["XS", "S", "M", "L"],
+    focus: "38% 45%",
+    image: "assets/embroidered-collection.png",
+    colors: [
+      { name: "Milky", value: "#f3eadb" },
+      { name: "Sage", value: "#7f9b89" },
+      { name: "Black", value: "#202326" }
+    ],
+    longDescription:
+      "Light linen jacket with soft fit and iris embroidery. Suitable for capsule wardrobe, summer events and everyday looks.",
+    gallery: [
+      { label: "General view", focus: "38% 45%" },
+      { label: "Embroidery", focus: "32% 36%" },
+      { label: "Texture", focus: "48% 61%" }
+    ]
   },
   {
     id: "cotton-hoodie",
     title: "Hoodie Herbarium",
+    type: "tops",
+    badge: "cotton",
     description: "Dense fleece, sage twig and small monogram.",
-    price: 7900
+    price: 7900,
+    sizes: ["S", "M", "L", "XL"],
+    focus: "56% 35%",
+    image: "assets/embroidered-collection.png",
+    colors: [
+      { name: "Graphite", value: "#3d4248" },
+      { name: "Milky", value: "#f3eadb" },
+      { name: "Pine", value: "#1f6b5a" }
+    ],
+    longDescription:
+      "Hoodie from dense cotton fleece with botanical embroidery and small monogram. Holds shape well and remains soft after washing.",
+    gallery: [
+      { label: "General view", focus: "56% 35%" },
+      { label: "Embroidery", focus: "60% 43%" },
+      { label: "Hood", focus: "51% 29%" }
+    ]
   },
   {
     id: "denim-shirt",
     title: "Shirt Indigo",
+    type: "tops",
+    badge: "denim",
     description: "Contrast stitches, embroidery on pocket and collar.",
-    price: 9200
+    price: 9200,
+    sizes: ["S", "M", "L"],
+    focus: "72% 52%",
+    image: "assets/embroidered-collection.png",
+    colors: [
+      { name: "Indigo", value: "#263b73" },
+      { name: "White", value: "#f7f7f2" },
+      { name: "Terracotta", value: "#c65a43" }
+    ],
+    longDescription:
+      "Shirt from soft denim with contrast embroidery on pocket and collar. Accent piece for everyday look.",
+    gallery: [
+      { label: "General view", focus: "72% 52%" },
+      { label: "Pocket", focus: "68% 43%" },
+      { label: "Collar", focus: "75% 34%" }
+    ]
   },
   {
     id: "canvas-tote",
     title: "Shopper Bloom",
+    type: "accessories",
+    badge: "canvas",
     description: "Dense shopper with botanical motif and initials.",
-    price: 4200
+    price: 4200,
+    sizes: ["One size"],
+    focus: "44% 68%",
+    image: "assets/embroidered-collection.png",
+    colors: [
+      { name: "Natural", value: "#d8c6a1" },
+      { name: "Black", value: "#202326" },
+      { name: "Terracotta", value: "#c65a43" }
+    ],
+    longDescription:
+      "Shopper from dense canvas with botanical motif. Holds laptop, documents and daily items.",
+    gallery: [
+      { label: "General view", focus: "44% 68%" },
+      { label: "Embroidery", focus: "39% 62%" },
+      { label: "Handles", focus: "49% 52%" }
+    ]
   },
   {
     id: "linen-shirt",
     title: "Shirt Meadow",
+    type: "tops",
+    badge: "shirt",
     description: "Light linen shirt with embroidery along the placket line.",
-    price: 8700
+    price: 8700,
+    sizes: ["XS", "S", "M", "L", "XL"],
+    focus: "28% 58%",
+    image: "assets/embroidered-collection.png",
+    colors: [
+      { name: "White", value: "#f7f7f2" },
+      { name: "Sky", value: "#9bbbd0" },
+      { name: "Pine", value: "#1f6b5a" }
+    ],
+    longDescription:
+      "Linen shirt with embroidery along the placket line. Breathable fabric, loose fit and calm decorative accent.",
+    gallery: [
+      { label: "General view", focus: "28% 58%" },
+      { label: "Placket", focus: "31% 48%" },
+      { label: "Cuff", focus: "23% 67%" }
+    ]
   },
   {
     id: "soft-bomber",
     title: "Bomber Thread",
+    type: "outerwear",
+    badge: "capsule",
     description: "Soft bomber with large motif on the back to order.",
-    price: 14800
+    price: 14800,
+    sizes: ["S", "M", "L"],
+    focus: "64% 62%",
+    image: "assets/embroidered-collection.png",
+    colors: [
+      { name: "Black", value: "#202326" },
+      { name: "Indigo", value: "#263b73" },
+      { name: "Milky", value: "#f3eadb" }
+    ],
+    longDescription:
+      "Soft bomber with large embroidery on the back to order. You can adapt the motif, scale and thread palette.",
+    gallery: [
+      { label: "General view", focus: "64% 62%" },
+      { label: "Back", focus: "66% 55%" },
+      { label: "Cuff", focus: "58% 72%" }
+    ]
   }
 ];
-const emptyDb = { users: [], sessions: [], orders: [], reviews: [], inventory: {}, inventoryLog: [], pendingStripeOrders: [] };
+const emptyDb = { users: [], sessions: [], orders: [], reviews: [], inventory: {}, inventoryLog: [], pendingStripeOrders: [], products: [] };
 const memoryDb = process.env.NITKA_DB_PATH === ":memory:" || (process.env.VERCEL && !hasRedisDb && !hasPostgresDb) ? JSON.parse(JSON.stringify(emptyDb)) : null;
 const dbPath = memoryDb ? "" : path.resolve(root, process.env.NITKA_DB_PATH || "data/db.json");
 const dataDir = memoryDb ? "" : path.dirname(dbPath);
@@ -149,6 +251,28 @@ function ensureDbDefaults(db) {
   db.inventory ||= {};
   db.inventoryLog ||= [];
   db.pendingStripeOrders ||= [];
+  db.products ||= [];
+
+  if (!db.products.length) {
+    db.products = JSON.parse(JSON.stringify(defaultProducts));
+    changed = true;
+  } else {
+    defaultProducts.forEach((defaultProduct) => {
+      const product = db.products.find((item) => item.id === defaultProduct.id);
+      if (!product) {
+        db.products.push(JSON.parse(JSON.stringify(defaultProduct)));
+        changed = true;
+        return;
+      }
+
+      Object.entries(defaultProduct).forEach(([key, value]) => {
+        if (product[key] === undefined) {
+          product[key] = JSON.parse(JSON.stringify(value));
+          changed = true;
+        }
+      });
+    });
+  }
 
   Object.entries(defaultInventory).forEach(([productId, stock]) => {
     if (!db.inventory[productId]) {
@@ -226,6 +350,7 @@ function writeDb(db) {
     memoryDb.inventory = db.inventory;
     memoryDb.inventoryLog = db.inventoryLog;
     memoryDb.pendingStripeOrders = db.pendingStripeOrders;
+    memoryDb.products = db.products;
     return;
   }
 
@@ -568,8 +693,78 @@ function publicInventory(inventory) {
   );
 }
 
-function getProduct(productId) {
-  return productCatalog.find((product) => product.id === productId) || null;
+function publicProduct(product) {
+  return {
+    id: product.id,
+    title: product.title,
+    type: product.type,
+    badge: product.badge,
+    description: product.description,
+    price: product.price,
+    sizes: Array.isArray(product.sizes) ? product.sizes : [],
+    focus: product.focus || "center",
+    image: product.image || "assets/embroidered-collection.png",
+    colors: Array.isArray(product.colors) ? product.colors : [],
+    longDescription: product.longDescription || product.description,
+    gallery: Array.isArray(product.gallery) ? product.gallery : [],
+    seoTitle: product.seoTitle || "",
+    seoDescription: product.seoDescription || ""
+  };
+}
+
+function publicProducts(db) {
+  return (db.products || defaultProducts).map(publicProduct);
+}
+
+function getProduct(productId, db) {
+  return publicProducts(db).find((product) => product.id === productId) || null;
+}
+
+function parseList(value, fallback = []) {
+  const items = Array.isArray(value)
+    ? value.map((item) => String(item).trim()).filter(Boolean)
+    : String(value || "")
+    .split(",")
+    .map((item) => item.trim())
+    .filter(Boolean)
+    .slice(0, 20);
+  return items.length ? items : fallback;
+}
+
+function sanitizeProductPatch(body, currentProduct) {
+  const price = Math.round(Number(body.price));
+  const next = {
+    ...currentProduct,
+    title: String(body.title || "").trim().slice(0, 120),
+    type: String(body.type || "").trim().slice(0, 40),
+    badge: String(body.badge || "").trim().slice(0, 40),
+    description: String(body.description || "").trim().slice(0, 260),
+    longDescription: String(body.longDescription || "").trim().slice(0, 1200),
+    seoTitle: String(body.seoTitle || "").trim().slice(0, 160),
+    seoDescription: String(body.seoDescription || "").trim().slice(0, 260),
+    image: String(body.image || "").trim().slice(0, 500),
+    focus: String(body.focus || "center").trim().slice(0, 40),
+    price,
+    sizes: parseList(body.sizes, currentProduct.sizes),
+    gallery: parseList(body.galleryLabels, []).map((label, index) => ({
+      label,
+      focus: parseList(body.galleryFocus, [])[index] || currentProduct.gallery?.[index]?.focus || nextFocusFallback(body.focus)
+    }))
+  };
+
+  if (!next.title || !next.description || !next.longDescription || !Number.isInteger(price) || price < 0) {
+    return null;
+  }
+
+  if (!next.gallery.length) {
+    next.gallery = Array.isArray(currentProduct.gallery) && currentProduct.gallery.length ? currentProduct.gallery : [{ label: "General view", focus: next.focus }];
+  }
+
+  return next;
+}
+
+function nextFocusFallback(focus) {
+  return String(focus || "center").trim().slice(0, 40) || "center";
 }
 
 function getStripeUnitAmount(price) {
@@ -579,6 +774,26 @@ function getStripeUnitAmount(price) {
 function getRequestOrigin(req) {
   const proto = req.headers["x-forwarded-proto"] || "http";
   return req.headers.origin || `${proto}://${req.headers.host}`;
+}
+
+function escapeHtmlAttribute(value) {
+  return String(value || "").replace(/[&<>"']/g, (char) => {
+    const entities = {
+      "&": "&amp;",
+      "<": "&lt;",
+      ">": "&gt;",
+      '"': "&quot;",
+      "'": "&#39;"
+    };
+    return entities[char];
+  });
+}
+
+function absoluteUrl(req, value) {
+  const text = String(value || "").trim();
+  if (!text) return "";
+  if (/^https?:\/\//i.test(text)) return text;
+  return `${getRequestOrigin(req).replace(/\/$/, "")}/${text.replace(/^\//, "")}`;
 }
 
 function createStripeCheckoutSession(params) {
@@ -1038,6 +1253,11 @@ async function handleApi(req, res) {
       return;
     }
 
+    if (url.pathname === "/api/products" && method === "GET") {
+      sendJson(res, 200, { products: publicProducts(db) });
+      return;
+    }
+
     if (url.pathname === "/api/shipping/rates" && method === "POST") {
       const body = await readJson(req);
       const shipment = await createShippoShipment(body);
@@ -1084,7 +1304,7 @@ async function handleApi(req, res) {
 
       for (const item of items) {
         const productId = getCartProductId(item, db.inventory);
-        const product = getProduct(productId);
+        const product = getProduct(productId, db);
         const quantity = Math.max(1, Math.floor(Number(item.quantity) || 1));
 
         if (!product) continue;
@@ -1268,6 +1488,59 @@ async function handleApi(req, res) {
       return;
     }
 
+    if (url.pathname === "/api/admin/products" && method === "GET") {
+      const user = getSessionUser(req, db);
+      if (!user) {
+        sendJson(res, 401, { message: "You must be logged in as the store owner." });
+        return;
+      }
+
+      if (!isAdmin(user)) {
+        sendJson(res, 403, { message: "Only the store owner can edit products." });
+        return;
+      }
+
+      sendJson(res, 200, { products: publicProducts(db) });
+      return;
+    }
+
+    if (url.pathname === "/api/admin/products" && method === "PATCH") {
+      const user = getSessionUser(req, db);
+      if (!user) {
+        sendJson(res, 401, { message: "You must be logged in as the store owner." });
+        return;
+      }
+
+      if (!isAdmin(user)) {
+        sendJson(res, 403, { message: "Only the store owner can edit products." });
+        return;
+      }
+
+      const body = await readJson(req);
+      const productId = String(body.productId || "").trim();
+      const productIndex = db.products.findIndex((product) => product.id === productId);
+
+      if (productIndex === -1) {
+        sendJson(res, 404, { message: "Product not found." });
+        return;
+      }
+
+      const nextProduct = sanitizeProductPatch(body, db.products[productIndex]);
+      if (!nextProduct) {
+        sendJson(res, 400, { message: "Fill product title, descriptions, and price correctly." });
+        return;
+      }
+
+      nextProduct.id = db.products[productIndex].id;
+      nextProduct.updatedAt = new Date().toISOString();
+      nextProduct.updatedBy = user.id;
+      db.products[productIndex] = nextProduct;
+
+      await writeDbAsync(db);
+      sendJson(res, 200, { product: publicProduct(nextProduct), products: publicProducts(db) });
+      return;
+    }
+
     if (url.pathname === "/api/admin/reviews" && method === "GET") {
       const user = getSessionUser(req, db);
       if (!user) {
@@ -1439,7 +1712,7 @@ async function handleApi(req, res) {
   }
 }
 
-function serveStatic(req, res) {
+async function serveStatic(req, res) {
   const urlPath = decodeURIComponent(req.url.split("?")[0]);
   const requestedPath = urlPath === "/" ? "/index.html" : urlPath;
   const filePath = path.resolve(root, `.${requestedPath}`);
@@ -1451,7 +1724,7 @@ function serveStatic(req, res) {
     return;
   }
 
-  fs.readFile(filePath, (error, content) => {
+  fs.readFile(filePath, async (error, content) => {
     if (error) {
       res.writeHead(404, { "Content-Type": "text/plain; charset=utf-8" });
       res.end("File not found");
@@ -1459,8 +1732,37 @@ function serveStatic(req, res) {
     }
 
     const ext = path.extname(filePath).toLowerCase();
+    let responseContent = content;
+
+    if (requestedPath === "/product.html") {
+      try {
+        const db = await readDbAsync();
+        const productId = new URL(req.url, getRequestOrigin(req)).searchParams.get("id");
+        const product = getProduct(productId, db);
+
+        if (product) {
+          const title = product.seoTitle || `${product.title} | HOODYBOODY`;
+          const description = product.seoDescription || product.longDescription || product.description;
+          const image = absoluteUrl(req, product.image);
+          const productUrl = `${getRequestOrigin(req).replace(/\/$/, "")}/product.html?id=${encodeURIComponent(product.id)}`;
+          const seo = `
+    <title>${escapeHtmlAttribute(title)}</title>
+    <meta name="description" content="${escapeHtmlAttribute(description)}" />
+    <meta property="og:title" content="${escapeHtmlAttribute(title)}" />
+    <meta property="og:description" content="${escapeHtmlAttribute(description)}" />
+    <meta property="og:type" content="product" />
+    <meta property="og:url" content="${escapeHtmlAttribute(productUrl)}" />
+    ${image ? `<meta property="og:image" content="${escapeHtmlAttribute(image)}" />` : ""}
+    <link rel="canonical" href="${escapeHtmlAttribute(productUrl)}" />`;
+          responseContent = Buffer.from(content.toString("utf8").replace(/<title>.*?<\/title>/, seo));
+        }
+      } catch {
+        responseContent = content;
+      }
+    }
+
     res.writeHead(200, { "Content-Type": types[ext] || "application/octet-stream" });
-    res.end(content);
+    res.end(responseContent);
   });
 }
 

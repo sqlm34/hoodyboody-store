@@ -419,7 +419,7 @@ h3 {
 .product-image {
   position: relative;
   aspect-ratio: 4 / 3;
-  background-image: url("assets/embroidered-collection.png");
+  background-image: var(--product-image, url("assets/embroidered-collection.png"));
   background-position: var(--focus, center);
   background-size: 195%;
 }
@@ -1553,6 +1553,56 @@ textarea:focus {
   gap: 18px;
 }
 
+.admin-catalog-panel {
+  gap: 18px;
+}
+
+.admin-products-list {
+  display: grid;
+  gap: 14px;
+}
+
+.admin-product-form {
+  display: grid;
+  grid-template-columns: minmax(160px, 0.28fr) 1fr;
+  gap: 18px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 14px;
+  background: #fff;
+}
+
+.admin-product-preview {
+  min-height: 190px;
+  border-radius: 8px;
+  border: 1px solid var(--line);
+  background-image: var(--product-image, url("assets/embroidered-collection.png"));
+  background-position: var(--focus, center);
+  background-size: 195%;
+  background-color: #f8faf8;
+}
+
+.admin-product-fields {
+  display: grid;
+  gap: 12px;
+}
+
+.admin-product-title {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.admin-product-title span {
+  color: var(--muted);
+  font-size: 0.88rem;
+}
+
+.full-span {
+  grid-column: 1 / -1;
+}
+
 .admin-reviews-list {
   display: grid;
   gap: 10px;
@@ -1688,7 +1738,7 @@ textarea:focus {
   display: block;
   aspect-ratio: 5 / 3;
   border-radius: 6px;
-  background-image: url("assets/embroidered-collection.png");
+  background-image: var(--product-image, url("assets/embroidered-collection.png"));
   background-position: var(--focus, center);
   background-size: 220%;
 }
@@ -1772,7 +1822,8 @@ textarea:focus {
   }
 
   .inventory-stats,
-  .inventory-row {
+  .inventory-row,
+  .admin-product-form {
     grid-template-columns: 1fr;
   }
 
