@@ -21,7 +21,7 @@
         <a class="account-pill login-link" href="auth.html" hidden>Login</a>
         <a class="account-pill cabinet-link" href="account.html" hidden>Cabinet</a>
         <a class="account-pill admin-link" href="admin.html" hidden>Owner</a>
-        <a class="account-pill" href="checkout.html" id="productCartLink">Cart 0</a>
+        <a class="account-pill" href="#cart" id="productCartLink" aria-haspopup="dialog">Cart 0</a>
         <button class="account-pill as-button logout-button" type="button" hidden>Logout</button>
       </div>
     </header>
@@ -117,6 +117,30 @@
         <a class="button primary" href="index.html#catalog">To catalog</a>
       </section>
     </main>
+
+    <aside class="cart-drawer" aria-label="Cart" aria-hidden="true">
+      <div class="cart-head">
+        <h2>Cart</h2>
+        <button class="icon-button cart-close" type="button" aria-label="Close cart">
+          <svg aria-hidden="true" viewBox="0 0 24 24">
+            <path d="M6 6l12 12" />
+            <path d="M18 6L6 18" />
+          </svg>
+        </button>
+      </div>
+      <div class="cart-items" id="cartItems"></div>
+      <div class="cart-empty" id="cartEmpty">Empty for now</div>
+      <div class="free-delivery-notice" id="cartDeliveryNotice" aria-live="polite" hidden></div>
+      <div class="cart-total">
+        <span>Total</span>
+        <strong id="cartTotal">$0.00</strong>
+      </div>
+      <div class="cart-actions">
+        <button class="button ghost dark wide add-more-link" type="button">Add more items</button>
+        <a class="button primary wide checkout-link" href="checkout.html" aria-disabled="true">Checkout</a>
+      </div>
+    </aside>
+    <div class="scrim" hidden></div>
 
     <script src="products.js"></script>
     <script src="session-nav.js"></script>

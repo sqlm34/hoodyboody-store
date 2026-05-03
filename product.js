@@ -1,5 +1,7 @@
 const CART_STORAGE_KEY = "nitka-cart";
 const IMAGE_URL = "assets/embroidered-collection.png";
+const FREE_DELIVERY_THRESHOLD = 10000;
+const FREE_DELIVERY_LABEL = "$100";
 
 const products = window.NITKA_PRODUCTS || [];
 const params = new URLSearchParams(window.location.search);
@@ -26,6 +28,15 @@ const productQuantity = document.querySelector("#productQuantity");
 const productAdd = document.querySelector("#productAdd");
 const productNote = document.querySelector("#productNote");
 const productCartLink = document.querySelector("#productCartLink");
+const cartDrawer = document.querySelector(".cart-drawer");
+const cartItems = document.querySelector("#cartItems");
+const cartEmpty = document.querySelector("#cartEmpty");
+const cartTotal = document.querySelector("#cartTotal");
+const cartDeliveryNotice = document.querySelector("#cartDeliveryNotice");
+const checkoutLink = document.querySelector(".checkout-link");
+const scrim = document.querySelector(".scrim");
+const cartClose = document.querySelector(".cart-close");
+const addMoreLink = document.querySelector(".add-more-link");
 const reviewsList = document.querySelector("#reviewsList");
 const reviewsEmpty = document.querySelector("#reviewsEmpty");
 const reviewForm = document.querySelector("#reviewForm");
@@ -86,11 +97,116 @@ function loadCart() {
 function saveCart(cart) {
   localStorage.setItem(CART_STORAGE_KEY, JSON.stringify(cart));
   updateCartLink();
+  renderCartDrawer();
 }
 
 function updateCartLink() {
   const count = loadCart().reduce((sum, item) => sum + item.quantity, 0);
   productCartLink.textContent = `Cart ${count}`;
+  productCartLink.setAttribute("aria-label", `Open cart, ${count} item${count === 1 ? "" : "s"}`);
+}
+
+function getCartProductId(item) {
+  if (item.productId) return item.productId;
+  const itemId = String(item.id || "");
+  const matchedProduct = products.find((catalogItem) => itemId === catalogItem.id || itemId.startsWith(`${catalogItem.id}-`));
+  return matchedProduct?.id || item.id;
+}
+
+function getCartQuantityForProductId(productId, cart = loadCart()) {
+  return cart.reduce((sum, item) => (getCartProductId(item) === productId ? sum + item.quantity : sum), 0);
+}
+
+function getStockForCartItem(item, cart = loadCart()) {
+  const productId = getCartProductId(item);
+  if (product && productId === product.id && availableStock !== null) return availableStock;
+  const catalogProduct = products.find((catalogItem) => catalogItem.id === productId);
+  if (Number.isFinite(Number(catalogProduct?.stock))) return Number(catalogProduct.stock);
+  if (Number.isFinite(Number(item.stock))) return Number(item.stock);
+  return null;
+}
+
+function renderCartDrawer() {
+  if (!cartItems || !cartEmpty || !cartTotal || !checkoutLink || !cartDeliveryNotice) return;
+
+  const cart = loadCart();
+  const itemCount = cart.reduce((sum, item) => sum + item.quantity, 0);
+  const total = cart.reduce((sum, item) => sum + item.price * item.quantity, 0);
+  const remainingForFreeDelivery = Math.max(0, FREE_DELIVERY_THRESHOLD - total);
+
+  cartTotal.textContent = formatPrice(total);
+  cartEmpty.classList.toggle("visible", cart.length === 0);
+  checkoutLink.setAttribute("aria-disabled", cart.length === 0 ? "true" : "false");
+  cartDeliveryNotice.hidden = cart.length === 0;
+  cartDeliveryNotice.classList.toggle("success", cart.length > 0 && remainingForFreeDelivery === 0);
+  cartDeliveryNotice.textContent =
+    remainingForFreeDelivery > 0
+      ? `Add ${formatPrice(remainingForFreeDelivery)} more to get free delivery from ${FREE_DELIVERY_LABEL}.`
+      : `Free delivery from ${FREE_DELIVERY_LABEL} is available for this order.`;
+
+  cartItems.innerHTML = cart
+    .map((item) => {
+      const productId = getCartProductId(item);
+      const stock = getStockForCartItem(item, cart);
+      const isAtStockLimit = stock !== null && getCartQuantityForProductId(productId, cart) >= stock;
+
+      return `
+        <div class="cart-item">
+          <div>
+            <strong>${escapeHtml(item.title)}</strong>
+            <span>${formatPrice(item.price)}</span>
+            ${item.description ? `<span class="cart-note">${escapeHtml(item.description)}</span>` : ""}
+          </div>
+          <div class="quantity" aria-label="Quantity">
+            <button type="button" aria-label="Decrease quantity" data-qty="${escapeHtml(item.id)}" data-delta="-1">-</button>
+            <strong>${item.quantity}</strong>
+            <button
+              type="button"
+              aria-label="Increase quantity"
+              data-qty="${escapeHtml(item.id)}"
+              data-delta="1"
+              ${isAtStockLimit ? "disabled" : ""}
+            >+</button>
+          </div>
+        </div>
+      `;
+    })
+    .join("");
+
+  updateCartLink();
+  if (itemCount === 0 && cartDrawer?.classList.contains("open")) {
+    checkoutLink.setAttribute("aria-disabled", "true");
+  }
+}
+
+function openCart() {
+  renderCartDrawer();
+  document.body.classList.add("cart-open");
+  cartDrawer.classList.add("open");
+  cartDrawer.setAttribute("aria-hidden", "false");
+  scrim.hidden = false;
+}
+
+function closeCart() {
+  document.body.classList.remove("cart-open");
+  cartDrawer.classList.remove("open");
+  cartDrawer.setAttribute("aria-hidden", "true");
+  scrim.hidden = true;
+}
+
+function updateCartQuantity(id, delta) {
+  const cart = loadCart();
+  const item = cart.find((cartItem) => cartItem.id === id);
+  if (!item) return;
+
+  const productId = getCartProductId(item);
+  const stock = getStockForCartItem(item, cart);
+  if (delta > 0 && stock !== null && getCartQuantityForProductId(productId, cart) >= stock) return;
+
+  item.quantity += delta;
+  const nextCart = item.quantity <= 0 ? cart.filter((cartItem) => cartItem.id !== id) : cart;
+  saveCart(nextCart);
+  renderStock();
 }
 
 function getStockLabel(stock) {
@@ -402,6 +518,7 @@ function renderProduct() {
   loadInventory();
   refreshReviewsAndAccess();
   updateCartLink();
+  renderCartDrawer();
 }
 
 thumbnailRow.addEventListener("click", (event) => {
@@ -442,6 +559,33 @@ productQuantity.addEventListener("change", finishQuantityInput);
 productQuantity.addEventListener("blur", finishQuantityInput);
 
 productAdd.addEventListener("click", addToCart);
+
+productCartLink.addEventListener("click", (event) => {
+  event.preventDefault();
+  openCart();
+});
+
+cartItems.addEventListener("click", (event) => {
+  const quantityButton = event.target.closest("[data-qty]");
+  if (!quantityButton) return;
+
+  updateCartQuantity(quantityButton.dataset.qty, Number(quantityButton.dataset.delta));
+});
+
+cartClose.addEventListener("click", closeCart);
+scrim.addEventListener("click", closeCart);
+
+addMoreLink.addEventListener("click", () => {
+  closeCart();
+  window.location.href = "index.html#catalog";
+});
+
+checkoutLink.addEventListener("click", (event) => {
+  event.preventDefault();
+  if (loadCart().length === 0) return;
+
+  window.location.href = "checkout.html";
+});
 
 reviewForm.addEventListener("submit", async (event) => {
   event.preventDefault();
