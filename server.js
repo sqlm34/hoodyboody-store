@@ -4,6 +4,9 @@ const fs = require("fs");
 const path = require("path");
 const crypto = require("crypto");
 let PgPool = null;
+let StsClient = null;
+let AssumeRoleWithWebIdentityCommand = null;
+let RdsSigner = null;
 
 function loadLocalEnv() {
   const envPath = path.resolve(__dirname, ".env");
@@ -38,12 +41,20 @@ const redisDbKey = process.env.NITKA_REDIS_DB_KEY || localEnv.NITKA_REDIS_DB_KEY
 const hasRedisDb = Boolean(redisRestUrl && redisRestToken);
 const postgresUrl = process.env.DATABASE_URL || process.env.POSTGRES_URL || localEnv.DATABASE_URL || localEnv.POSTGRES_URL || "";
 const postgresPassword = process.env.PGPASSWORD || process.env.POSTGRES_PASSWORD || localEnv.PGPASSWORD || localEnv.POSTGRES_PASSWORD || "";
+const hasAwsIamPostgres = Boolean(
+  process.env.PGHOST &&
+    process.env.PGDATABASE &&
+    process.env.PGUSER &&
+    process.env.AWS_ROLE_ARN &&
+    process.env.AWS_REGION &&
+    process.env.VERCEL_OIDC_TOKEN
+);
 const hasPostgresDb = Boolean(
   postgresUrl ||
     (process.env.PGHOST &&
       process.env.PGDATABASE &&
       process.env.PGUSER &&
-      postgresPassword)
+      (postgresPassword || hasAwsIamPostgres))
 );
 const postgresDbKey = process.env.NITKA_POSTGRES_DB_KEY || localEnv.NITKA_POSTGRES_DB_KEY || "default";
 const shippingOrigin = {
@@ -271,6 +282,52 @@ async function writeDbAsync(db) {
 
 let pgPool = null;
 let pgReady = false;
+let awsCredentialsCache = null;
+let awsCredentialsExpiresAt = 0;
+
+async function getAwsIamCredentials() {
+  if (awsCredentialsCache && awsCredentialsExpiresAt > Date.now() + 60_000) return awsCredentialsCache;
+  if (!StsClient) {
+    ({ STSClient: StsClient, AssumeRoleWithWebIdentityCommand } = require("@aws-sdk/client-sts"));
+  }
+
+  const sts = new StsClient({ region: process.env.AWS_REGION });
+  const response = await sts.send(
+    new AssumeRoleWithWebIdentityCommand({
+      RoleArn: process.env.AWS_ROLE_ARN,
+      RoleSessionName: "nitka-store-vercel",
+      WebIdentityToken: process.env.VERCEL_OIDC_TOKEN,
+      DurationSeconds: 900
+    })
+  );
+  const credentials = response.Credentials;
+
+  awsCredentialsCache = {
+    accessKeyId: credentials.AccessKeyId,
+    secretAccessKey: credentials.SecretAccessKey,
+    sessionToken: credentials.SessionToken
+  };
+  awsCredentialsExpiresAt = credentials.Expiration ? new Date(credentials.Expiration).getTime() : Date.now() + 10 * 60 * 1000;
+  return awsCredentialsCache;
+}
+
+async function getPostgresPassword() {
+  if (postgresPassword) return postgresPassword;
+  if (!hasAwsIamPostgres) return "";
+  if (!RdsSigner) {
+    ({ Signer: RdsSigner } = require("@aws-sdk/rds-signer"));
+  }
+
+  const signer = new RdsSigner({
+    region: process.env.AWS_REGION,
+    hostname: process.env.PGHOST,
+    port: Number(process.env.PGPORT || 5432),
+    username: process.env.PGUSER,
+    credentials: await getAwsIamCredentials()
+  });
+
+  return signer.getAuthToken();
+}
 
 function getPgPool() {
   if (pgPool) return pgPool;
@@ -286,7 +343,7 @@ function getPgPool() {
         port: Number(process.env.PGPORT || localEnv.PGPORT || 5432),
         database: process.env.PGDATABASE || localEnv.PGDATABASE,
         user: process.env.PGUSER || localEnv.PGUSER,
-        password: postgresPassword,
+        password: getPostgresPassword,
         ssl: String(process.env.PGSSLMODE || localEnv.PGSSLMODE || "").toLowerCase() === "disable" ? false : { rejectUnauthorized: false }
       });
 
