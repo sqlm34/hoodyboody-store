@@ -721,11 +721,16 @@ function publicProduct(product) {
 }
 
 function publicProducts(db) {
-  return (db.products || defaultProducts).map(publicProduct);
+  const products = Array.isArray(db.products) && db.products.length ? db.products : defaultProducts;
+  return products.map(publicProduct);
 }
 
 function getProduct(productId, db) {
   return publicProducts(db).find((product) => product.id === productId) || null;
+}
+
+function getProductLookup(db) {
+  return Object.fromEntries(publicProducts(db).map((product) => [product.id, product]));
 }
 
 function parseList(value, fallback = []) {
@@ -1112,6 +1117,24 @@ function getCartProductId(item, inventory) {
     .find((productId) => String(item.id || "").startsWith(`${productId}-`));
 }
 
+function getStripeLineItem(item, product) {
+  const title = String(product?.title || item.title || "Custom item").trim().slice(0, 120);
+  const unitAmount = getStripeUnitAmount(product?.price ?? item.price);
+  const productDescription = String(product?.description || "").trim();
+  const itemDescription = String(item.description || "").trim();
+  const description = product
+    ? [productDescription, itemDescription].filter(Boolean).join(" - ")
+    : itemDescription || "Custom order";
+
+  if (!title || unitAmount <= 0) return null;
+
+  return {
+    title,
+    unitAmount,
+    description: description.slice(0, 500)
+  };
+}
+
 function getStockStatus(stock) {
   if (stock <= 0) return "out";
   if (stock <= 5) return "low";
@@ -1364,25 +1387,26 @@ async function handleApi(req, res) {
 
       let lineIndex = 0;
       const requestedInventory = {};
+      const productLookup = getProductLookup(db);
 
       for (const item of items) {
-        const productId = getCartProductId(item, db.inventory);
-        const product = getProduct(productId, db);
+        const productId = getCartProductId(item, productLookup);
+        const product = productId ? productLookup[productId] : null;
+        const lineItem = getStripeLineItem(item, product);
         const quantity = Math.max(1, Math.floor(Number(item.quantity) || 1));
 
-        if (!product) continue;
+        if (!lineItem) continue;
 
-        requestedInventory[productId] ||= 0;
-        requestedInventory[productId] += quantity;
+        if (productId && db.inventory[productId]) {
+          requestedInventory[productId] ||= 0;
+          requestedInventory[productId] += quantity;
+        }
 
         params.append(`line_items[${lineIndex}][quantity]`, String(quantity));
         params.append(`line_items[${lineIndex}][price_data][currency]`, stripeCurrency);
-        params.append(`line_items[${lineIndex}][price_data][unit_amount]`, String(getStripeUnitAmount(product.price)));
-        params.append(`line_items[${lineIndex}][price_data][product_data][name]`, product.title);
-        params.append(
-          `line_items[${lineIndex}][price_data][product_data][description]`,
-          item.description ? `${product.description} · ${item.description}` : product.description
-        );
+        params.append(`line_items[${lineIndex}][price_data][unit_amount]`, String(lineItem.unitAmount));
+        params.append(`line_items[${lineIndex}][price_data][product_data][name]`, lineItem.title);
+        params.append(`line_items[${lineIndex}][price_data][product_data][description]`, lineItem.description);
         lineIndex += 1;
       }
 
