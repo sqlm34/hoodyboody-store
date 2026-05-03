@@ -30,6 +30,11 @@ const adminPassword = process.env.NITKA_ADMIN_PASSWORD || localEnv.NITKA_ADMIN_P
 const stripeSecretKey = process.env.STRIPE_SECRET_KEY || localEnv.STRIPE_SECRET_KEY || "";
 const stripeCurrency = String(process.env.STRIPE_CURRENCY || localEnv.STRIPE_CURRENCY || "usd").toLowerCase();
 const shippoApiKey = process.env.SHIPPO_API_KEY || localEnv.SHIPPO_API_KEY || "";
+const redisRestUrl = process.env.UPSTASH_REDIS_REST_URL || process.env.KV_REST_API_URL || localEnv.UPSTASH_REDIS_REST_URL || localEnv.KV_REST_API_URL || "";
+const redisRestToken =
+  process.env.UPSTASH_REDIS_REST_TOKEN || process.env.KV_REST_API_TOKEN || localEnv.UPSTASH_REDIS_REST_TOKEN || localEnv.KV_REST_API_TOKEN || "";
+const redisDbKey = process.env.NITKA_REDIS_DB_KEY || localEnv.NITKA_REDIS_DB_KEY || "nitka:db";
+const hasRedisDb = Boolean(redisRestUrl && redisRestToken);
 const shippingOrigin = {
   name: process.env.SHIPPING_FROM_NAME || localEnv.SHIPPING_FROM_NAME || "HOODYBOODY",
   street1: process.env.SHIPPING_FROM_STREET1 || localEnv.SHIPPING_FROM_STREET1 || "417 Montgomery St",
@@ -88,7 +93,7 @@ const productCatalog = [
   }
 ];
 const emptyDb = { users: [], sessions: [], orders: [], reviews: [], inventory: {}, inventoryLog: [], pendingStripeOrders: [] };
-const memoryDb = process.env.NITKA_DB_PATH === ":memory:" || process.env.VERCEL ? JSON.parse(JSON.stringify(emptyDb)) : null;
+const memoryDb = process.env.NITKA_DB_PATH === ":memory:" || (process.env.VERCEL && !hasRedisDb) ? JSON.parse(JSON.stringify(emptyDb)) : null;
 const dbPath = memoryDb ? "" : path.resolve(root, process.env.NITKA_DB_PATH || "data/db.json");
 const dataDir = memoryDb ? "" : path.dirname(dbPath);
 const sessionCookie = "nitka_session";
@@ -204,6 +209,47 @@ function writeDb(db) {
 
   ensureDb();
   fs.writeFileSync(dbPath, JSON.stringify(db, null, 2));
+}
+
+async function redisCommand(command) {
+  const response = await fetch(redisRestUrl, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${redisRestToken}`,
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify(command)
+  });
+  const data = await response.json().catch(() => ({}));
+
+  if (!response.ok) {
+    throw new Error(data.error || data.message || "Persistent database request failed.");
+  }
+
+  return data.result;
+}
+
+async function readDbAsync() {
+  if (!hasRedisDb) return readDb();
+
+  const stored = await redisCommand(["GET", redisDbKey]);
+  const db = stored ? JSON.parse(stored) : JSON.parse(JSON.stringify(emptyDb));
+
+  if (ensureDbDefaults(db) || !stored) {
+    await writeDbAsync(db);
+  }
+
+  return db;
+}
+
+async function writeDbAsync(db) {
+  if (!hasRedisDb) {
+    writeDb(db);
+    return;
+  }
+
+  ensureDbDefaults(db);
+  await redisCommand(["SET", redisDbKey, JSON.stringify(db)]);
 }
 
 function sendJson(res, status, payload, headers = {}) {
@@ -746,7 +792,7 @@ function createOrderFromPayload(db, user, body, overrides = {}) {
 }
 
 async function handleApi(req, res) {
-  const db = readDb();
+  const db = await readDbAsync();
   const method = req.method;
   const url = new URL(req.url, `http://${req.headers.host}`);
 
@@ -783,7 +829,7 @@ async function handleApi(req, res) {
 
       db.users.push(user);
       const token = makeSession(db, user.id);
-      writeDb(db);
+      await writeDbAsync(db);
       sendJson(res, 201, { user: publicUser(user) }, sessionHeader(token));
       return;
     }
@@ -800,7 +846,7 @@ async function handleApi(req, res) {
       }
 
       const token = makeSession(db, user.id);
-      writeDb(db);
+      await writeDbAsync(db);
       sendJson(res, 200, { user: publicUser(user) }, sessionHeader(token));
       return;
     }
@@ -808,7 +854,7 @@ async function handleApi(req, res) {
     if (url.pathname === "/api/logout" && method === "POST") {
       const token = parseCookies(req)[sessionCookie];
       db.sessions = db.sessions.filter((session) => session.token !== token);
-      writeDb(db);
+      await writeDbAsync(db);
       sendJson(res, 200, { ok: true }, clearSessionHeader());
       return;
     }
@@ -827,6 +873,15 @@ async function handleApi(req, res) {
     if (url.pathname === "/api/session" && method === "GET") {
       const user = getSessionUser(req, db);
       sendJson(res, 200, { user: publicUser(user) });
+      return;
+    }
+
+    if (url.pathname === "/api/health" && method === "GET") {
+      sendJson(res, 200, {
+        ok: true,
+        storage: hasRedisDb ? "redis" : memoryDb ? "memory" : "file",
+        vercel: Boolean(process.env.VERCEL)
+      });
       return;
     }
 
@@ -946,7 +1001,7 @@ async function handleApi(req, res) {
         payload: body,
         createdAt: new Date().toISOString()
       });
-      writeDb(db);
+      await writeDbAsync(db);
       sendJson(res, 200, { id: session.id, url: session.url });
       return;
     }
@@ -996,7 +1051,7 @@ async function handleApi(req, res) {
       }
 
       db.pendingStripeOrders = db.pendingStripeOrders.filter((item) => item.sessionId !== sessionId);
-      writeDb(db);
+      await writeDbAsync(db);
       sendJson(res, 201, { order: result.order });
       return;
     }
@@ -1060,7 +1115,7 @@ async function handleApi(req, res) {
         createdAt: new Date().toISOString()
       });
 
-      writeDb(db);
+      await writeDbAsync(db);
       sendJson(res, 200, { inventory: publicInventory(db.inventory)[productId] });
       return;
     }
@@ -1107,7 +1162,7 @@ async function handleApi(req, res) {
       }
 
       const [review] = db.reviews.splice(reviewIndex, 1);
-      writeDb(db);
+      await writeDbAsync(db);
       sendJson(res, 200, { ok: true, review: publicReview(review) });
       return;
     }
@@ -1131,7 +1186,7 @@ async function handleApi(req, res) {
         entrance: String(body.entrance || "").trim()
       };
 
-      writeDb(db);
+      await writeDbAsync(db);
       sendJson(res, 200, { user: publicUser(user) });
       return;
     }
@@ -1165,7 +1220,7 @@ async function handleApi(req, res) {
         return;
       }
 
-      writeDb(db);
+      await writeDbAsync(db);
       sendJson(res, 201, { order: result.order });
       return;
     }
@@ -1225,7 +1280,7 @@ async function handleApi(req, res) {
       };
 
       db.reviews.push(review);
-      writeDb(db);
+      await writeDbAsync(db);
       sendJson(res, 201, { review: publicReview(review) });
       return;
     }
