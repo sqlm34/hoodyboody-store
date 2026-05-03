@@ -16,7 +16,7 @@
       "headers": [
         {
           "key": "X-Robots-Tag",
-          "value": "noindex, nofollow"
+          "value": "noindex, nofollow, noarchive"
         }
       ]
     }
@@ -24,11 +24,11 @@
   "functions": {
     "server.js": {
       "maxDuration": 30,
-      "includeFiles": "{*.html,*.css,*.js,assets/**,package.json}"
+      "includeFiles": "{*.html,*.css,*.js,robots.txt,assets/**,package.json}"
     },
     "api/index.js": {
       "maxDuration": 30,
-      "includeFiles": "{*.html,*.css,*.js,assets/**,package.json}"
+      "includeFiles": "{*.html,*.css,*.js,robots.txt,assets/**,package.json}"
     }
   }
 }
