@@ -2,3 +2,5 @@
 node_modules/
 .vercel/
 data/db.json
+
+.env*.local

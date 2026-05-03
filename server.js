@@ -252,32 +252,34 @@ async function redisCommand(command) {
 }
 
 async function readDbAsync() {
-  if (hasPostgresDb) return readPgDb();
-  if (!hasRedisDb) return readDb();
+  if (hasRedisDb) {
+    const stored = await redisCommand(["GET", redisDbKey]);
+    const db = stored ? JSON.parse(stored) : JSON.parse(JSON.stringify(emptyDb));
 
-  const stored = await redisCommand(["GET", redisDbKey]);
-  const db = stored ? JSON.parse(stored) : JSON.parse(JSON.stringify(emptyDb));
+    if (ensureDbDefaults(db) || !stored) {
+      await writeDbAsync(db);
+    }
 
-  if (ensureDbDefaults(db) || !stored) {
-    await writeDbAsync(db);
+    return db;
   }
 
-  return db;
+  if (hasPostgresDb) return readPgDb();
+  return readDb();
 }
 
 async function writeDbAsync(db) {
+  if (hasRedisDb) {
+    ensureDbDefaults(db);
+    await redisCommand(["SET", redisDbKey, JSON.stringify(db)]);
+    return;
+  }
+
   if (hasPostgresDb) {
     await writePgDb(db);
     return;
   }
 
-  if (!hasRedisDb) {
-    writeDb(db);
-    return;
-  }
-
-  ensureDbDefaults(db);
-  await redisCommand(["SET", redisDbKey, JSON.stringify(db)]);
+  writeDb(db);
 }
 
 let pgPool = null;
@@ -1015,7 +1017,7 @@ async function handleApi(req, res) {
     if (url.pathname === "/api/health" && method === "GET") {
       sendJson(res, 200, {
         ok: true,
-        storage: hasPostgresDb ? "postgres" : hasRedisDb ? "redis" : memoryDb ? "memory" : "file",
+        storage: hasRedisDb ? "redis" : hasPostgresDb ? "postgres" : memoryDb ? "memory" : "file",
         vercel: Boolean(process.env.VERCEL),
         databaseEnv: {
           redis: hasRedisDb,
