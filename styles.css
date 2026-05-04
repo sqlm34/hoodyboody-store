@@ -475,9 +475,8 @@ h3 {
 }
 
 .product-body {
-  display: grid;
-  grid-template-rows: auto auto auto auto auto;
-  align-content: start;
+  display: flex;
+  flex-direction: column;
   gap: 14px;
   min-height: 0;
   min-width: 0;
@@ -499,6 +498,13 @@ h3 {
   color: var(--muted);
   font-size: 0.9rem;
   font-weight: 760;
+}
+
+.product-card-footer {
+  display: grid;
+  gap: 10px;
+  margin-top: auto;
+  padding-top: 18px;
 }
 
 .rating-stars {

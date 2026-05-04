@@ -239,10 +239,12 @@ function renderCatalog() {
               <span class="price">${formatPrice(product.price)}</span>
             </div>
             <p>${escapeHtml(product.description)}</p>
-            ${renderProductRating(product.id)}
-            ${renderProductStock(product.id)}
-            <div class="size-row" aria-label="Sizes">
-              ${product.sizes.map((size) => `<span class="size-pill">${escapeHtml(size)}</span>`).join("")}
+            <div class="product-card-footer">
+              ${renderProductRating(product.id)}
+              ${renderProductStock(product.id)}
+              <div class="size-row" aria-label="Sizes">
+                ${product.sizes.map((size) => `<span class="size-pill">${escapeHtml(size)}</span>`).join("")}
+              </div>
             </div>
           </div>
         </article>
