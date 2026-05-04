@@ -11,10 +11,13 @@ const adminProductsDashboard = document.querySelector("#adminProductsDashboard")
 const adminProductsList = document.querySelector("#adminProductsList");
 const adminProductsNote = document.querySelector("#adminProductsNote");
 const reloadProducts = document.querySelector("#reloadProducts");
+const createProductCard = document.querySelector("#createProductCard");
 
 let inventory = {};
 let reviews = [];
 let statusTimer = 0;
+let selectedProductId = "";
+let editorMode = "grid";
 
 async function api(path, options = {}) {
   const response = await fetch(path, {
@@ -111,6 +114,26 @@ function getStockStatus(stock) {
   return { className: "in", text: "In stock" };
 }
 
+function getBlankProduct() {
+  return {
+    id: "",
+    title: "New product card",
+    type: "tops",
+    badge: "new",
+    description: "Short product description.",
+    price: 0,
+    sizes: ["S", "M", "L"],
+    focus: "50% 50%",
+    image: DEFAULT_IMAGE_URL,
+    imageName: "",
+    colors: [{ name: "Black", value: "#202326" }],
+    longDescription: "Detailed product description.",
+    gallery: [{ label: "General view", focus: "50% 50%", image: DEFAULT_IMAGE_URL }],
+    seoTitle: "",
+    seoDescription: ""
+  };
+}
+
 function getProductReviews(productId) {
   return reviews.filter((review) => review.productId === productId);
 }
@@ -183,6 +206,7 @@ function renderStockEditor(product) {
   const updatedAt = inventory[product.id]?.updatedAt
     ? new Date(inventory[product.id].updatedAt).toLocaleString("en-US")
     : "no data";
+  const canSaveStock = Boolean(product.id);
 
   return `
     <section class="admin-product-stock full-span" data-stock-editor>
@@ -195,9 +219,9 @@ function renderStockEditor(product) {
       </div>
       <div class="admin-stock-controls">
         <button class="icon-button" type="button" data-adjust-stock="-1" aria-label="Decrease stock">-</button>
-        <input type="number" name="stock" min="0" step="1" value="${stock}" aria-label="Product stock" />
+        <input type="number" name="stock" min="0" step="1" value="${stock}" aria-label="Product stock" readonly />
         <button class="icon-button" type="button" data-adjust-stock="1" aria-label="Increase stock">+</button>
-        <button class="button primary" type="button" data-save-stock>Save stock</button>
+        <button class="button primary" type="button" data-save-stock ${canSaveStock ? "" : "disabled"}>Save stock</button>
       </div>
     </section>
   `;
@@ -255,7 +279,134 @@ function showDashboard() {
   adminProductsDashboard.hidden = false;
 }
 
+function renderProductGrid() {
+  return `
+    <div class="admin-product-picker" aria-label="Product cards">
+      ${products
+        .map((product) => {
+          const stock = getStock(product.id);
+          const status = getStockStatus(stock);
+
+          return `
+            <button
+              class="admin-product-tile ${product.id === selectedProductId ? "active" : ""}"
+              type="button"
+              data-open-product="${escapeHtml(product.id)}"
+            >
+              <span
+                class="admin-product-tile-photo"
+                style="--product-image: url('${escapeHtml(product.image || DEFAULT_IMAGE_URL)}'); --focus: ${escapeHtml(product.focus || "center")}"
+              >
+                <span class="product-badge">${escapeHtml(product.badge || "product")}</span>
+              </span>
+              <span class="admin-product-tile-body">
+                <strong>${escapeHtml(product.title)}</strong>
+                <small>${escapeHtml(product.type || "product")} · ${escapeHtml(product.id)}</small>
+                <span class="stock-pill ${status.className}">${status.text}</span>
+              </span>
+            </button>
+          `;
+        })
+        .join("")}
+    </div>
+  `;
+}
+
+function renderProductForm(product, mode = "edit") {
+  const isCreate = mode === "create";
+
+  return `
+    <form class="admin-product-form" data-product-id="${escapeHtml(product.id)}" data-editor-mode="${escapeHtml(mode)}">
+      <div
+        class="admin-product-preview"
+        style="--product-image: url('${escapeHtml(product.image || DEFAULT_IMAGE_URL)}'); --focus: ${escapeHtml(product.focus || "center")}"
+      ></div>
+      <div class="admin-product-fields">
+        <div class="admin-product-title">
+          <strong>${escapeHtml(isCreate ? "Create new product card" : product.title)}</strong>
+          <span>${escapeHtml(isCreate ? "New card" : product.id)}</span>
+        </div>
+        <div class="form-grid">
+          <label>
+            Product name
+            <input name="title" value="${escapeHtml(product.title)}" required />
+          </label>
+          <label>
+            Price in cents
+            <input name="price" type="number" min="0" step="1" value="${Number(product.price) || 0}" required />
+          </label>
+          <label>
+            Category
+            <select name="type">
+              <option value="outerwear" ${product.type === "outerwear" ? "selected" : ""}>Outerwear</option>
+              <option value="tops" ${product.type === "tops" ? "selected" : ""}>Tops</option>
+              <option value="accessories" ${product.type === "accessories" ? "selected" : ""}>Accessories</option>
+            </select>
+          </label>
+          <label>
+            Badge
+            <input name="badge" value="${escapeHtml(product.badge || "")}" />
+          </label>
+          <div class="admin-photo-upload full-span">
+            <input name="image" type="hidden" value="${escapeHtml(product.image || "")}" />
+            <input type="file" accept="image/jpeg,image/png,image/webp" data-photo-input multiple hidden />
+            <div class="admin-photo-header">
+              <span>Product photos</span>
+              <small>${isCreate ? "Save the card first, then upload photos." : "Choose one or more JPG, PNG or WEBP photos."}</small>
+            </div>
+            ${renderPhotoTiles(product)}
+            <div class="admin-photo-actions">
+              <button class="button ghost dark" type="button" data-upload-photo ${isCreate ? "disabled" : ""}>Upload photos</button>
+              <small>${escapeHtml(isCreate ? "Photos are available after saving." : product.imageName || "No uploaded photos yet")}</small>
+            </div>
+          </div>
+          <label>
+            Photo focus
+            <input name="focus" value="${escapeHtml(product.focus || "center")}" placeholder="50% 50%" />
+          </label>
+          ${renderSizePicker(product)}
+          ${renderStockEditor(product)}
+          ${isCreate ? "" : renderProductReviews(product)}
+          <label class="full-span">
+            Card description
+            <textarea name="description" rows="2" required>${escapeHtml(product.description || "")}</textarea>
+          </label>
+          <label class="full-span">
+            Product page description
+            <textarea name="longDescription" rows="3" required>${escapeHtml(product.longDescription || "")}</textarea>
+          </label>
+          <label>
+            SEO title
+            <input name="seoTitle" value="${escapeHtml(product.seoTitle || "")}" placeholder="${escapeHtml(product.title)} | HOODYBOODY" />
+          </label>
+          <label>
+            SEO description
+            <textarea name="seoDescription" rows="2" placeholder="Search engine description">${escapeHtml(product.seoDescription || "")}</textarea>
+          </label>
+        </div>
+        <div class="admin-editor-actions">
+          <button class="button ghost dark" type="button" data-close-editor>Back to cards</button>
+          <button class="button primary" type="submit">${isCreate ? "Create product" : "Save product"}</button>
+        </div>
+      </div>
+    </form>
+  `;
+}
+
+function getSelectedProduct() {
+  if (editorMode === "create") return getBlankProduct();
+  return products.find((product) => product.id === selectedProductId) || null;
+}
+
 function renderProductsEditor() {
+  const selectedProduct = getSelectedProduct();
+
+  adminProductsList.innerHTML =
+    renderProductGrid() +
+    (selectedProduct ? renderProductForm(selectedProduct, editorMode === "create" ? "create" : "edit") : "");
+}
+
+function renderLegacyProductsEditor() {
   adminProductsList.innerHTML = products
     .map(
       (product) => `
@@ -463,6 +614,7 @@ adminProductsList.addEventListener("submit", (event) => {
   const form = event.target.closest("[data-product-id]");
   const submitButton = form.querySelector('button[type="submit"]');
   const data = Object.fromEntries(new FormData(form));
+  const isCreate = form.dataset.editorMode === "create";
   data.productId = form.dataset.productId;
   data.price = Number(data.price);
 
@@ -472,28 +624,50 @@ adminProductsList.addEventListener("submit", (event) => {
   }
 
   submitButton.disabled = true;
-  submitButton.textContent = "Saving...";
-  setProductsStatus("Saving product card...", false, { persist: true });
+  submitButton.textContent = isCreate ? "Creating..." : "Saving...";
+  setProductsStatus(isCreate ? "Creating product card..." : "Saving product card...", false, { persist: true });
 
   api("/api/admin/products", {
-    method: "PATCH",
+    method: isCreate ? "POST" : "PATCH",
     body: JSON.stringify(data)
   })
     .then((response) => {
       products = response.products || products;
+      if (response.inventory && response.product?.id) {
+        inventory[response.product.id] = response.inventory;
+      }
+      selectedProductId = response.product?.id || data.productId || selectedProductId;
+      editorMode = "edit";
       renderProductsEditor();
-      setProductsStatus("Product card saved successfully. SEO tags updated automatically.");
+      setProductsStatus(isCreate ? "Product card created successfully." : "Product card saved successfully. SEO tags updated automatically.");
     })
     .catch((error) => {
       setProductsStatus(error.message, true);
     })
     .finally(() => {
       submitButton.disabled = false;
-      submitButton.textContent = "Save product";
+      submitButton.textContent = isCreate ? "Create product" : "Save product";
     });
 });
 
 adminProductsList.addEventListener("click", (event) => {
+  const openProductButton = event.target.closest("[data-open-product]");
+  if (openProductButton) {
+    selectedProductId = openProductButton.dataset.openProduct;
+    editorMode = "edit";
+    renderProductsEditor();
+    adminProductsList.querySelector(".admin-product-form")?.scrollIntoView({ behavior: "smooth", block: "start" });
+    return;
+  }
+
+  const closeEditorButton = event.target.closest("[data-close-editor]");
+  if (closeEditorButton) {
+    selectedProductId = "";
+    editorMode = "grid";
+    renderProductsEditor();
+    return;
+  }
+
   const uploadButton = event.target.closest("[data-upload-photo]");
   if (uploadButton) {
     const form = uploadButton.closest("[data-product-id]");
@@ -633,5 +807,11 @@ adminProductsList.addEventListener("change", (event) => {
 });
 
 reloadProducts.addEventListener("click", () => loadEditorData());
+createProductCard.addEventListener("click", () => {
+  selectedProductId = "";
+  editorMode = "create";
+  renderProductsEditor();
+  adminProductsList.querySelector(".admin-product-form")?.scrollIntoView({ behavior: "smooth", block: "start" });
+});
 
 loadEditorData({ silent: true });

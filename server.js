@@ -744,6 +744,17 @@ function parseList(value, fallback = []) {
   return items.length ? items : fallback;
 }
 
+function slugifyProductId(value) {
+  const slug = String(value || "")
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 52);
+
+  return slug || `product-${Date.now().toString(36)}`;
+}
+
 function sanitizeProductPatch(body, currentProduct) {
   const price = Math.round(Number(body.price));
   const next = {
@@ -1665,6 +1676,83 @@ async function handleApi(req, res) {
       }
 
       sendJson(res, 200, { products: publicProducts(db) });
+      return;
+    }
+
+    if (url.pathname === "/api/admin/products" && method === "POST") {
+      const user = getSessionUser(req, db);
+      if (!user) {
+        sendJson(res, 401, { message: "You must be logged in as the store owner." });
+        return;
+      }
+
+      if (!isAdmin(user)) {
+        sendJson(res, 403, { message: "Only the store owner can create products." });
+        return;
+      }
+
+      const body = await readJson(req);
+      const baseProduct = {
+        id: "",
+        title: "New product card",
+        type: "tops",
+        badge: "new",
+        description: "Short product description.",
+        longDescription: "Detailed product description.",
+        seoTitle: "",
+        seoDescription: "",
+        image: "assets/embroidered-collection.png",
+        imageName: "",
+        focus: "50% 50%",
+        price: 0,
+        sizes: ["S", "M", "L"],
+        colors: [{ name: "Black", value: "#202326" }],
+        gallery: [{ label: "General view", focus: "50% 50%", image: "assets/embroidered-collection.png" }]
+      };
+      const nextProduct = sanitizeProductPatch(body, baseProduct);
+
+      if (!nextProduct) {
+        sendJson(res, 400, { message: "Fill product title, descriptions, and price correctly." });
+        return;
+      }
+
+      const baseId = slugifyProductId(nextProduct.title);
+      let productId = baseId;
+      let counter = 2;
+      while (db.products.some((product) => product.id === productId)) {
+        productId = `${baseId}-${counter}`;
+        counter += 1;
+      }
+
+      nextProduct.id = productId;
+      nextProduct.createdAt = new Date().toISOString();
+      nextProduct.updatedAt = nextProduct.createdAt;
+      nextProduct.updatedBy = user.id;
+      db.products.push(nextProduct);
+
+      const stock = Math.max(0, Math.round(Number(body.stock) || 0));
+      db.inventory[productId] = {
+        stock,
+        updatedAt: new Date().toISOString(),
+        updatedBy: user.id
+      };
+      db.inventoryLog.push({
+        id: crypto.randomUUID(),
+        productId,
+        previousStock: 0,
+        stock,
+        delta: stock,
+        userId: user.id,
+        userName: user.name,
+        createdAt: new Date().toISOString()
+      });
+
+      await writeDbAsync(db);
+      sendJson(res, 201, {
+        product: publicProduct(nextProduct),
+        products: publicProducts(db),
+        inventory: publicInventory(db.inventory)[productId]
+      });
       return;
     }
 

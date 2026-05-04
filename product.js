@@ -599,10 +599,6 @@ productColorChoices.addEventListener("click", (event) => {
 
 quantityMinus.addEventListener("click", () => setQuantity(selectedQuantity - 1));
 quantityPlus.addEventListener("click", () => setQuantity(selectedQuantity + 1));
-productQuantity.addEventListener("focus", clearQuantityForTyping);
-productQuantity.addEventListener("input", handleQuantityInput);
-productQuantity.addEventListener("change", finishQuantityInput);
-productQuantity.addEventListener("blur", finishQuantityInput);
 
 productAdd.addEventListener("click", addToCart);
 

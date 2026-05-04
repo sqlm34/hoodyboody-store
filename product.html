@@ -72,16 +72,18 @@
           </fieldset>
 
           <div class="quantity-selector" aria-label="Product quantity">
-            <button class="icon-button" type="button" id="quantityMinus" aria-label="Decrease quantity">
-              <i class="fa-solid fa-minus" aria-hidden="true"></i>
-            </button>
             <label>
               Quantity
-              <input id="productQuantity" type="number" min="1" step="1" value="1" inputmode="numeric" />
+              <span class="quantity-stepper">
+                <button class="icon-button" type="button" id="quantityMinus" aria-label="Decrease quantity">
+                  <i class="fa-solid fa-minus" aria-hidden="true"></i>
+                </button>
+                <input id="productQuantity" type="number" min="1" step="1" value="1" inputmode="numeric" readonly />
+                <button class="icon-button" type="button" id="quantityPlus" aria-label="Increase quantity">
+                  <i class="fa-solid fa-plus" aria-hidden="true"></i>
+                </button>
+              </span>
             </label>
-            <button class="icon-button" type="button" id="quantityPlus" aria-label="Increase quantity">
-              <i class="fa-solid fa-plus" aria-hidden="true"></i>
-            </button>
           </div>
 
           <button class="button primary wide" type="button" id="productAdd">Add to cart</button>

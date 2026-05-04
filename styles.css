@@ -533,10 +533,9 @@ h3 {
 }
 
 .quantity-selector {
-  display: grid;
-  grid-template-columns: 42px minmax(120px, 1fr) 42px;
-  gap: 8px;
-  align-items: end;
+  display: flex;
+  align-items: flex-end;
+  gap: 10px;
 }
 
 .quantity-selector label {
@@ -548,18 +547,38 @@ h3 {
 }
 
 .quantity-selector input {
+  width: 64px;
   min-height: 42px;
   text-align: center;
   font-weight: 820;
 }
 
+.quantity-stepper {
+  display: inline-flex;
+  align-items: center;
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--white);
+}
+
 .quantity-selector .icon-button {
   border-color: var(--line);
-  border-radius: 8px;
+  border-radius: 0;
+  border-width: 0 1px 0 0;
   color: var(--ink);
   background: var(--white);
   font-size: 1.2rem;
   font-weight: 900;
+}
+
+.quantity-stepper .icon-button:last-child {
+  border-width: 0 0 0 1px;
+}
+
+.quantity-stepper input {
+  border: 0;
+  border-radius: 0;
 }
 
 .quantity-selector .icon-button:disabled {
@@ -1710,6 +1729,62 @@ textarea:focus {
   gap: 14px;
 }
 
+.admin-product-picker {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: 12px;
+}
+
+.admin-product-tile {
+  display: grid;
+  gap: 10px;
+  width: 100%;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 8px;
+  color: inherit;
+  text-align: left;
+  background: #fff;
+  cursor: pointer;
+}
+
+.admin-product-tile:hover,
+.admin-product-tile:focus-visible,
+.admin-product-tile.active {
+  border-color: var(--pine);
+  outline: 0;
+  box-shadow: 0 12px 28px rgba(20, 47, 39, 0.12);
+}
+
+.admin-product-tile-photo {
+  position: relative;
+  display: block;
+  aspect-ratio: 4 / 5;
+  overflow: hidden;
+  border-radius: 7px;
+  background-color: #f8faf8;
+  background-image: var(--product-image, url("assets/embroidered-collection.png"));
+  background-position: var(--focus, center);
+  background-repeat: no-repeat;
+  background-size: cover;
+}
+
+.admin-product-tile-photo .product-badge {
+  position: absolute;
+  top: 10px;
+  left: 10px;
+}
+
+.admin-product-tile-body {
+  display: grid;
+  gap: 7px;
+}
+
+.admin-product-tile-body small {
+  color: var(--muted);
+  overflow-wrap: anywhere;
+}
+
 .admin-product-form {
   display: grid;
   grid-template-columns: minmax(220px, 0.34fr) minmax(0, 1fr);
@@ -1890,24 +1965,39 @@ textarea:focus {
 }
 
 .admin-stock-controls {
-  display: grid;
-  grid-template-columns: auto minmax(90px, 120px) auto minmax(130px, auto);
+  display: inline-grid;
+  grid-template-columns: 42px minmax(70px, 96px) 42px minmax(130px, auto);
   align-items: center;
-  gap: 8px;
+  justify-content: start;
+  gap: 0;
 }
 
 .admin-stock-controls .icon-button {
   border-color: var(--line);
-  border-radius: 8px;
+  border-radius: 0;
   color: var(--ink);
   background: var(--white);
   font-size: 1.1rem;
   font-weight: 900;
 }
 
+.admin-stock-controls .icon-button:first-child {
+  border-radius: 8px 0 0 8px;
+}
+
+.admin-stock-controls .icon-button:nth-child(3) {
+  border-radius: 0 8px 8px 0;
+}
+
 .admin-stock-controls input {
   min-height: 42px;
+  border-inline: 0;
+  border-radius: 0;
   text-align: center;
+}
+
+.admin-stock-controls .button {
+  margin-left: 8px;
 }
 
 .admin-review-grid {
@@ -1948,7 +2038,15 @@ textarea:focus {
   background: #edf8f4;
 }
 
-.admin-product-fields > .button {
+.admin-editor-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.admin-product-fields > .button,
+.admin-editor-actions .button {
   justify-self: end;
   min-width: 170px;
 }
@@ -2206,6 +2304,7 @@ textarea:focus {
   .admin-stock-controls .button {
     grid-column: 1 / -1;
     width: 100%;
+    margin-left: 0;
   }
 
   .account-inline,
