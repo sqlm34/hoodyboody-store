@@ -2,6 +2,17 @@ let products = window.NITKA_PRODUCTS || [];
 
 const DEFAULT_IMAGE_URL = "assets/embroidered-collection.png";
 const DEFAULT_SIZE_OPTIONS = ["XXS", "XS", "S", "M", "L", "XL", "XXL", "One size"];
+const PHOTO_FOCUS_OPTIONS = [
+  { label: "Top left", value: "20% 20%" },
+  { label: "Top", value: "50% 20%" },
+  { label: "Top right", value: "80% 20%" },
+  { label: "Left", value: "20% 50%" },
+  { label: "Center", value: "center" },
+  { label: "Right", value: "80% 50%" },
+  { label: "Bottom left", value: "20% 80%" },
+  { label: "Bottom", value: "50% 80%" },
+  { label: "Bottom right", value: "80% 80%" }
+];
 const maxUploadSourceBytes = 12 * 1024 * 1024;
 const maxImageEdge = 1600;
 
@@ -67,6 +78,16 @@ function setProductsStatus(message, isError = false, options = {}) {
 
 function getSizeOptions(product) {
   return Array.from(new Set([...DEFAULT_SIZE_OPTIONS, ...(Array.isArray(product.sizes) ? product.sizes : [])]));
+}
+
+function normalizeFocus(value) {
+  return String(value || "center").trim() || "center";
+}
+
+function getFocusOptions(product) {
+  const currentFocus = normalizeFocus(product.focus);
+  const hasCurrentFocus = PHOTO_FOCUS_OPTIONS.some((option) => option.value === currentFocus);
+  return hasCurrentFocus ? PHOTO_FOCUS_OPTIONS : [{ label: "Current", value: currentFocus }, ...PHOTO_FOCUS_OPTIONS];
 }
 
 function getProductPhotos(product) {
@@ -191,6 +212,36 @@ function renderSizePicker(product) {
                 aria-pressed="${selectedSizes.has(size) ? "true" : "false"}"
               >
                 ${escapeHtml(size)}
+              </button>
+            `
+          )
+          .join("")}
+      </div>
+    </div>
+  `;
+}
+
+function renderFocusPicker(product) {
+  const selectedFocus = normalizeFocus(product.focus);
+
+  return `
+    <div class="admin-focus-picker full-span" data-focus-picker>
+      <input type="hidden" name="focus" value="${escapeHtml(selectedFocus)}" />
+      <div>
+        <span>Photo focus</span>
+        <small>Choose where the product image should stay centered.</small>
+      </div>
+      <div class="admin-focus-options">
+        ${getFocusOptions(product)
+          .map(
+            (option) => `
+              <button
+                class="admin-focus-button ${option.value === selectedFocus ? "active" : ""}"
+                type="button"
+                data-focus-option="${escapeHtml(option.value)}"
+                aria-pressed="${option.value === selectedFocus ? "true" : "false"}"
+              >
+                ${escapeHtml(option.label)}
               </button>
             `
           )
@@ -360,10 +411,7 @@ function renderProductForm(product, mode = "edit") {
               <small>${escapeHtml(isCreate ? "Photos are available after saving." : product.imageName || "No uploaded photos yet")}</small>
             </div>
           </div>
-          <label>
-            Photo focus
-            <input name="focus" value="${escapeHtml(product.focus || "center")}" placeholder="50% 50%" />
-          </label>
+          ${renderFocusPicker(product)}
           ${renderSizePicker(product)}
           ${renderStockEditor(product)}
           ${isCreate ? "" : renderProductReviews(product)}
@@ -454,10 +502,7 @@ function renderLegacyProductsEditor() {
                   <small>${escapeHtml(product.imageName || "No uploaded photos yet")}</small>
                 </div>
               </div>
-              <label>
-                Photo focus
-                <input name="focus" value="${escapeHtml(product.focus || "center")}" placeholder="50% 50%" />
-              </label>
+              ${renderFocusPicker(product)}
               ${renderSizePicker(product)}
               ${renderStockEditor(product)}
               ${renderProductReviews(product)}
@@ -688,6 +733,24 @@ adminProductsList.addEventListener("click", (event) => {
     sizeButton.setAttribute("aria-pressed", sizeButton.classList.contains("active") ? "true" : "false");
     updateSizePicker(picker);
     sizeButton.closest("[data-size-picker]").querySelector("small").textContent = "Click Save product to save size changes.";
+    return;
+  }
+
+  const focusButton = event.target.closest("[data-focus-option]");
+  if (focusButton) {
+    const picker = focusButton.closest("[data-focus-picker]");
+    const form = focusButton.closest("[data-product-id]");
+    const focus = focusButton.dataset.focusOption;
+
+    picker.querySelector('input[name="focus"]').value = focus;
+    picker.querySelectorAll(".admin-focus-button").forEach((button) => {
+      const isActive = button === focusButton;
+      button.classList.toggle("active", isActive);
+      button.setAttribute("aria-pressed", isActive ? "true" : "false");
+    });
+    form.querySelector(".admin-product-preview").style.setProperty("--focus", focus);
+    form.querySelector(".admin-photo-tile.active .admin-photo-thumb")?.style.setProperty("--focus", focus);
+    picker.querySelector("small").textContent = "Click Save product to save photo focus.";
     return;
   }
 

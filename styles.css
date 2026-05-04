@@ -1836,14 +1836,16 @@ textarea:focus {
 }
 
 .admin-photo-header span,
-.admin-size-picker > div:first-child span {
+.admin-size-picker > div:first-child span,
+.admin-focus-picker > div:first-child span {
   color: var(--muted);
   font-size: 0.94rem;
   font-weight: 760;
 }
 
 .admin-photo-header small,
-.admin-size-picker small {
+.admin-size-picker small,
+.admin-focus-picker small {
   color: var(--muted);
   font-size: 0.82rem;
   font-weight: 650;
@@ -2010,18 +2012,21 @@ textarea:focus {
   padding: 12px;
 }
 
-.admin-size-picker {
+.admin-size-picker,
+.admin-focus-picker {
   display: grid;
   gap: 10px;
 }
 
-.admin-size-options {
+.admin-size-options,
+.admin-focus-options {
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
 }
 
-.admin-size-button {
+.admin-size-button,
+.admin-focus-button {
   min-height: 38px;
   border: 1px solid var(--line);
   border-radius: 8px;
@@ -2032,7 +2037,8 @@ textarea:focus {
   font-weight: 800;
 }
 
-.admin-size-button.active {
+.admin-size-button.active,
+.admin-focus-button.active {
   border-color: var(--pine);
   color: var(--pine);
   background: #edf8f4;
