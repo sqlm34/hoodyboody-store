@@ -1787,6 +1787,63 @@ async function handleApi(req, res) {
       return;
     }
 
+    if (url.pathname === "/api/admin/products/photo" && method === "DELETE") {
+      const user = getSessionUser(req, db);
+      if (!user) {
+        sendJson(res, 401, { message: "You must be logged in as the store owner." });
+        return;
+      }
+
+      if (!isAdmin(user)) {
+        sendJson(res, 403, { message: "Only the store owner can delete product photos." });
+        return;
+      }
+
+      const body = await readJson(req);
+      const productId = String(body.productId || "").trim();
+      const imageUrl = String(body.image || body.imageUrl || "").trim();
+      const imageId = getProductImageIdFromUrl(imageUrl);
+      const productIndex = db.products.findIndex((product) => product.id === productId);
+
+      if (productIndex === -1) {
+        sendJson(res, 404, { message: "Product not found." });
+        return;
+      }
+
+      if (!imageId || !db.productImages?.[imageId]) {
+        sendJson(res, 404, { message: "Product photo not found." });
+        return;
+      }
+
+      const product = db.products[productIndex];
+      const currentGallery = Array.isArray(product.gallery) ? product.gallery : [];
+      const nextGallery = currentGallery.filter((item) => item?.image !== imageUrl);
+      const wasInGallery = nextGallery.length !== currentGallery.length;
+
+      if (!wasInGallery && product.image !== imageUrl) {
+        sendJson(res, 404, { message: "Product photo is not attached to this product." });
+        return;
+      }
+
+      const nextCover = nextGallery.find((item) => item?.image);
+      const nextImage = product.image === imageUrl ? nextCover?.image || "assets/embroidered-collection.png" : product.image;
+      const nextImageName = product.image === imageUrl ? nextCover?.label || "" : product.imageName || "";
+
+      delete db.productImages[imageId];
+      db.products[productIndex] = {
+        ...product,
+        image: nextImage,
+        imageName: nextImageName,
+        gallery: nextGallery.length ? nextGallery : [{ label: "General view", focus: product.focus || "center" }],
+        updatedAt: new Date().toISOString(),
+        updatedBy: user.id
+      };
+
+      await writeDbAsync(db);
+      sendJson(res, 200, { product: publicProduct(db.products[productIndex]), products: publicProducts(db) });
+      return;
+    }
+
     if (url.pathname === "/api/admin/reviews" && method === "GET") {
       const user = getSessionUser(req, db);
       if (!user) {

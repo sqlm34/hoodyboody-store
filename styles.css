@@ -20,13 +20,14 @@
 
 html {
   max-width: 100%;
+  overflow-x: hidden;
   scroll-behavior: smooth;
 }
 
 body {
   margin: 0;
   max-width: 100%;
-  overflow-x: clip;
+  overflow-x: hidden;
   color: var(--ink);
   background: var(--paper);
   font-family: "Unbounded", Inter, "Segoe UI", Arial, sans-serif;
@@ -70,6 +71,7 @@ textarea {
   left: 0;
   right: 0;
   display: flex;
+  min-width: 0;
   align-items: center;
   justify-content: space-between;
   gap: 18px;
@@ -84,7 +86,7 @@ textarea {
   display: inline-flex;
   align-items: center;
   gap: 10px;
-  min-width: max-content;
+  min-width: 0;
   font-weight: 750;
 }
 
@@ -119,9 +121,11 @@ textarea {
 
 .top-actions {
   display: inline-flex;
+  flex: 0 1 auto;
   align-items: center;
   justify-content: flex-end;
   gap: 10px;
+  max-width: 100%;
   min-width: 0;
 }
 
@@ -194,11 +198,13 @@ textarea {
 .cart-count {
   position: absolute;
   top: -5px;
-  right: -4px;
+  right: -2px;
   display: grid;
   min-width: 20px;
   height: 20px;
+  max-width: 24px;
   place-items: center;
+  overflow: hidden;
   padding: 0 5px;
   border-radius: 999px;
   color: var(--white);
@@ -1775,6 +1781,7 @@ textarea:focus {
 }
 
 .admin-photo-tile {
+  position: relative;
   display: grid;
   gap: 6px;
   width: 100%;
@@ -1784,6 +1791,17 @@ textarea:focus {
   padding: 7px;
   color: var(--muted);
   background: #f8faf8;
+}
+
+.admin-photo-cover {
+  display: grid;
+  gap: 6px;
+  width: 100%;
+  min-width: 0;
+  border: 0;
+  padding: 0;
+  color: inherit;
+  background: transparent;
   cursor: pointer;
 }
 
@@ -1810,6 +1828,25 @@ textarea:focus {
   font-weight: 760;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.admin-photo-delete {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  width: 30px;
+  height: 30px;
+  min-height: 30px;
+  border-color: rgba(22, 26, 29, 0.14);
+  color: var(--coral);
+  background: rgba(255, 255, 255, 0.9);
+  box-shadow: 0 8px 18px rgba(22, 26, 29, 0.14);
+}
+
+.admin-photo-delete:hover,
+.admin-photo-delete:focus-visible {
+  color: var(--white);
+  background: var(--coral);
 }
 
 .admin-photo-actions {
@@ -2206,15 +2243,27 @@ textarea:focus {
 
 @media (max-width: 620px) {
   .topbar {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
     gap: 10px;
     padding: 12px 14px;
   }
 
+  .brand {
+    max-width: 100%;
+  }
+
   .brand span:last-child {
-    max-width: 92px;
+    max-width: min(92px, 30vw);
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
+  }
+
+  .top-actions {
+    gap: 6px;
+    justify-self: end;
+    max-width: calc(100vw - 132px);
   }
 
   .account-pill {
@@ -2223,6 +2272,11 @@ textarea:focus {
     min-width: 38px;
     padding-inline: 10px;
     font-size: 0.76rem;
+  }
+
+  .account-pill.cart-icon-link {
+    min-width: 38px;
+    padding-inline: 10px;
   }
 
   .account-pill .action-text {

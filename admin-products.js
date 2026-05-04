@@ -79,6 +79,7 @@ function getProductPhotos(product) {
       image: url,
       label: label || `Photo ${photos.length + 1}`,
       focus: focus || product.focus || "center",
+      canDelete: url.startsWith("/api/product-images/"),
       isCover: url === product.image
     });
   }
@@ -120,18 +121,25 @@ function renderPhotoTiles(product) {
       ${getProductPhotos(product)
         .map(
           (photo) => `
-            <button
-              class="admin-photo-tile ${photo.isCover ? "active" : ""}"
-              type="button"
-              data-cover-photo="${escapeHtml(photo.image)}"
-              title="Use as cover photo"
-            >
-              <span
-                class="admin-photo-thumb"
-                style="--product-image: url('${escapeHtml(photo.image)}'); --focus: ${escapeHtml(photo.focus)}"
-              ></span>
-              <small>${escapeHtml(photo.isCover ? "Cover" : photo.label)}</small>
-            </button>
+            <div class="admin-photo-tile ${photo.isCover ? "active" : ""}">
+              <button
+                class="admin-photo-cover"
+                type="button"
+                data-cover-photo="${escapeHtml(photo.image)}"
+                title="Use as cover photo"
+              >
+                <span
+                  class="admin-photo-thumb"
+                  style="--product-image: url('${escapeHtml(photo.image)}'); --focus: ${escapeHtml(photo.focus)}"
+                ></span>
+                <small>${escapeHtml(photo.isCover ? "Cover" : photo.label)}</small>
+              </button>
+              ${
+                photo.canDelete
+                  ? `<button class="icon-button admin-photo-delete" type="button" data-delete-photo="${escapeHtml(photo.image)}" aria-label="Delete photo"><i class="fa-solid fa-trash"></i></button>`
+                  : ""
+              }
+            </div>
           `
         )
         .join("")}
@@ -402,7 +410,6 @@ async function uploadProductPhotos(form, files) {
 
   uploadButton.disabled = true;
   note.textContent = `Uploading ${selectedFiles.length} photo${selectedFiles.length === 1 ? "" : "s"}...`;
-  setProductsStatus("");
 
   for (const [index, file] of selectedFiles.entries()) {
     note.textContent = `Uploading ${index + 1} of ${selectedFiles.length}: ${file.name}`;
@@ -421,7 +428,6 @@ async function uploadProductPhotos(form, files) {
   uploadButton.disabled = false;
   products = latestResponse?.products || products;
   renderProductsEditor();
-  setProductsStatus(`${selectedFiles.length} photo${selectedFiles.length === 1 ? "" : "s"} uploaded and saved.`);
 }
 
 function updateSizePicker(picker) {
@@ -490,8 +496,9 @@ adminProductsList.addEventListener("submit", (event) => {
 adminProductsList.addEventListener("click", (event) => {
   const uploadButton = event.target.closest("[data-upload-photo]");
   if (uploadButton) {
-    setProductsStatus("Choose photos from your computer.");
-    uploadButton.closest("[data-product-id]").querySelector("[data-photo-input]").click();
+    const form = uploadButton.closest("[data-product-id]");
+    form.querySelector(".admin-photo-actions small").textContent = "Choose photos from your computer.";
+    form.querySelector("[data-photo-input]").click();
     return;
   }
 
@@ -500,14 +507,38 @@ adminProductsList.addEventListener("click", (event) => {
     const picker = sizeButton.closest("[data-size-picker]");
     const activeCount = picker.querySelectorAll(".admin-size-button.active").length;
     if (sizeButton.classList.contains("active") && activeCount === 1) {
-      setProductsStatus("At least one size must stay active.", true);
       return;
     }
 
     sizeButton.classList.toggle("active");
     sizeButton.setAttribute("aria-pressed", sizeButton.classList.contains("active") ? "true" : "false");
     updateSizePicker(picker);
-    setProductsStatus("Size selection updated. Click Save product to save.");
+    sizeButton.closest("[data-size-picker]").querySelector("small").textContent = "Click Save product to save size changes.";
+    return;
+  }
+
+  const deletePhotoButton = event.target.closest("[data-delete-photo]");
+  if (deletePhotoButton) {
+    const form = deletePhotoButton.closest("[data-product-id]");
+    const note = form.querySelector(".admin-photo-actions small");
+    const productId = form.dataset.productId;
+    const image = deletePhotoButton.dataset.deletePhoto;
+    if (!window.confirm("Delete this photo?")) return;
+
+    deletePhotoButton.disabled = true;
+    note.textContent = "Deleting photo...";
+    api("/api/admin/products/photo", {
+      method: "DELETE",
+      body: JSON.stringify({ productId, image })
+    })
+      .then((response) => {
+        products = response.products || products;
+        renderProductsEditor();
+      })
+      .catch((error) => {
+        deletePhotoButton.disabled = false;
+        note.textContent = error.message;
+      });
     return;
   }
 
@@ -518,8 +549,8 @@ adminProductsList.addEventListener("click", (event) => {
     form.querySelector('input[name="image"]').value = image;
     form.querySelector(".admin-product-preview").style.setProperty("--product-image", `url('${image}')`);
     form.querySelectorAll(".admin-photo-tile").forEach((tile) => tile.classList.remove("active"));
-    photoTile.classList.add("active");
-    setProductsStatus("Cover photo selected. Click Save product to save.");
+    photoTile.closest(".admin-photo-tile").classList.add("active");
+    form.querySelector(".admin-photo-actions small").textContent = "Click Save product to save cover photo.";
     return;
   }
 
@@ -528,7 +559,6 @@ adminProductsList.addEventListener("click", (event) => {
     const editor = stockButton.closest("[data-stock-editor]");
     const input = editor.querySelector('input[name="stock"]');
     input.value = Math.max(0, Number(input.value || 0) + Number(stockButton.dataset.adjustStock));
-    setProductsStatus("Stock value changed. Click Save stock to apply.");
     return;
   }
 
@@ -570,7 +600,6 @@ adminProductsList.addEventListener("click", (event) => {
     if (!window.confirm("Delete this review?")) return;
 
     deleteReviewButton.disabled = true;
-    setProductsStatus("Deleting review...", false, { persist: true });
     api("/api/admin/reviews", {
       method: "DELETE",
       body: JSON.stringify({ reviewId })
@@ -578,13 +607,10 @@ adminProductsList.addEventListener("click", (event) => {
       .then(() => {
         reviews = reviews.filter((review) => review.id !== reviewId);
         renderProductsEditor();
-        setProductsStatus("Review deleted successfully.");
       })
       .catch((error) => {
-        setProductsStatus(error.message, true);
-      })
-      .finally(() => {
         deleteReviewButton.disabled = false;
+        deleteReviewButton.textContent = error.message;
       });
   }
 });
@@ -597,8 +623,9 @@ adminProductsList.addEventListener("change", (event) => {
   uploadProductPhotos(form, input.files)
     .catch((error) => {
       const uploadButton = form.querySelector("[data-upload-photo]");
+      const note = form.querySelector(".admin-photo-actions small");
       uploadButton.disabled = false;
-      setProductsStatus(error.message, true);
+      note.textContent = error.message;
     })
     .finally(() => {
       input.value = "";
