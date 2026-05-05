@@ -7,6 +7,12 @@ const crypto = require("crypto");
 const { createOrderController } = require("./controllers/orderController");
 const { createAdminOrderRouter } = require("./routes/adminOrderRoutes");
 const { createStripeWebhookRouter } = require("./routes/stripeWebhookRoutes");
+const {
+  createShippoService,
+  normalizeProductShippingFields,
+  saveSelectedShippingOption,
+  validateProductShippingFields
+} = require("./services/shippoService");
 let PgPool = null;
 let StsClient = null;
 let AssumeRoleWithWebIdentityCommand = null;
@@ -74,6 +80,29 @@ const shippingOrigin = {
   country: "US",
   phone: process.env.SHIPPING_FROM_PHONE || localEnv.SHIPPING_FROM_PHONE || "4153334444",
   email: process.env.SHIPPING_FROM_EMAIL || localEnv.SHIPPING_FROM_EMAIL || adminEmail
+};
+const checkoutShippoService = createShippoService({ apiKey: shippoApiKey, shippingOrigin });
+const defaultShippingByType = {
+  accessories: {
+    weight_value: 10,
+    weight_unit: "oz",
+    length: 12,
+    width: 10,
+    height: 2,
+    dimension_unit: "in",
+    package_type: "soft_pack",
+    required: true
+  },
+  default: {
+    weight_value: 18,
+    weight_unit: "oz",
+    length: 15,
+    width: 12,
+    height: 3,
+    dimension_unit: "in",
+    package_type: "soft_pack",
+    required: true
+  }
 };
 const defaultInventory = {
   "linen-jacket": 12,
@@ -249,6 +278,30 @@ function ensureDb() {
   }
 }
 
+function getDefaultProductShipping(product = {}) {
+  return JSON.parse(JSON.stringify(defaultShippingByType[product.type] || defaultShippingByType.default));
+}
+
+function ensureProductShippingDefaults(product = {}) {
+  const isDigital = product.isDigital === true || String(product.type || "").toLowerCase() === "digital";
+  const current = normalizeProductShippingFields(product);
+  const fallback = getDefaultProductShipping(product);
+
+  product.isDigital = isDigital;
+  product.shipping = {
+    weight_value: current.weight_value || fallback.weight_value,
+    weight_unit: current.weight_unit || fallback.weight_unit,
+    length: current.length || fallback.length,
+    width: current.width || fallback.width,
+    height: current.height || fallback.height,
+    dimension_unit: current.dimension_unit || fallback.dimension_unit,
+    package_type: current.package_type || fallback.package_type,
+    required: !isDigital
+  };
+
+  return product;
+}
+
 function ensureDbDefaults(db) {
   let changed = false;
 
@@ -282,6 +335,13 @@ function ensureDbDefaults(db) {
       });
     });
   }
+
+  db.products.forEach((product) => {
+    const before = JSON.stringify(product.shipping || {});
+    const beforeDigital = product.isDigital;
+    ensureProductShippingDefaults(product);
+    if (before !== JSON.stringify(product.shipping || {}) || beforeDigital !== product.isDigital) changed = true;
+  });
 
   Object.entries(defaultInventory).forEach(([productId, stock]) => {
     if (!db.inventory[productId]) {
@@ -706,22 +766,26 @@ function publicInventory(inventory) {
 }
 
 function publicProduct(product) {
+  const normalizedProduct = ensureProductShippingDefaults({ ...product, shipping: { ...(product.shipping || {}) } });
+
   return {
-    id: product.id,
-    title: product.title,
-    type: product.type,
-    badge: product.badge,
-    description: product.description,
-    price: product.price,
-    sizes: Array.isArray(product.sizes) ? product.sizes : [],
-    focus: product.focus || "center",
-    image: product.image || "assets/embroidered-collection.png",
-    imageName: product.imageName || "",
-    colors: Array.isArray(product.colors) ? product.colors : [],
-    longDescription: product.longDescription || product.description,
-    gallery: Array.isArray(product.gallery) ? product.gallery : [],
-    seoTitle: product.seoTitle || "",
-    seoDescription: product.seoDescription || ""
+    id: normalizedProduct.id,
+    title: normalizedProduct.title,
+    type: normalizedProduct.type,
+    badge: normalizedProduct.badge,
+    description: normalizedProduct.description,
+    price: normalizedProduct.price,
+    sizes: Array.isArray(normalizedProduct.sizes) ? normalizedProduct.sizes : [],
+    focus: normalizedProduct.focus || "center",
+    image: normalizedProduct.image || "assets/embroidered-collection.png",
+    imageName: normalizedProduct.imageName || "",
+    colors: Array.isArray(normalizedProduct.colors) ? normalizedProduct.colors : [],
+    longDescription: normalizedProduct.longDescription || normalizedProduct.description,
+    gallery: Array.isArray(normalizedProduct.gallery) ? normalizedProduct.gallery : [],
+    seoTitle: normalizedProduct.seoTitle || "",
+    seoDescription: normalizedProduct.seoDescription || "",
+    isDigital: normalizedProduct.isDigital === true,
+    shipping: normalizedProduct.shipping
   };
 }
 
@@ -762,6 +826,28 @@ function slugifyProductId(value) {
 
 function sanitizeProductPatch(body, currentProduct) {
   const price = Math.round(Number(body.price));
+  let shippingValidation;
+
+  try {
+    shippingValidation = validateProductShippingFields({
+      ...currentProduct,
+      ...body,
+      isDigital: String(body.isDigital || body.digital || "false") === "true",
+      shipping: {
+        ...(currentProduct.shipping || {}),
+        weight_value: body.weight_value,
+        weight_unit: body.weight_unit,
+        length: body.length,
+        width: body.width,
+        height: body.height,
+        dimension_unit: body.dimension_unit,
+        package_type: body.package_type
+      }
+    });
+  } catch (error) {
+    return { product: null, message: error.message };
+  }
+
   const next = {
     ...currentProduct,
     title: String(body.title || "").trim().slice(0, 120),
@@ -774,6 +860,8 @@ function sanitizeProductPatch(body, currentProduct) {
     image: String(body.image || "").trim().slice(0, 500),
     focus: String(body.focus || "center").trim().slice(0, 40),
     price,
+    isDigital: shippingValidation.isDigital,
+    shipping: shippingValidation.shipping,
     sizes: parseList(body.sizes, currentProduct.sizes),
     gallery: parseList(body.galleryLabels, []).map((label, index) => ({
       label,
@@ -782,14 +870,14 @@ function sanitizeProductPatch(body, currentProduct) {
   };
 
   if (!next.title || !next.description || !next.longDescription || !Number.isInteger(price) || price < 0) {
-    return null;
+    return { product: null, message: "Fill product title, descriptions, and price correctly." };
   }
 
   if (!next.gallery.length) {
     next.gallery = Array.isArray(currentProduct.gallery) && currentProduct.gallery.length ? currentProduct.gallery : [{ label: "General view", focus: next.focus }];
   }
 
-  return next;
+  return { product: next };
 }
 
 function nextFocusFallback(focus) {
@@ -1007,152 +1095,61 @@ function getStripeCustomerParams(body) {
   return params;
 }
 
-function shippoRequest(method, apiPath, payload = null) {
-  const body = payload ? JSON.stringify(payload) : "";
-
-  return new Promise((resolve, reject) => {
-    const shippoReq = https.request(
-      {
-        hostname: "api.goshippo.com",
-        path: apiPath,
-        method,
-        headers: {
-          Authorization: `ShippoToken ${shippoApiKey}`,
-          "Content-Type": "application/json",
-          "SHIPPO-API-VERSION": "2018-02-08",
-          ...(body ? { "Content-Length": Buffer.byteLength(body) } : {})
-        }
-      },
-      (shippoRes) => {
-        let responseBody = "";
-
-        shippoRes.on("data", (chunk) => {
-          responseBody += chunk;
-        });
-
-        shippoRes.on("end", () => {
-          const data = JSON.parse(responseBody || "{}");
-
-          if (shippoRes.statusCode >= 200 && shippoRes.statusCode < 300) {
-            resolve(data);
-            return;
-          }
-
-          reject(new Error(data.detail || data.message || data.error?.message || "Shippo could not calculate delivery."));
-        });
-      }
-    );
-
-    shippoReq.on("error", reject);
-    if (body) shippoReq.write(body);
-    shippoReq.end();
-  });
-}
-
-function getCartProductIdForShipping(item, db) {
-  const productLookup = Object.fromEntries(publicProducts(db).map((product) => [product.id, true]));
-  return getCartProductId(item, productLookup);
-}
-
-function getParcelForItems(items, db) {
-  const quantity = items.reduce((sum, item) => sum + Math.max(1, Number(item.quantity) || 1), 0);
-  const weight = items.reduce((sum, item) => {
-    const productId = getCartProductIdForShipping(item, db);
-    const baseWeight = productId === "canvas-tote" ? 10 : productId ? 18 : 16;
-    return sum + baseWeight * Math.max(1, Number(item.quantity) || 1);
-  }, 0);
-
-  return {
-    length: 15,
-    width: 12,
-    height: Math.min(12, Math.max(3, 2 + quantity)),
-    weight: Math.max(1, weight)
-  };
-}
-
 function publicShippoRates(data) {
-  const rates = data.results || data.rates || [];
+  const rates = Array.isArray(data) ? data : data.results || data.rates || [];
 
   return rates
     .filter((rate) => String(rate.currency || "").toUpperCase() === "USD")
     .map((rate) => ({
       id: rate.object_id,
-      shipmentId: data.object_id || rate.shipment,
+      shipmentId: data.object_id || data.id || rate.shipment,
       carrier: rate.provider,
       service: rate.servicelevel?.name || rate.servicelevel?.token || "Shipping",
+      serviceToken: rate.servicelevel?.token || "",
       price: Math.round(Number(rate.amount || 0) * 100),
       currency: rate.currency,
-      deliveryDays: rate.estimated_days || null
+      deliveryDays: rate.estimated_days || null,
+      attributes: Array.isArray(rate.attributes) ? rate.attributes : []
     }))
     .filter((rate) => rate.price >= 0)
     .sort((a, b) => a.price - b.price);
 }
 
 async function createShippoShipment(body, db) {
-  if (!shippoApiKey) {
-    throw new Error("Shippo is not configured. Set SHIPPO_API_KEY before starting the server.");
-  }
-
-  const destination = body.destination || {};
   const items = Array.isArray(body.items) ? body.items : [];
-  const street1 = String(destination.address || "").trim();
-  const city = String(destination.city || "").trim();
-  const state = String(destination.state || "").trim().toUpperCase();
-  const zip = String(destination.zip || "").trim();
+  const subtotal = getCartSubtotal(items, db);
 
   if (!items.length) throw new Error("The cart is empty.");
-  if (!street1 || !city || !state || !zip) {
-    throw new Error("Enter a complete US delivery address before calculating shipping.");
-  }
 
-  const parcel = getParcelForItems(items, db);
-
-  return shippoRequest("POST", "/shipments/", {
-    address_to: {
-      name: String(destination.name || "Customer").trim(),
-      street1,
-      street2: String(destination.apartment || "").trim(),
-      city,
-      state,
-      zip,
-      country: "US",
-      phone: String(destination.phone || "").trim(),
-      email: String(destination.email || "").trim()
-    },
-    address_from: {
-      name: shippingOrigin.name,
-      street1: shippingOrigin.street1,
-      street2: shippingOrigin.street2,
-      city: shippingOrigin.city,
-      state: shippingOrigin.state,
-      zip: shippingOrigin.zip,
-      country: shippingOrigin.country,
-      phone: shippingOrigin.phone,
-      email: shippingOrigin.email
-    },
-    parcels: [
-      {
-        length: String(parcel.length),
-        width: String(parcel.width),
-        height: String(parcel.height),
-        distance_unit: "in",
-        weight: String(Math.max(1, Math.round(parcel.weight / 16))),
-        mass_unit: "lb"
-      }
-    ],
-    async: false
+  return checkoutShippoService.getShippoRates({
+    destination: body.destination || {},
+    items,
+    products: publicProducts(db),
+    subtotal,
+    metadata: "checkout"
   });
 }
 
-async function normalizeCheckoutBody(body) {
+function getCartSubtotal(items, db) {
+  const productLookup = getProductLookup(db);
+
+  return Array.isArray(items)
+    ? items.reduce((sum, item) => {
+        const productId = getCartProductId(item, productLookup);
+        const product = productId ? productLookup[productId] : null;
+        const price = Math.round(Number(product?.price ?? item.price) || 0);
+        return sum + price * Math.max(1, Number(item.quantity) || 1);
+      }, 0)
+    : 0;
+}
+
+async function normalizeCheckoutBody(body, db) {
   const normalized = {
     ...body,
     delivery: { ...(body.delivery || {}) },
     totals: { ...(body.totals || {}) }
   };
-  const subtotal = Array.isArray(normalized.items)
-    ? normalized.items.reduce((sum, item) => sum + Math.round(Number(item.price) || 0) * Math.max(1, Number(item.quantity) || 1), 0)
-    : 0;
+  const subtotal = getCartSubtotal(normalized.items, db);
 
   let deliveryPrice = Math.max(0, Math.round(Number(normalized.delivery.price) || 0));
   if (normalized.delivery.type === "shipping") {
@@ -1166,22 +1163,17 @@ async function normalizeCheckoutBody(body) {
       throw new Error("Select a shipping rate before checkout.");
     }
 
-    const shipmentRates = await shippoRequest("GET", `/shipments/${encodeURIComponent(shipmentId)}/rates/USD`);
-    const selectedRate = publicShippoRates(shipmentRates).find((rate) => rate.id === rateId);
-    if (!selectedRate) {
-      throw new Error("Selected Shippo shipping rate is no longer available.");
-    }
-
-    deliveryPrice = selectedRate.price;
-    normalized.delivery = {
-      ...normalized.delivery,
-      price: selectedRate.price,
-      carrier: selectedRate.carrier,
-      service: selectedRate.service,
-      deliveryDays: selectedRate.deliveryDays,
-      shippoShipmentId: shipmentId,
-      shippoRateId: rateId
-    };
+    const shipmentRates = await checkoutShippoService.request("GET", `/shipments/${encodeURIComponent(shipmentId)}/rates/USD`);
+    const options = checkoutShippoService.buildShippingOptions({ rates: publicShippoRates(shipmentRates), subtotal });
+    normalized.delivery = saveSelectedShippingOption(
+      {
+        ...normalized.delivery,
+        shippoShipmentId: shipmentId,
+        shippoRateId: rateId
+      },
+      options
+    );
+    deliveryPrice = normalized.delivery.customerShippingPrice;
   }
 
   normalized.totals = {
@@ -1432,15 +1424,20 @@ async function handleApi(req, res) {
 
     if (url.pathname === "/api/shipping/rates" && method === "POST") {
       const body = await readJson(req);
-      const shipment = await createShippoShipment(body, db);
-      const rates = publicShippoRates(shipment);
+      const shipping = await createShippoShipment(body, db);
+      const options = shipping.options || [];
 
-      if (!rates.length) {
-        sendJson(res, 404, { message: "No Shippo shipping rates are available for this address." });
+      if (!options.length) {
+        sendJson(res, 404, { message: "No Shippo shipping options are available for this address." });
         return;
       }
 
-      sendJson(res, 200, { shipmentId: shipment.id, rates });
+      sendJson(res, 200, {
+        shipmentId: shipping.shipmentId,
+        options,
+        rates: options,
+        subtotal: getCartSubtotal(Array.isArray(body.items) ? body.items : [], db)
+      });
       return;
     }
 
@@ -1452,7 +1449,7 @@ async function handleApi(req, res) {
         return;
       }
 
-      const body = await normalizeCheckoutBody(await readJson(req));
+      const body = await normalizeCheckoutBody(await readJson(req), db);
       const items = Array.isArray(body.items) ? body.items : [];
 
       if (!items.length) {
@@ -1541,6 +1538,11 @@ async function handleApi(req, res) {
       params.append("metadata[delivery_zip]", String(body.delivery?.zip || ""));
       params.append("metadata[delivery_address]", String(body.delivery?.address || ""));
       params.append("metadata[shipping_price]", String(body.totals?.delivery || body.delivery?.price || 0));
+      params.append("metadata[customer_shipping_price]", String(body.delivery?.customerShippingPrice ?? body.delivery?.price ?? 0));
+      params.append("metadata[real_shippo_cost]", String(body.delivery?.realShippoCost ?? body.delivery?.real_shippo_cost ?? 0));
+      params.append("metadata[shipping_option_id]", String(body.delivery?.shippingOptionId || ""));
+      params.append("metadata[shipping_option_type]", String(body.delivery?.shippingOptionType || ""));
+      params.append("metadata[shipping_title]", String(body.delivery?.shippingTitle || ""));
       params.append("metadata[shippo_shipment_id]", String(body.delivery?.shippoShipmentId || ""));
       params.append("metadata[shippo_rate_id]", String(body.delivery?.shippoRateId || ""));
       params.append("metadata[shippo_carrier]", String(body.delivery?.carrier || ""));
@@ -1733,13 +1735,16 @@ async function handleApi(req, res) {
         focus: "50% 50%",
         price: 0,
         sizes: ["S", "M", "L"],
+        isDigital: false,
+        shipping: getDefaultProductShipping({ type: "tops" }),
         colors: [{ name: "Black", value: "#202326" }],
         gallery: [{ label: "General view", focus: "50% 50%", image: "assets/embroidered-collection.png" }]
       };
-      const nextProduct = sanitizeProductPatch(body, baseProduct);
+      const productPatch = sanitizeProductPatch(body, baseProduct);
+      const nextProduct = productPatch.product;
 
       if (!nextProduct) {
-        sendJson(res, 400, { message: "Fill product title, descriptions, and price correctly." });
+        sendJson(res, 400, { message: productPatch.message || "Fill product title, descriptions, and price correctly." });
         return;
       }
 
@@ -1804,9 +1809,10 @@ async function handleApi(req, res) {
         return;
       }
 
-      const nextProduct = sanitizeProductPatch(body, db.products[productIndex]);
+      const productPatch = sanitizeProductPatch(body, db.products[productIndex]);
+      const nextProduct = productPatch.product;
       if (!nextProduct) {
-        sendJson(res, 400, { message: "Fill product title, descriptions, and price correctly." });
+        sendJson(res, 400, { message: productPatch.message || "Fill product title, descriptions, and price correctly." });
         return;
       }
 
@@ -2051,7 +2057,7 @@ async function handleApi(req, res) {
         return;
       }
 
-      const body = await normalizeCheckoutBody(await readJson(req));
+      const body = await normalizeCheckoutBody(await readJson(req), db);
       const result = createOrderFromPayload(db, user, body);
 
       if (!result.order) {

@@ -1,6 +1,7 @@
 {
   "scripts": {
-    "start": "node server.js"
+    "start": "node server.js",
+    "test": "node --test --test-isolation=none tests/shippingService.test.js"
   },
   "engines": {
     "node": "22.x"

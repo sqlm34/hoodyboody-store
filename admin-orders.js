@@ -128,6 +128,10 @@ function renderOrders(orders) {
               <strong>${formatMoney(order.shippingAmount)}</strong>
             </div>
             <div>
+              <span>Real Shippo cost</span>
+              <strong>${formatMoney(order.realShippingCost || 0)}</strong>
+            </div>
+            <div>
               <span>Order ID</span>
               <strong>${order.orderId}</strong>
             </div>

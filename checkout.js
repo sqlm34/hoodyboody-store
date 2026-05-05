@@ -75,7 +75,7 @@ function getDeliveryType() {
 
 function getDeliveryPrice() {
   if (getDeliveryType() === "pickup") return 0;
-  return selectedShippingRate?.price || 0;
+  return selectedShippingRate?.customerShippingPrice ?? selectedShippingRate?.customer_shipping_price ?? selectedShippingRate?.price ?? 0;
 }
 
 function getItemsTotal() {
@@ -119,7 +119,7 @@ function renderSummary() {
   checkoutDeliveryNotice.hidden = cart.length === 0 || getDeliveryType() === "pickup";
   checkoutDeliveryNotice.classList.toggle("success", Boolean(selectedShippingRate));
   checkoutDeliveryNotice.textContent = selectedShippingRate
-    ? `${selectedShippingRate.carrier} ${selectedShippingRate.service} added to the total.`
+    ? `${selectedShippingRate.title} added to the total.`
     : "Enter a US address to calculate shipping.";
 
   summaryItems.innerHTML = cart
@@ -180,8 +180,10 @@ function renderShippingRates() {
   shippingRateSelect.innerHTML = shippingRates.length
     ? shippingRates
         .map((rate) => {
-          const days = rate.deliveryDays ? `, ${rate.deliveryDays} days` : "";
-          return `<option value="${escapeHtml(rate.id)}">${escapeHtml(rate.carrier)} ${escapeHtml(rate.service)} - ${formatPrice(rate.price)}${days}</option>`;
+          const days = rate.deliveryDays || rate.estimated_days ? `, ${rate.deliveryDays || rate.estimated_days} days` : "";
+          const price = rate.customerShippingPrice ?? rate.customer_shipping_price ?? rate.displayPrice ?? rate.display_price ?? rate.price ?? 0;
+          const priceLabel = price ? formatPrice(price) : "Free";
+          return `<option value="${escapeHtml(rate.id)}">${escapeHtml(rate.title || "Shipping")} - ${priceLabel}${days}</option>`;
         })
         .join("")
     : `<option value="">Enter address to calculate shipping</option>`;
@@ -189,7 +191,7 @@ function renderShippingRates() {
   if (shippingRates.length) {
     selectedShippingRate = shippingRates.find((rate) => rate.id === shippingRateSelect.value) || shippingRates[0];
     shippingRateSelect.value = selectedShippingRate.id;
-    shippingRateNote.textContent = "Shipping calculated by Shippo.";
+    shippingRateNote.textContent = "Shipping calculated securely.";
     shippingRateNote.classList.remove("error");
   } else {
     selectedShippingRate = null;
@@ -243,7 +245,7 @@ async function calculateShippingRates() {
         destination: getShippingDestination()
       })
     });
-    shippingRates = data.rates || [];
+    shippingRates = data.options || data.rates || [];
     selectedShippingRate = shippingRates[0] || null;
     renderShippingRates();
   } catch (error) {
@@ -329,11 +331,18 @@ function getCheckoutPayload() {
       apartment: formData.apartment,
       entrance: formData.entrance,
       comment: formData.deliveryComment,
+      shippingOptionId: selectedShippingRate?.id || "",
+      shippingOptionType: selectedShippingRate?.type || "",
+      shippingTitle: selectedShippingRate?.title || "",
+      customerShippingPrice: selectedShippingRate?.customerShippingPrice ?? selectedShippingRate?.customer_shipping_price ?? delivery,
+      customer_shipping_price: selectedShippingRate?.customerShippingPrice ?? selectedShippingRate?.customer_shipping_price ?? delivery,
+      realShippoCost: selectedShippingRate?.realShippoAmount ?? selectedShippingRate?.real_shippo_amount ?? delivery,
+      real_shippo_cost: selectedShippingRate?.realShippoAmount ?? selectedShippingRate?.real_shippo_amount ?? delivery,
       carrier: selectedShippingRate?.carrier || "",
       service: selectedShippingRate?.service || "",
-      deliveryDays: selectedShippingRate?.deliveryDays || null,
-      shippoShipmentId: selectedShippingRate?.shipmentId || "",
-      shippoRateId: selectedShippingRate?.id || ""
+      deliveryDays: selectedShippingRate?.deliveryDays || selectedShippingRate?.estimated_days || null,
+      shippoShipmentId: selectedShippingRate?.shipmentId || selectedShippingRate?.shippo_shipment_id || "",
+      shippoRateId: selectedShippingRate?.shippoRateId || selectedShippingRate?.shippo_rate_id || selectedShippingRate?.id || ""
     },
     payment: {
       type: paymentInput?.value || "card",

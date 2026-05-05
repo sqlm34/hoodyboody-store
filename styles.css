@@ -1987,7 +1987,8 @@ textarea:focus {
 
 .admin-photo-header span,
 .admin-size-picker > div:first-child span,
-.admin-focus-picker > div:first-child span {
+.admin-focus-picker > div:first-child span,
+.admin-shipping-fields .admin-inline-head strong {
   color: var(--muted);
   font-size: 0.94rem;
   font-weight: 760;
@@ -1995,7 +1996,8 @@ textarea:focus {
 
 .admin-photo-header small,
 .admin-size-picker small,
-.admin-focus-picker small {
+.admin-focus-picker small,
+.admin-shipping-fields small {
   color: var(--muted);
   font-size: 0.82rem;
   font-weight: 650;
@@ -2163,9 +2165,17 @@ textarea:focus {
 }
 
 .admin-size-picker,
-.admin-focus-picker {
+.admin-focus-picker,
+.admin-shipping-fields {
   display: grid;
   gap: 10px;
+}
+
+.admin-shipping-fields {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 14px;
+  background: #f8faf8;
 }
 
 .admin-size-options,

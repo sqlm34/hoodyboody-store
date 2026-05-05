@@ -2,6 +2,7 @@ let products = window.NITKA_PRODUCTS || [];
 
 const DEFAULT_IMAGE_URL = "assets/embroidered-collection.png";
 const DEFAULT_SIZE_OPTIONS = ["XXS", "XS", "S", "M", "L", "XL", "XXL", "One size"];
+const PACKAGE_TYPE_OPTIONS = ["parcel", "soft_pack", "padded_envelope", "box", "tube", "custom"];
 const PHOTO_FOCUS_OPTIONS = [
   { label: "Top left", value: "20% 20%" },
   { label: "Top", value: "50% 20%" },
@@ -151,7 +152,18 @@ function getBlankProduct() {
     longDescription: "Detailed product description.",
     gallery: [{ label: "General view", focus: "50% 50%", image: DEFAULT_IMAGE_URL }],
     seoTitle: "",
-    seoDescription: ""
+    seoDescription: "",
+    isDigital: false,
+    shipping: {
+      weight_value: 18,
+      weight_unit: "oz",
+      length: 15,
+      width: 12,
+      height: 3,
+      dimension_unit: "in",
+      package_type: "soft_pack",
+      required: true
+    }
   };
 }
 
@@ -319,6 +331,71 @@ function renderProductReviews(product) {
   `;
 }
 
+function getShippingField(product, key, fallback = "") {
+  return product.shipping?.[key] ?? product[key] ?? fallback;
+}
+
+function renderShippingEditor(product) {
+  const isDigital = product.isDigital === true || product.type === "digital";
+  const weightUnit = getShippingField(product, "weight_unit", "oz");
+  const dimensionUnit = getShippingField(product, "dimension_unit", "in");
+  const packageType = getShippingField(product, "package_type", "parcel");
+
+  return `
+    <section class="admin-shipping-fields full-span">
+      <div class="admin-inline-head">
+        <div>
+          <strong>Shipping parameters</strong>
+          <small>Required for physical products. Used for Shippo rates and labels.</small>
+        </div>
+      </div>
+      <div class="form-grid">
+        <label>
+          Fulfillment
+          <select name="isDigital">
+            <option value="false" ${isDigital ? "" : "selected"}>Physical product</option>
+            <option value="true" ${isDigital ? "selected" : ""}>Digital product</option>
+          </select>
+        </label>
+        <label>
+          Package type
+          <select name="package_type">
+            ${PACKAGE_TYPE_OPTIONS.map((type) => `<option value="${type}" ${packageType === type ? "selected" : ""}>${type.replace(/_/g, " ")}</option>`).join("")}
+          </select>
+        </label>
+        <label>
+          Weight
+          <input name="weight_value" type="number" min="0.01" step="0.01" value="${escapeHtml(getShippingField(product, "weight_value", 18))}" ${isDigital ? "" : "required"} />
+        </label>
+        <label>
+          Weight unit
+          <select name="weight_unit">
+            ${["oz", "lb", "g", "kg"].map((unit) => `<option value="${unit}" ${weightUnit === unit ? "selected" : ""}>${unit}</option>`).join("")}
+          </select>
+        </label>
+        <label>
+          Length
+          <input name="length" type="number" min="0.01" step="0.01" value="${escapeHtml(getShippingField(product, "length", 15))}" ${isDigital ? "" : "required"} />
+        </label>
+        <label>
+          Width
+          <input name="width" type="number" min="0.01" step="0.01" value="${escapeHtml(getShippingField(product, "width", 12))}" ${isDigital ? "" : "required"} />
+        </label>
+        <label>
+          Height
+          <input name="height" type="number" min="0.01" step="0.01" value="${escapeHtml(getShippingField(product, "height", 3))}" ${isDigital ? "" : "required"} />
+        </label>
+        <label>
+          Dimension unit
+          <select name="dimension_unit">
+            ${["in", "cm"].map((unit) => `<option value="${unit}" ${dimensionUnit === unit ? "selected" : ""}>${unit}</option>`).join("")}
+          </select>
+        </label>
+      </div>
+    </section>
+  `;
+}
+
 function showLocked(message) {
   adminProductsDashboard.hidden = true;
   adminProductsLocked.hidden = false;
@@ -414,6 +491,7 @@ function renderProductForm(product, mode = "edit") {
           ${renderFocusPicker(product)}
           ${renderSizePicker(product)}
           ${renderStockEditor(product)}
+          ${renderShippingEditor(product)}
           ${isCreate ? "" : renderProductReviews(product)}
           <label class="full-span">
             Card description
@@ -505,6 +583,7 @@ function renderLegacyProductsEditor() {
               ${renderFocusPicker(product)}
               ${renderSizePicker(product)}
               ${renderStockEditor(product)}
+              ${renderShippingEditor(product)}
               ${renderProductReviews(product)}
               <label class="full-span">
                 Card description
@@ -630,6 +709,16 @@ function updateSizePicker(picker) {
   const activeSizes = Array.from(picker.querySelectorAll(".admin-size-button.active")).map((button) => button.dataset.sizeOption);
   picker.querySelector('input[name="sizes"]').value = activeSizes.join(", ");
   return activeSizes;
+}
+
+function updateShippingEditorState(section) {
+  const isDigital = section.querySelector('select[name="isDigital"]')?.value === "true";
+  section.querySelectorAll('input[name="weight_value"], input[name="length"], input[name="width"], input[name="height"]').forEach((input) => {
+    input.required = !isDigital;
+  });
+  section.querySelector("small").textContent = isDigital
+    ? "Digital products do not need weight or dimensions."
+    : "Required for physical products. Used for Shippo rates and labels.";
 }
 
 async function loadEditorData(options = {}) {
@@ -853,6 +942,12 @@ adminProductsList.addEventListener("click", (event) => {
 });
 
 adminProductsList.addEventListener("change", (event) => {
+  const shippingSelect = event.target.closest('.admin-shipping-fields select[name="isDigital"]');
+  if (shippingSelect) {
+    updateShippingEditorState(shippingSelect.closest(".admin-shipping-fields"));
+    return;
+  }
+
   const input = event.target.closest("[data-photo-input]");
   if (!input || !input.files.length) return;
 
