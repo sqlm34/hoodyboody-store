@@ -1,8 +1,12 @@
 const http = require("http");
 const https = require("https");
+const express = require("express");
 const fs = require("fs");
 const path = require("path");
 const crypto = require("crypto");
+const { createOrderController } = require("./controllers/orderController");
+const { createAdminOrderRouter } = require("./routes/adminOrderRoutes");
+const { createStripeWebhookRouter } = require("./routes/stripeWebhookRoutes");
 let PgPool = null;
 let StsClient = null;
 let AssumeRoleWithWebIdentityCommand = null;
@@ -32,6 +36,7 @@ const port = Number(process.env.PORT) || 8000;
 const adminEmail = process.env.NITKA_ADMIN_EMAIL || localEnv.NITKA_ADMIN_EMAIL || "owner@nitka.local";
 const adminPassword = process.env.NITKA_ADMIN_PASSWORD || localEnv.NITKA_ADMIN_PASSWORD || "owner123";
 const stripeSecretKey = process.env.STRIPE_SECRET_KEY || localEnv.STRIPE_SECRET_KEY || "";
+const stripeWebhookSecret = process.env.STRIPE_WEBHOOK_SECRET || localEnv.STRIPE_WEBHOOK_SECRET || "";
 const stripeCurrency = String(process.env.STRIPE_CURRENCY || localEnv.STRIPE_CURRENCY || "usd").toLowerCase();
 const shippoApiKey = process.env.SHIPPO_API_KEY || localEnv.SHIPPO_API_KEY || "";
 const redisRestUrl = process.env.UPSTASH_REDIS_REST_URL || process.env.KV_REST_API_URL || localEnv.UPSTASH_REDIS_REST_URL || localEnv.KV_REST_API_URL || "";
@@ -1254,9 +1259,9 @@ function createOrderFromPayload(db, user, body, overrides = {}) {
   const delivery = body.delivery || {};
   const paymentType = String(body.payment?.type || "").trim();
   const isDeferredPayment = paymentType === "invoice" || paymentType === "sbp";
-  const orderStatus = overrides.status || (isDeferredPayment ? "Awaiting payment" : "Paid");
+  const orderStatus = String(overrides.status || (isDeferredPayment ? "pending" : "paid")).trim().toLowerCase();
   const paidAt = overrides.paidAt ?? (isDeferredPayment ? "" : new Date().toISOString());
-  const shouldDecrementStock = overrides.decrementStock ?? orderStatus === "Paid";
+  const shouldDecrementStock = overrides.decrementStock ?? orderStatus === "paid";
   const tracking = getTrackingInfo(delivery.type);
 
   const order = {
@@ -1456,6 +1461,7 @@ async function handleApi(req, res) {
       }
 
       const origin = getRequestOrigin(req);
+      const pendingId = crypto.randomUUID();
       const params = new URLSearchParams();
       params.append("mode", "payment");
       params.append("success_url", `${origin}/checkout.html?stripe=success&session_id={CHECKOUT_SESSION_ID}`);
@@ -1485,6 +1491,7 @@ async function handleApi(req, res) {
         params.append(`line_items[${lineIndex}][price_data][unit_amount]`, String(lineItem.unitAmount));
         params.append(`line_items[${lineIndex}][price_data][product_data][name]`, lineItem.title);
         params.append(`line_items[${lineIndex}][price_data][product_data][description]`, lineItem.description);
+        if (productId) params.append(`line_items[${lineIndex}][price_data][product_data][metadata][product_id]`, productId);
         lineIndex += 1;
       }
 
@@ -1525,13 +1532,22 @@ async function handleApi(req, res) {
       }
 
       params.append("metadata[source]", "cart");
+      params.append("metadata[pending_id]", pendingId);
       params.append("metadata[customer_name]", String(body.customer?.name || ""));
       params.append("metadata[customer_phone]", String(body.customer?.phone || ""));
       params.append("metadata[delivery_type]", String(body.delivery?.type || ""));
       params.append("metadata[delivery_city]", String(body.delivery?.city || ""));
+      params.append("metadata[delivery_state]", String(body.delivery?.state || ""));
       params.append("metadata[delivery_zip]", String(body.delivery?.zip || ""));
       params.append("metadata[delivery_address]", String(body.delivery?.address || ""));
+      params.append("metadata[shipping_price]", String(body.totals?.delivery || body.delivery?.price || 0));
+      params.append("metadata[shippo_shipment_id]", String(body.delivery?.shippoShipmentId || ""));
+      params.append("metadata[shippo_rate_id]", String(body.delivery?.shippoRateId || ""));
+      params.append("metadata[shippo_carrier]", String(body.delivery?.carrier || ""));
+      params.append("metadata[shippo_service]", String(body.delivery?.service || ""));
       params.append("metadata[total]", String(body.totals?.total || ""));
+      params.append("payment_intent_data[metadata][source]", "cart");
+      params.append("payment_intent_data[metadata][pending_id]", pendingId);
 
       const session = await createStripeCheckoutSession(params);
       const user = getSessionUser(req, db);
@@ -1539,7 +1555,9 @@ async function handleApi(req, res) {
         return !item.createdAt || Date.now() - new Date(item.createdAt).getTime() < 1000 * 60 * 60 * 24;
       });
       db.pendingStripeOrders.push({
+        id: pendingId,
         sessionId: session.id,
+        paymentIntentId: typeof session.payment_intent === "string" ? session.payment_intent : "",
         userId: user?.id || "",
         payload: body,
         createdAt: new Date().toISOString()
@@ -1559,16 +1577,21 @@ async function handleApi(req, res) {
 
       const body = await readJson(req);
       const sessionId = String(body.sessionId || "").trim();
-      const pending = db.pendingStripeOrders.find((item) => item.sessionId === sessionId);
 
-      if (!sessionId || !pending) {
-        sendJson(res, 404, { message: "Payment session was not found." });
+      if (!sessionId) {
+        sendJson(res, 400, { message: "Payment session was not found." });
         return;
       }
 
       const existingOrder = db.orders.find((order) => order.payment?.stripeSessionId === sessionId);
       if (existingOrder) {
         sendJson(res, 200, { order: existingOrder });
+        return;
+      }
+
+      const pending = db.pendingStripeOrders.find((item) => item.sessionId === sessionId);
+      if (!pending) {
+        sendJson(res, 404, { message: "Payment session was not found." });
         return;
       }
 
@@ -1580,11 +1603,15 @@ async function handleApi(req, res) {
 
       const user = db.users.find((item) => item.id === pending.userId) || null;
       const result = createOrderFromPayload(db, user, pending.payload, {
-        status: "Paid",
+        status: "paid",
         paidAt: new Date().toISOString(),
         payment: {
           provider: "stripe",
-          stripeSessionId: sessionId
+          type: "card",
+          stripeSessionId: sessionId,
+          stripePaymentIntentId: typeof stripeSession.payment_intent === "string" ? stripeSession.payment_intent : "",
+          stripePendingId: pending.id || "",
+          amountPaid: Math.max(0, Math.round(Number(stripeSession.amount_total || pending.payload?.totals?.total || 0) || 0))
         }
       });
 
@@ -2166,7 +2193,27 @@ function appHandler(req, res) {
   serveStatic(req, res);
 }
 
-const server = http.createServer(appHandler);
+const orderController = createOrderController({
+  createOrderFromPayload,
+  getSessionUser,
+  isAdmin,
+  readDbAsync,
+  shippoApiKey,
+  shippingOrigin,
+  stripeSecretKey,
+  stripeWebhookSecret,
+  writeDbAsync
+});
+const expressApp = express();
+
+expressApp.use("/api", createStripeWebhookRouter({ express, orderController }));
+expressApp.use("/api", createAdminOrderRouter({ express, orderController }));
+expressApp.get("/admin/orders", (req, res) => {
+  res.sendFile(path.join(root, "admin-orders.html"));
+});
+expressApp.use((req, res) => appHandler(req, res));
+
+const server = http.createServer(expressApp);
 
 if (require.main === module) {
   server.listen(port, () => {
@@ -2175,4 +2222,4 @@ if (require.main === module) {
   });
 }
 
-module.exports = appHandler;
+module.exports = expressApp;
