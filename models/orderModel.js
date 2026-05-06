@@ -4,17 +4,33 @@ const ORDER_STATUS = {
   PENDING: "pending",
   PAID: "paid",
   PROCESSING: "processing",
-  SHIPPED: "shipped"
+  LABEL_CREATED: "label_created",
+  SHIPPED: "shipped",
+  DELIVERED: "delivered",
+  CANCELLED: "cancelled",
+  REFUNDED: "refunded"
 };
 
-const paidStatuses = new Set([ORDER_STATUS.PAID, ORDER_STATUS.PROCESSING, ORDER_STATUS.SHIPPED]);
+const paidStatuses = new Set([
+  ORDER_STATUS.PAID,
+  ORDER_STATUS.PROCESSING,
+  ORDER_STATUS.LABEL_CREATED,
+  ORDER_STATUS.SHIPPED,
+  ORDER_STATUS.DELIVERED,
+  ORDER_STATUS.CANCELLED,
+  ORDER_STATUS.REFUNDED
+]);
 
 function normalizeStatus(status) {
   const value = String(status || "").trim().toLowerCase();
 
   if (value === "paid") return ORDER_STATUS.PAID;
   if (value === "processing") return ORDER_STATUS.PROCESSING;
+  if (value === "label_created" || value === "ready_to_ship") return ORDER_STATUS.LABEL_CREATED;
   if (value === "shipped") return ORDER_STATUS.SHIPPED;
+  if (value === "delivered") return ORDER_STATUS.DELIVERED;
+  if (value === "cancelled" || value === "canceled") return ORDER_STATUS.CANCELLED;
+  if (value === "refunded") return ORDER_STATUS.REFUNDED;
   if (value === "awaiting payment" || value === "pending") return ORDER_STATUS.PENDING;
 
   return value || ORDER_STATUS.PENDING;
@@ -76,7 +92,7 @@ function markOrderPaid(order, payment = {}) {
     status: ORDER_STATUS.PAID,
     paidAt
   };
-  order.status = status === ORDER_STATUS.SHIPPED || status === ORDER_STATUS.PROCESSING ? status : ORDER_STATUS.PAID;
+  order.status = paidStatuses.has(status) && status !== ORDER_STATUS.CANCELLED && status !== ORDER_STATUS.REFUNDED ? status : ORDER_STATUS.PAID;
   order.paidAt ||= paidAt;
   ensureInternalTrackingId(order);
 
@@ -101,6 +117,10 @@ function attachShippingLabel(order, label = {}) {
     carrier: label.carrier || "",
     service: label.service || "",
     realShippingCost: Math.max(0, Math.round(Number(label.realShippingCost || label.realShippoCost || order.delivery?.realShippoCost || order.delivery?.real_shippo_cost || 0) || 0)),
+    customerShippingPrice: getCustomerShippingPrice(order),
+    shippingDiscount: getShippingDiscount(order),
+    freeShippingApplied: Boolean(order.delivery?.freeShippingApplied || order.delivery?.free_shipping_applied || getShippingDiscount(order) > 0),
+    labelPurchaseMode: getLabelPurchaseMode(order),
     status: "label_created",
     createdAt: order.shipping?.createdAt || now,
     updatedAt: now,
@@ -124,7 +144,7 @@ function attachShippingLabel(order, label = {}) {
     }
   };
 
-  order.status = ORDER_STATUS.PROCESSING;
+  order.status = ORDER_STATUS.LABEL_CREATED;
   order.payment = {
     ...(order.payment || {}),
     status: ORDER_STATUS.PAID
@@ -149,6 +169,61 @@ function getOrderAmount(order) {
   return Math.max(0, Math.round(Number(order.totals?.total ?? order.payment?.amountPaid ?? 0) || 0));
 }
 
+function getOrderSubtotal(order) {
+  return Math.max(0, Math.round(Number(order.totals?.subtotal || 0) || 0));
+}
+
+function getCustomerShippingPrice(order) {
+  const delivery = order.delivery || {};
+  return Math.max(0, Math.round(Number(delivery.customerShippingPrice || delivery.customer_shipping_price || order.totals?.delivery || delivery.price || 0) || 0));
+}
+
+function getRealShippingCost(order) {
+  const shipping = order.shipping || {};
+  const delivery = order.delivery || {};
+  return Math.max(0, Math.round(Number(shipping.realShippingCost || delivery.realShippoCost || delivery.real_shippo_cost || 0) || 0));
+}
+
+function getShippingDiscount(order) {
+  const delivery = order.delivery || {};
+  const shipping = order.shipping || {};
+  return Math.max(0, Math.round(Number(shipping.shippingDiscount || delivery.shippingDiscount || delivery.shipping_discount || Math.max(0, getRealShippingCost(order) - getCustomerShippingPrice(order))) || 0));
+}
+
+function getLabelPurchaseMode(order) {
+  const delivery = order.delivery || {};
+  const shipping = order.shipping || {};
+  return String(shipping.labelPurchaseMode || delivery.labelPurchaseMode || delivery.label_purchase_mode || (getOrderSubtotal(order) >= 10000 ? "manual" : "automatic")).trim();
+}
+
+function isPaid(order) {
+  const status = normalizeStatus(order.status);
+  return (
+    normalizeStatus(order.payment?.status || order.status) === ORDER_STATUS.PAID &&
+    ![ORDER_STATUS.CANCELLED, ORDER_STATUS.REFUNDED].includes(status)
+  );
+}
+
+function shouldBuyLabelManually(order) {
+  return getLabelPurchaseMode(order) === "manual";
+}
+
+function canBuyLabel(order) {
+  const shipping = order.shipping || {};
+  const delivery = order.delivery || {};
+  return (
+    shouldBuyLabelManually(order) &&
+    isPaid(order) &&
+    String(delivery.type || "").toLowerCase() === "shipping" &&
+    !(shipping.labelUrl || shipping.labelPdfUrl) &&
+    Boolean(delivery.shippoRateId || delivery.shippo_rate_id)
+  );
+}
+
+function isCustomerPaidShipping(order) {
+  return getOrderSubtotal(order) < 10000 && getRealShippingCost(order) > 0 && getCustomerShippingPrice(order) >= getRealShippingCost(order);
+}
+
 function publicAdminOrder(order) {
   const shipping = order.shipping || {};
   const delivery = order.delivery || {};
@@ -168,7 +243,10 @@ function publicAdminOrder(order) {
     },
     items: Array.isArray(order.items) ? order.items : [],
     amount: getOrderAmount(order),
-    shippingAmount: Math.max(0, Math.round(Number(order.totals?.delivery || delivery.price || 0) || 0)),
+    subtotal: getOrderSubtotal(order),
+    shippingType: delivery.shippingType || delivery.shippingOptionType || "",
+    shippingAmount: getCustomerShippingPrice(order),
+    customerShippingPrice: getCustomerShippingPrice(order),
     status: normalizeStatus(order.status),
     paymentStatus: normalizeStatus(order.payment?.status),
     internalTrackingId: order.internalTrackingId || shipping.internalTrackingId || "",
@@ -176,7 +254,12 @@ function publicAdminOrder(order) {
     shippoTrackingNumber: shipping.shippoTrackingNumber || shipping.trackingNumber || tracking.number || "",
     carrier: shipping.carrier || delivery.carrier || tracking.company || "",
     service: shipping.service || delivery.service || "",
-    realShippingCost: Math.max(0, Math.round(Number(shipping.realShippingCost || delivery.realShippoCost || delivery.real_shippo_cost || 0) || 0)),
+    realShippingCost: getRealShippingCost(order),
+    shippingDiscount: getShippingDiscount(order),
+    freeShippingApplied: Boolean(shipping.freeShippingApplied || delivery.freeShippingApplied || delivery.free_shipping_applied || getShippingDiscount(order) > 0),
+    labelPurchaseMode: getLabelPurchaseMode(order),
+    canBuyLabel: canBuyLabel(order),
+    shippingPaidByCustomer: isCustomerPaidShipping(order),
     labelUrl: shipping.labelUrl || shipping.labelPdfUrl || "",
     trackingUrl: shipping.trackingUrl || tracking.url || "",
     deliveryType: delivery.type || "",
@@ -195,7 +278,7 @@ function updateOrderStatus(order, status) {
   const next = normalizeStatus(status);
 
   if (!paidStatuses.has(next)) {
-    throw new Error("Order status must be paid, processing, or shipped.");
+    throw new Error("Order status must be paid, processing, label_created, shipped, delivered, cancelled, or refunded.");
   }
 
   order.status = next;
@@ -205,7 +288,14 @@ function updateOrderStatus(order, status) {
   };
   order.shipping = {
     ...(order.shipping || {}),
-    status: next === ORDER_STATUS.SHIPPED ? "shipped" : order.shipping?.status || ""
+    status:
+      next === ORDER_STATUS.LABEL_CREATED
+        ? "label_created"
+        : next === ORDER_STATUS.SHIPPED
+          ? "shipped"
+          : next === ORDER_STATUS.DELIVERED
+            ? "delivered"
+            : order.shipping?.status || ""
   };
   order.updatedAt = new Date().toISOString();
 
@@ -215,6 +305,7 @@ function updateOrderStatus(order, status) {
 module.exports = {
   ORDER_STATUS,
   attachShippingLabel,
+  canBuyLabel,
   ensureInternalTrackingId,
   findOrderByPaymentIntent,
   findOrderByPendingId,
@@ -226,5 +317,6 @@ module.exports = {
   publicAdminOrder,
   recordShippingError,
   removePendingStripeOrder,
+  shouldBuyLabelManually,
   updateOrderStatus
 };

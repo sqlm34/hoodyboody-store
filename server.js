@@ -9,10 +9,13 @@ const { createAdminOrderRouter } = require("./routes/adminOrderRoutes");
 const { createStripeWebhookRouter } = require("./routes/stripeWebhookRoutes");
 const {
   createShippoService,
+  getLabelPurchaseMode,
   normalizeProductShippingFields,
+  normalizeFreeShippingConfig,
   saveSelectedShippingOption,
   validateProductShippingFields
 } = require("./services/shippoService");
+const { sendOrderStatusEmail } = require("./services/emailService");
 let PgPool = null;
 let StsClient = null;
 let AssumeRoleWithWebIdentityCommand = null;
@@ -70,18 +73,27 @@ const hasPostgresDb = Boolean(
       (postgresPassword || hasAwsIamPostgres))
 );
 const postgresDbKey = process.env.NITKA_POSTGRES_DB_KEY || localEnv.NITKA_POSTGRES_DB_KEY || "default";
+const sessionMaxAgeSeconds = 60 * 60 * 24 * 30;
+const freeShippingConfig = normalizeFreeShippingConfig({
+  thresholdUsd: process.env.FREE_SHIPPING_THRESHOLD || localEnv.FREE_SHIPPING_THRESHOLD || 100,
+  coverageLimitUsd: process.env.FREE_SHIPPING_COVERAGE_LIMIT || localEnv.FREE_SHIPPING_COVERAGE_LIMIT || 10,
+  maxWeightLb: process.env.FREE_SHIPPING_MAX_WEIGHT_LB || localEnv.FREE_SHIPPING_MAX_WEIGHT_LB || 10,
+  maxLengthIn: process.env.FREE_SHIPPING_MAX_LENGTH_IN || localEnv.FREE_SHIPPING_MAX_LENGTH_IN || 18,
+  maxWidthIn: process.env.FREE_SHIPPING_MAX_WIDTH_IN || localEnv.FREE_SHIPPING_MAX_WIDTH_IN || 18,
+  maxHeightIn: process.env.FREE_SHIPPING_MAX_HEIGHT_IN || localEnv.FREE_SHIPPING_MAX_HEIGHT_IN || 18
+});
 const shippingOrigin = {
   name: process.env.SHIPPING_FROM_NAME || localEnv.SHIPPING_FROM_NAME || "HOODYBOODY",
-  street1: process.env.SHIPPING_FROM_STREET1 || localEnv.SHIPPING_FROM_STREET1 || "417 Montgomery St",
-  street2: process.env.SHIPPING_FROM_STREET2 || localEnv.SHIPPING_FROM_STREET2 || "5th Floor",
-  city: process.env.SHIPPING_FROM_CITY || localEnv.SHIPPING_FROM_CITY || "San Francisco",
-  state: process.env.SHIPPING_FROM_STATE || localEnv.SHIPPING_FROM_STATE || "CA",
-  zip: process.env.SHIPPING_FROM_ZIP || localEnv.SHIPPING_FROM_ZIP || "94104",
+  street1: process.env.SHIPPING_FROM_STREET1 || localEnv.SHIPPING_FROM_STREET1 || "6463 Bayside South Drive",
+  street2: process.env.SHIPPING_FROM_STREET2 || localEnv.SHIPPING_FROM_STREET2 || "",
+  city: process.env.SHIPPING_FROM_CITY || localEnv.SHIPPING_FROM_CITY || "Indianapolis",
+  state: process.env.SHIPPING_FROM_STATE || localEnv.SHIPPING_FROM_STATE || "IN",
+  zip: process.env.SHIPPING_FROM_ZIP || localEnv.SHIPPING_FROM_ZIP || "46250",
   country: "US",
   phone: process.env.SHIPPING_FROM_PHONE || localEnv.SHIPPING_FROM_PHONE || "4153334444",
   email: process.env.SHIPPING_FROM_EMAIL || localEnv.SHIPPING_FROM_EMAIL || adminEmail
 };
-const checkoutShippoService = createShippoService({ apiKey: shippoApiKey, shippingOrigin });
+const checkoutShippoService = createShippoService({ apiKey: shippoApiKey, shippingOrigin, freeShippingConfig });
 const defaultShippingByType = {
   accessories: {
     weight_value: 10,
@@ -659,7 +671,7 @@ function hashPassword(password, salt) {
 
 function makeSession(db, userId) {
   const token = crypto.randomBytes(32).toString("hex");
-  const expiresAt = Date.now() + 1000 * 60 * 60 * 24 * 7;
+  const expiresAt = Date.now() + sessionMaxAgeSeconds * 1000;
   db.sessions = db.sessions.filter((session) => session.expiresAt > Date.now());
   db.sessions.push({ token, userId, expiresAt });
   return token;
@@ -667,7 +679,7 @@ function makeSession(db, userId) {
 
 function sessionHeader(token) {
   return {
-    "Set-Cookie": `${sessionCookie}=${encodeURIComponent(token)}; HttpOnly; SameSite=Lax; Path=/; Max-Age=604800`
+    "Set-Cookie": `${sessionCookie}=${encodeURIComponent(token)}; HttpOnly; SameSite=Lax; Path=/; Max-Age=${sessionMaxAgeSeconds}`
   };
 }
 
@@ -1164,7 +1176,13 @@ async function normalizeCheckoutBody(body, db) {
     }
 
     const shipmentRates = await checkoutShippoService.request("GET", `/shipments/${encodeURIComponent(shipmentId)}/rates/USD`);
-    const options = checkoutShippoService.buildShippingOptions({ rates: publicShippoRates(shipmentRates), subtotal });
+    const options = checkoutShippoService.buildShippingOptions({
+      rates: publicShippoRates(shipmentRates),
+      subtotal,
+      destination: normalized.delivery,
+      parcels: checkoutShippoService.buildShippoParcelsFromCart(normalized.items, publicProducts(db)),
+      freeShippingConfig
+    });
     normalized.delivery = saveSelectedShippingOption(
       {
         ...normalized.delivery,
@@ -1219,6 +1237,45 @@ function getStockStatus(stock) {
   return "in";
 }
 
+function getOrderShippingFields(delivery = {}, totals = {}) {
+  const subtotal = Math.max(0, Math.round(Number(totals.subtotal || 0) || 0));
+  const customerShippingPrice = Math.max(
+    0,
+    Math.round(Number(delivery.customerShippingPrice ?? delivery.customer_shipping_price ?? delivery.price ?? totals.delivery ?? 0) || 0)
+  );
+  const realShippoCost = Math.max(
+    0,
+    Math.round(Number(delivery.realShippoCost ?? delivery.real_shippo_cost ?? delivery.realShippoAmount ?? customerShippingPrice) || 0)
+  );
+  const shippingDiscount = Math.max(0, Math.round(Number(delivery.shippingDiscount ?? delivery.shipping_discount ?? Math.max(0, realShippoCost - customerShippingPrice)) || 0));
+  const labelPurchaseMode =
+    delivery.type === "shipping"
+      ? String(delivery.labelPurchaseMode || delivery.label_purchase_mode || getLabelPurchaseMode(subtotal, freeShippingConfig)).trim()
+      : "";
+
+  return {
+    subtotal,
+    customerShippingPrice,
+    realShippoCost,
+    shippingDiscount,
+    labelPurchaseMode,
+    shippingOptionType: String(delivery.shippingOptionType || delivery.shippingType || "").trim(),
+    shippingTitle: String(delivery.shippingTitle || "").trim(),
+    freeShippingApplied: Boolean(delivery.freeShippingApplied || delivery.free_shipping_applied || shippingDiscount > 0)
+  };
+}
+
+async function notifyOrderStatus(order, statusKey, statusLabel) {
+  try {
+    return await sendOrderStatusEmail(order, statusKey, { statusLabel });
+  } catch (error) {
+    order.notifications ||= { sent: [] };
+    order.notifications.lastError = error.message || "Email notification failed.";
+    order.notifications.failedAt = new Date().toISOString();
+    return { skipped: true, reason: "send_failed" };
+  }
+}
+
 function createOrderFromPayload(db, user, body, overrides = {}) {
   const items = Array.isArray(body.items) ? body.items : [];
 
@@ -1249,6 +1306,18 @@ function createOrderFromPayload(db, user, body, overrides = {}) {
   }
 
   const delivery = body.delivery || {};
+  const baseTotals = {
+    subtotal: Math.max(0, Math.round(Number(body.totals?.subtotal ?? getCartSubtotal(items, db)) || 0)),
+    delivery: Math.max(0, Math.round(Number(body.totals?.delivery ?? delivery.price ?? 0) || 0)),
+    total: Math.max(0, Math.round(Number(body.totals?.total ?? 0) || 0))
+  };
+  const shippingFields = getOrderShippingFields(delivery, baseTotals);
+  const totals = {
+    ...body.totals,
+    subtotal: shippingFields.subtotal,
+    delivery: shippingFields.customerShippingPrice,
+    total: shippingFields.subtotal + shippingFields.customerShippingPrice
+  };
   const paymentType = String(body.payment?.type || "").trim();
   const isDeferredPayment = paymentType === "invoice" || paymentType === "sbp";
   const orderStatus = String(overrides.status || (isDeferredPayment ? "pending" : "paid")).trim().toLowerCase();
@@ -1264,6 +1333,18 @@ function createOrderFromPayload(db, user, body, overrides = {}) {
     customer: body.customer || {},
     delivery: {
       ...delivery,
+      price: shippingFields.customerShippingPrice,
+      shippingType: shippingFields.shippingOptionType,
+      customerShippingPrice: shippingFields.customerShippingPrice,
+      customer_shipping_price: shippingFields.customerShippingPrice,
+      realShippoCost: shippingFields.realShippoCost,
+      real_shippo_cost: shippingFields.realShippoCost,
+      shippingDiscount: shippingFields.shippingDiscount,
+      shipping_discount: shippingFields.shippingDiscount,
+      freeShippingApplied: shippingFields.freeShippingApplied,
+      free_shipping_applied: shippingFields.freeShippingApplied,
+      labelPurchaseMode: shippingFields.labelPurchaseMode,
+      label_purchase_mode: shippingFields.labelPurchaseMode,
       tracking
     },
     payment: {
@@ -1272,7 +1353,16 @@ function createOrderFromPayload(db, user, body, overrides = {}) {
       status: orderStatus,
       paidAt
     },
-    totals: body.totals || {},
+    totals,
+    shipping: {
+      labelPurchaseMode: shippingFields.labelPurchaseMode,
+      customerShippingPrice: shippingFields.customerShippingPrice,
+      realShippingCost: shippingFields.realShippoCost,
+      shippingDiscount: shippingFields.shippingDiscount,
+      freeShippingApplied: shippingFields.freeShippingApplied,
+      status: shippingFields.labelPurchaseMode === "manual" ? "label_pending_manual" : ""
+    },
+    notifications: { sent: [] },
     status: orderStatus,
     createdAt: new Date().toISOString()
   };
@@ -1537,9 +1627,13 @@ async function handleApi(req, res) {
       params.append("metadata[delivery_state]", String(body.delivery?.state || ""));
       params.append("metadata[delivery_zip]", String(body.delivery?.zip || ""));
       params.append("metadata[delivery_address]", String(body.delivery?.address || ""));
+      params.append("metadata[subtotal]", String(body.totals?.subtotal || 0));
       params.append("metadata[shipping_price]", String(body.totals?.delivery || body.delivery?.price || 0));
       params.append("metadata[customer_shipping_price]", String(body.delivery?.customerShippingPrice ?? body.delivery?.price ?? 0));
       params.append("metadata[real_shippo_cost]", String(body.delivery?.realShippoCost ?? body.delivery?.real_shippo_cost ?? 0));
+      params.append("metadata[shipping_discount]", String(body.delivery?.shippingDiscount ?? body.delivery?.shipping_discount ?? 0));
+      params.append("metadata[free_shipping_applied]", String(Boolean(body.delivery?.freeShippingApplied || body.delivery?.free_shipping_applied)));
+      params.append("metadata[label_purchase_mode]", String(body.delivery?.labelPurchaseMode || body.delivery?.label_purchase_mode || ""));
       params.append("metadata[shipping_option_id]", String(body.delivery?.shippingOptionId || ""));
       params.append("metadata[shipping_option_type]", String(body.delivery?.shippingOptionType || ""));
       params.append("metadata[shipping_title]", String(body.delivery?.shippingTitle || ""));
@@ -1623,6 +1717,7 @@ async function handleApi(req, res) {
       }
 
       db.pendingStripeOrders = db.pendingStripeOrders.filter((item) => item.sessionId !== sessionId);
+      await notifyOrderStatus(result.order, "order_paid", "order paid / confirmed");
       await writeDbAsync(db);
       sendJson(res, 201, { order: result.order });
       return;
@@ -2063,6 +2158,10 @@ async function handleApi(req, res) {
       if (!result.order) {
         sendJson(res, result.status, { message: result.message });
         return;
+      }
+
+      if (result.order.payment?.status === "paid") {
+        await notifyOrderStatus(result.order, "order_paid", "order paid / confirmed");
       }
 
       await writeDbAsync(db);

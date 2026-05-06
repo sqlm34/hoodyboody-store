@@ -128,6 +128,9 @@ function renderOrders(orders) {
       const date = new Date(order.createdAt).toLocaleDateString("en-US");
       const items = (order.items || []).map((item) => escapeHtml(item.title)).join(", ");
       const tracking = order.delivery?.tracking || {};
+      const deliverySource = `${order.delivery?.shippingTitle || ""} ${order.delivery?.shippingType || ""} ${order.delivery?.shippingOptionType || ""}`;
+      const deliveryLabel = /standard|free|discount/i.test(deliverySource) ? "Standard AliExpress" : tracking.company || "being clarified";
+      tracking.company = deliveryLabel;
 
       return `
         <article class="order-card">

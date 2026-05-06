@@ -1,11 +1,17 @@
 const https = require("https");
 
 const FREE_SHIPPING_THRESHOLD = 10000;
+const FREE_SHIPPING_COVERAGE_LIMIT = 1000;
+const FREE_SHIPPING_MAX_WEIGHT_LB = 10;
+const FREE_SHIPPING_MAX_LENGTH_IN = 18;
+const FREE_SHIPPING_MAX_WIDTH_IN = 18;
+const FREE_SHIPPING_MAX_HEIGHT_IN = 18;
 const PACKAGE_TYPES = ["parcel", "soft_pack", "padded_envelope", "box", "tube", "custom"];
 const WEIGHT_UNITS = ["oz", "lb", "g", "kg"];
 const DIMENSION_UNITS = ["in", "cm"];
 const STANDARD_SERVICE_PATTERN = /(ground|economy|standard|parcel\s*select|retail\s*ground|advantage|surepost|smartpost|first[-\s]*class)/i;
 const EXPRESS_SERVICE_PATTERN = /(express|priority|2[-\s]*day|two[-\s]*day|next[-\s]*day|overnight|air|expedited|same[-\s]*day|second[-\s]*day)/i;
+const EXCLUDED_FREE_SHIPPING_STATES = new Set(["AK", "HI", "PR"]);
 
 function cents(value) {
   return Math.max(0, Math.round(Number(value || 0) * 100));
@@ -18,6 +24,23 @@ function moneyFromCents(value) {
 function asPositiveNumber(value) {
   const number = Number(value);
   return Number.isFinite(number) && number > 0 ? number : 0;
+}
+
+function centsFromUsd(value, fallbackCents) {
+  const number = Number(value);
+  if (!Number.isFinite(number) || number < 0) return fallbackCents;
+  return Math.round(number * 100);
+}
+
+function normalizeFreeShippingConfig(config = {}) {
+  return {
+    thresholdCents: centsFromUsd(config.thresholdUsd, FREE_SHIPPING_THRESHOLD),
+    coverageLimitCents: centsFromUsd(config.coverageLimitUsd, FREE_SHIPPING_COVERAGE_LIMIT),
+    maxWeightLb: asPositiveNumber(config.maxWeightLb) || FREE_SHIPPING_MAX_WEIGHT_LB,
+    maxLengthIn: asPositiveNumber(config.maxLengthIn) || FREE_SHIPPING_MAX_LENGTH_IN,
+    maxWidthIn: asPositiveNumber(config.maxWidthIn) || FREE_SHIPPING_MAX_WIDTH_IN,
+    maxHeightIn: asPositiveNumber(config.maxHeightIn) || FREE_SHIPPING_MAX_HEIGHT_IN
+  };
 }
 
 function normalizeRates(data = {}) {
@@ -223,6 +246,63 @@ function rateSearchText(rate) {
   return `${rate.carrier || ""} ${rate.service || ""} ${rate.serviceToken || ""} ${(rate.attributes || []).join(" ")}`;
 }
 
+function getDestinationState(destination = {}) {
+  return String(destination.state || destination.province || "").trim().toUpperCase();
+}
+
+function getDestinationCountry(destination = {}) {
+  return String(destination.country || "US").trim().toUpperCase();
+}
+
+function isContinentalUsDestination(destination = {}) {
+  const country = getDestinationCountry(destination);
+  const state = getDestinationState(destination);
+  return country === "US" && state && !EXCLUDED_FREE_SHIPPING_STATES.has(state);
+}
+
+function getParcelLimitState(parcels = [], config = {}) {
+  const policy = normalizeFreeShippingConfig(config);
+  const totals = (Array.isArray(parcels) ? parcels : []).reduce(
+    (result, parcel) => {
+      result.weight += Number(parcel.weight || 0);
+      result.length = Math.max(result.length, Number(parcel.length || 0));
+      result.width = Math.max(result.width, Number(parcel.width || 0));
+      result.height = Math.max(result.height, Number(parcel.height || 0));
+      return result;
+    },
+    { weight: 0, length: 0, width: 0, height: 0 }
+  );
+
+  return {
+    oversized:
+      totals.weight > policy.maxWeightLb ||
+      totals.length > policy.maxLengthIn ||
+      totals.width > policy.maxWidthIn ||
+      totals.height > policy.maxHeightIn,
+    totals,
+    policy
+  };
+}
+
+function getFreeShippingEligibility({ subtotal = 0, destination = {}, parcels = [], config = {} }) {
+  const policy = normalizeFreeShippingConfig(config);
+
+  if (subtotal < policy.thresholdCents) {
+    return { eligible: false, reason: "subtotal_below_threshold", policy };
+  }
+
+  if (!isContinentalUsDestination(destination)) {
+    return { eligible: false, reason: "outside_continental_us", policy };
+  }
+
+  const parcelLimit = getParcelLimitState(parcels, policy);
+  if (parcelLimit.oversized) {
+    return { eligible: false, reason: "oversized", policy, parcelLimit };
+  }
+
+  return { eligible: true, reason: "eligible", policy, parcelLimit };
+}
+
 function selectStandardRate(rates = []) {
   return rates.filter((rate) => STANDARD_SERVICE_PATTERN.test(rateSearchText(rate))).sort((a, b) => a.price - b.price)[0] || null;
 }
@@ -231,8 +311,14 @@ function selectExpressRate(rates = []) {
   return rates.filter((rate) => EXPRESS_SERVICE_PATTERN.test(rateSearchText(rate))).sort((a, b) => a.price - b.price)[0] || null;
 }
 
-function shippingOptionFromRate({ type, title, rate, customerShippingPrice }) {
+function getLabelPurchaseMode(subtotal, config = {}) {
+  const policy = normalizeFreeShippingConfig(config);
+  return subtotal >= policy.thresholdCents ? "manual" : "automatic";
+}
+
+function shippingOptionFromRate({ type, title, rate, customerShippingPrice, shippingDiscount = 0, freeShippingApplied = false, labelPurchaseMode = "automatic" }) {
   const customerPrice = Math.max(0, Math.round(Number(customerShippingPrice) || 0));
+  const discount = Math.max(0, Math.round(Number(shippingDiscount) || 0));
 
   return {
     id: `${type}:${rate.id}`,
@@ -243,6 +329,12 @@ function shippingOptionFromRate({ type, title, rate, customerShippingPrice }) {
     customerShippingPrice: customerPrice,
     real_shippo_amount: rate.price,
     realShippoAmount: rate.price,
+    shipping_discount: discount,
+    shippingDiscount: discount,
+    free_shipping_applied: Boolean(freeShippingApplied),
+    freeShippingApplied: Boolean(freeShippingApplied),
+    label_purchase_mode: labelPurchaseMode,
+    labelPurchaseMode,
     shippo_rate_id: rate.id,
     shippoRateId: rate.id,
     shippo_shipment_id: rate.shipmentId,
@@ -255,18 +347,27 @@ function shippingOptionFromRate({ type, title, rate, customerShippingPrice }) {
   };
 }
 
-function buildShippingOptions({ rates = [], subtotal = 0 }) {
+function buildShippingOptions({ rates = [], subtotal = 0, destination = {}, parcels = [], freeShippingConfig = {} }) {
+  const policy = normalizeFreeShippingConfig(freeShippingConfig);
   const standardRate = selectStandardRate(rates);
   const expressRate = selectExpressRate(rates);
+  const labelPurchaseMode = getLabelPurchaseMode(subtotal, policy);
+  const freeShipping = getFreeShippingEligibility({ subtotal, destination, parcels, config: policy });
   const options = [];
 
-  if (standardRate && subtotal >= FREE_SHIPPING_THRESHOLD) {
+  if (standardRate && freeShipping.eligible) {
+    const discount = Math.min(policy.coverageLimitCents, standardRate.price);
+    const customerPrice = Math.max(0, standardRate.price - discount);
+
     options.push(
       shippingOptionFromRate({
         type: "free",
-        title: "Free Shipping",
+        title: customerPrice === 0 ? "Free Shipping" : "Shipping Discount",
         rate: standardRate,
-        customerShippingPrice: 0
+        customerShippingPrice: customerPrice,
+        shippingDiscount: discount,
+        freeShippingApplied: true,
+        labelPurchaseMode
       })
     );
   } else if (standardRate) {
@@ -275,7 +376,8 @@ function buildShippingOptions({ rates = [], subtotal = 0 }) {
         type: "standard",
         title: "Standard Shipping",
         rate: standardRate,
-        customerShippingPrice: standardRate.price
+        customerShippingPrice: standardRate.price,
+        labelPurchaseMode
       })
     );
   }
@@ -286,7 +388,8 @@ function buildShippingOptions({ rates = [], subtotal = 0 }) {
         type: "express",
         title: "Express Shipping",
         rate: expressRate,
-        customerShippingPrice: expressRate.price
+        customerShippingPrice: expressRate.price,
+        labelPurchaseMode
       })
     );
   }
@@ -319,6 +422,12 @@ function saveSelectedShippingOption(delivery = {}, options = []) {
     realShippoCost: selected.real_shippo_amount,
     real_shippo_cost: selected.real_shippo_amount,
     realShippoAmount: selected.real_shippo_amount,
+    shippingDiscount: selected.shipping_discount || 0,
+    shipping_discount: selected.shipping_discount || 0,
+    freeShippingApplied: selected.free_shipping_applied === true,
+    free_shipping_applied: selected.free_shipping_applied === true,
+    labelPurchaseMode: selected.label_purchase_mode || "automatic",
+    label_purchase_mode: selected.label_purchase_mode || "automatic",
     carrier: selected.carrier,
     service: selected.service,
     deliveryDays: selected.estimated_days,
@@ -327,7 +436,9 @@ function saveSelectedShippingOption(delivery = {}, options = []) {
   };
 }
 
-function createShippoService({ apiKey, shippingOrigin, logger }) {
+function createShippoService({ apiKey, shippingOrigin, freeShippingConfig, logger }) {
+  const serviceFreeShippingConfig = normalizeFreeShippingConfig(freeShippingConfig);
+
   function requestOnce(method, apiPath, payload = null) {
     const body = payload ? JSON.stringify(payload) : "";
 
@@ -403,8 +514,9 @@ function createShippoService({ apiKey, shippingOrigin, logger }) {
     throw lastError;
   }
 
-  async function createShipment({ destination, items, products, metadata = "" }) {
+  async function createShipment({ destination, items, products, parcels, metadata = "" }) {
     const addressTo = getAddressTo(destination);
+    const shipmentParcels = parcels || buildShippoParcelsFromCart(items, products);
 
     if (!addressTo.street1 || !addressTo.city || !addressTo.state || !addressTo.zip) {
       throw new Error("Enter a complete US delivery address before calculating shipping.");
@@ -413,16 +525,23 @@ function createShippoService({ apiKey, shippingOrigin, logger }) {
     return request("POST", "/shipments/", {
       address_from: getAddressFrom(shippingOrigin),
       address_to: addressTo,
-      parcels: buildShippoParcelsFromCart(items, products),
+      parcels: shipmentParcels,
       async: false,
       metadata: String(metadata || "checkout").slice(0, 100)
     });
   }
 
   async function getShippoRates({ destination, items, products, subtotal = 0, metadata = "" }) {
-    const shipment = await createShipment({ destination, items, products, metadata });
+    const parcels = buildShippoParcelsFromCart(items, products);
+    const shipment = await createShipment({ destination, items, products, parcels, metadata });
     const rates = normalizeRates(shipment);
-    const options = buildShippingOptions({ rates, subtotal });
+    const options = buildShippingOptions({
+      rates,
+      subtotal,
+      destination,
+      parcels,
+      freeShippingConfig: serviceFreeShippingConfig
+    });
 
     if (!options.length) {
       throw new Error("No standard or express Shippo shipping options are available for this address.");
@@ -454,8 +573,8 @@ function createShippoService({ apiKey, shippingOrigin, logger }) {
     return selectStandardRate(rates) || rates.find((rate) => rate.attributes.includes("BESTVALUE")) || rates[0];
   }
 
-  async function purchaseShippingLabelAfterPayment(order) {
-    const paid = String(order.payment?.status || order.status || "").toLowerCase() === "paid" || ["processing", "label_created"].includes(String(order.status || "").toLowerCase());
+  async function purchaseShippingLabelAfterPayment(order, options = {}) {
+    const paid = String(order.payment?.status || order.status || "").toLowerCase() === "paid" || ["processing", "label_created", "ready_to_ship"].includes(String(order.status || "").toLowerCase());
     if (!paid) throw new Error("Shipping label can only be purchased after payment.");
 
     const delivery = order.delivery || {};
@@ -466,6 +585,10 @@ function createShippoService({ apiKey, shippingOrigin, logger }) {
       service: delivery.service || "",
       price: Math.max(0, Math.round(Number(delivery.realShippoCost || delivery.real_shippo_cost || delivery.realShippoAmount || 0) || 0))
     };
+
+    if (!selectedRate.id && options.requireSavedRate) {
+      throw new Error("Saved Shippo rate id is required to buy this label.");
+    }
 
     if (!selectedRate.id) {
       const shipment = await createShipmentForOrder(order);
@@ -509,6 +632,7 @@ function createShippoService({ apiKey, shippingOrigin, logger }) {
     purchaseShippingLabelAfterPayment,
     request,
     saveSelectedShippingOption,
+    getFreeShippingEligibility,
     selectExpressRate,
     selectRate,
     selectStandardRate,
@@ -518,11 +642,19 @@ function createShippoService({ apiKey, shippingOrigin, logger }) {
 
 module.exports = {
   FREE_SHIPPING_THRESHOLD,
+  FREE_SHIPPING_COVERAGE_LIMIT,
+  FREE_SHIPPING_MAX_WEIGHT_LB,
+  FREE_SHIPPING_MAX_LENGTH_IN,
+  FREE_SHIPPING_MAX_WIDTH_IN,
+  FREE_SHIPPING_MAX_HEIGHT_IN,
   PACKAGE_TYPES,
   buildShippingOptions,
   buildShippoParcelsFromCart,
   createShippoService,
+  getFreeShippingEligibility,
+  getLabelPurchaseMode,
   normalizeProductShippingFields,
+  normalizeFreeShippingConfig,
   normalizeRates,
   saveSelectedShippingOption,
   selectExpressRate,

@@ -77,6 +77,10 @@ async function loadDashboard() {
     renderStats();
     showDashboard();
   } catch (error) {
+    if (error.status === 401) {
+      window.location.href = "/auth.html?next=/admin.html";
+      return;
+    }
     showLocked(error.message);
   }
 }

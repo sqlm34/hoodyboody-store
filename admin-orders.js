@@ -58,10 +58,10 @@ function orderItemsText(order) {
 function getLabelBlock(order) {
   if (!order.labelUrl) {
     const retryButton =
-      order.deliveryType === "shipping"
-        ? `<button class="button ghost dark admin-order-action" data-action="retry-label" data-order-id="${order.id}" type="button">
+      order.canBuyLabel
+        ? `<button class="button primary admin-order-action" data-action="buy-label" data-order-id="${order.id}" type="button">
             <i class="fa-solid fa-tag" aria-hidden="true"></i>
-            <span>Create label</span>
+            <span>Buy Label</span>
           </button>`
         : "";
 
@@ -99,7 +99,9 @@ function renderOrders(orders) {
 
   ordersList.innerHTML = orders
     .map(
-      (order) => `
+      (order) => {
+        const paidShippingClass = order.shippingPaidByCustomer ? " shipping-paid-by-customer" : "";
+        return `
         <article class="admin-order-card checkout-panel">
           <div class="admin-order-head">
             <div>
@@ -108,28 +110,40 @@ function renderOrders(orders) {
               <p>${order.customer?.email || "No email"}${order.customer?.phone ? ` · ${order.customer.phone}` : ""}</p>
             </div>
             <select class="admin-order-status admin-order-action" data-action="status" data-order-id="${order.id}" aria-label="Order status">
-              ${["paid", "processing", "shipped"]
+              ${["paid", "processing", "label_created", "shipped", "delivered", "cancelled", "refunded"]
                 .map((status) => `<option value="${status}" ${order.status === status ? "selected" : ""}>${status}</option>`)
                 .join("")}
             </select>
           </div>
 
-          <div class="admin-order-grid">
+          <div class="admin-order-grid admin-shipping-payment-block${paidShippingClass}">
             <div>
               <span>Items</span>
               <strong>${orderItemsText(order) || "No items"}</strong>
+            </div>
+            <div>
+              <span>Subtotal</span>
+              <strong>${formatMoney(order.subtotal || 0)}</strong>
             </div>
             <div>
               <span>Payment amount</span>
               <strong>${formatMoney(order.amount)}</strong>
             </div>
             <div>
-              <span>Shipping amount</span>
-              <strong>${formatMoney(order.shippingAmount)}</strong>
+              <span>Customer shipping</span>
+              <strong>${formatMoney(order.customerShippingPrice || order.shippingAmount || 0)}</strong>
             </div>
             <div>
               <span>Real Shippo cost</span>
               <strong>${formatMoney(order.realShippingCost || 0)}</strong>
+            </div>
+            <div>
+              <span>Shipping discount</span>
+              <strong>${formatMoney(order.shippingDiscount || 0)}</strong>
+            </div>
+            <div>
+              <span>Label purchase</span>
+              <strong>${order.labelPurchaseMode || "automatic"}</strong>
             </div>
             <div>
               <span>Order ID</span>
@@ -153,7 +167,8 @@ function renderOrders(orders) {
             ${getLabelBlock(order)}
           </div>
         </article>
-      `
+      `;
+      }
     )
     .join("");
 }
@@ -166,6 +181,10 @@ async function loadOrders() {
     renderOrders(data.orders || []);
     showDashboard();
   } catch (error) {
+    if (error.status === 401) {
+      window.location.href = "/auth.html?next=/admin/orders";
+      return;
+    }
     showLocked(error.message);
   } finally {
     ordersRefresh.disabled = false;
@@ -185,10 +204,15 @@ async function handleOrderAction(event) {
     return;
   }
 
-  if (target.dataset.action === "retry-label") {
+  if (target.dataset.action === "buy-label") {
     target.disabled = true;
-    await api(`/api/admin/orders/${encodeURIComponent(target.dataset.orderId)}/label`, { method: "POST", body: "{}" });
-    await loadOrders();
+    try {
+      await api(`/api/admin/orders/${encodeURIComponent(target.dataset.orderId)}/label`, { method: "POST", body: "{}" });
+      await loadOrders();
+    } catch (error) {
+      ordersSummary.textContent = error.message;
+      target.disabled = false;
+    }
     return;
   }
 

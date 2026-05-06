@@ -13,7 +13,7 @@ async function logout() {
   try {
     await fetch("/api/logout", { method: "POST" });
   } finally {
-    window.location.href = "index.html";
+    window.location.href = window.location.pathname.includes("admin") ? "/auth.html" : "index.html";
   }
 }
 

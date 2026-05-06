@@ -738,6 +738,10 @@ async function loadEditorData(options = {}) {
     renderProductsEditor();
     if (!options.silent) setProductsStatus("Owner product data refreshed successfully.");
   } catch (error) {
+    if (error.status === 401) {
+      window.location.href = "/auth.html?next=/admin-products.html";
+      return;
+    }
     showLocked(error.message);
   }
 }

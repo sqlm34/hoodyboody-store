@@ -1,6 +1,7 @@
 const { createLogger } = require("../services/loggerService");
 const { createShippoService } = require("../services/shippoService");
 const { createStripeService } = require("../services/stripeService");
+const { sendOrderStatusEmail } = require("../services/emailService");
 const {
   ORDER_STATUS,
   attachShippingLabel,
@@ -14,6 +15,7 @@ const {
   publicAdminOrder,
   recordShippingError,
   removePendingStripeOrder,
+  shouldBuyLabelManually,
   updateOrderStatus
 } = require("../models/orderModel");
 
@@ -72,7 +74,7 @@ function buildFallbackPayloadFromStripe({ stripeSession, paymentIntent }) {
     };
   });
   const deliveryPrice = deliveryLines.reduce((sum, lineItem) => sum + Math.max(0, Math.round(Number(lineItem.amount_total || 0))), 0);
-  const subtotal = items.reduce((sum, item) => sum + item.price * item.quantity, 0);
+  const subtotal = Number(metadata.subtotal || "") || items.reduce((sum, item) => sum + item.price * item.quantity, 0);
   const total = Math.max(0, Math.round(Number(stripeSession?.amount_total ?? paymentIntent?.amount_received ?? subtotal + deliveryPrice) || 0));
   const hasAddress = Boolean(address.line1 || address.city || address.state || address.postal_code);
 
@@ -94,6 +96,12 @@ function buildFallbackPayloadFromStripe({ stripeSession, paymentIntent }) {
       customer_shipping_price: Number(metadata.customer_shipping_price || metadata.shipping_price || "") || deliveryPrice,
       realShippoCost: Number(metadata.real_shippo_cost || "") || deliveryPrice,
       real_shippo_cost: Number(metadata.real_shippo_cost || "") || deliveryPrice,
+      shippingDiscount: Number(metadata.shipping_discount || "") || 0,
+      shipping_discount: Number(metadata.shipping_discount || "") || 0,
+      freeShippingApplied: metadata.free_shipping_applied === "true",
+      free_shipping_applied: metadata.free_shipping_applied === "true",
+      labelPurchaseMode: metadata.label_purchase_mode || "",
+      label_purchase_mode: metadata.label_purchase_mode || "",
       shippingOptionId: metadata.shipping_option_id || "",
       shippingOptionType: metadata.shipping_option_type || "",
       shippingTitle: metadata.shipping_title || "",
@@ -150,6 +158,18 @@ function createOrderController(context) {
   const logger = createLogger("orders");
   const stripeService = createStripeService({ secretKey: stripeSecretKey, webhookSecret: stripeWebhookSecret, logger });
   const shippoService = createShippoService({ apiKey: shippoApiKey, shippingOrigin, logger });
+
+  async function notifyOrderStatus(order, statusKey, statusLabel) {
+    try {
+      return await sendOrderStatusEmail(order, statusKey, { statusLabel });
+    } catch (error) {
+      order.notifications ||= { sent: [] };
+      order.notifications.lastError = error.message || "Email notification failed.";
+      order.notifications.failedAt = new Date().toISOString();
+      logger.warn("Order email notification failed.", { orderId: order.id, statusKey, message: error.message });
+      return { skipped: true, reason: "send_failed" };
+    }
+  }
 
   function requireAdmin(req, db) {
     const user = getSessionUser(req, db);
@@ -254,7 +274,7 @@ function createOrderController(context) {
     return order;
   }
 
-  async function ensureShippingLabel(order) {
+  async function ensureShippingLabel(order, options = {}) {
     if (String(order.delivery?.type || "").toLowerCase() !== "shipping") {
       return { skipped: true, reason: "Order does not require shipping." };
     }
@@ -263,12 +283,24 @@ function createOrderController(context) {
       return { skipped: true, reason: "Shipping label already exists." };
     }
 
+    if (shouldBuyLabelManually(order) && !options.allowManualPurchase) {
+      order.shipping ||= {};
+      order.shipping.labelPurchaseMode = "manual";
+      order.shipping.status = order.shipping.status || "label_pending_manual";
+      return { skipped: true, reason: "Manual label purchase is required for this order." };
+    }
+
+    if (options.requireSavedRate && !(order.delivery?.shippoRateId || order.delivery?.shippo_rate_id)) {
+      throw new Error("Saved Shippo rate id is required before buying this label.");
+    }
+
     order.status = ORDER_STATUS.PROCESSING;
     ensureInternalTrackingId(order);
 
     try {
-      const label = await shippoService.createLabelForOrder(order);
+      const label = await shippoService.createLabelForOrder(order, { requireSavedRate: options.requireSavedRate });
       attachShippingLabel(order, label);
+      await notifyOrderStatus(order, "label_created", "label created / ready to ship");
       logger.info("Shippo label created.", { orderId: order.id, trackingNumber: label.trackingNumber });
       return { label };
     } catch (error) {
@@ -301,6 +333,7 @@ function createOrderController(context) {
     };
     pending ||= findPendingStripeOrder(db, resolvedIds);
     const order = ensurePaidOrderForStripe(db, resolvedIds, pending, stripeSession, paymentIntent, event.id);
+    await notifyOrderStatus(order, "order_paid", "order paid / confirmed");
 
     await writeDbAsync(db);
 
@@ -356,7 +389,7 @@ function createOrderController(context) {
         return;
       }
 
-      await ensureShippingLabel(order);
+      await ensureShippingLabel(order, { allowManualPurchase: true, requireSavedRate: true });
       await writeDbAsync(db);
       res.status(200).json({ order: publicAdminOrder(order) });
     } catch (error) {
@@ -376,6 +409,16 @@ function createOrderController(context) {
       }
 
       updateOrderStatus(order, req.body?.status);
+      const statusLabel = {
+        shipped: "shipped",
+        delivered: "delivered",
+        cancelled: "cancelled",
+        refunded: "refunded",
+        label_created: "label created / ready to ship"
+      }[order.status];
+      if (statusLabel) {
+        await notifyOrderStatus(order, `order_${order.status}`, statusLabel);
+      }
       await writeDbAsync(db);
       res.status(200).json({ order: publicAdminOrder(order) });
     } catch (error) {
