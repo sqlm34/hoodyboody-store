@@ -3028,6 +3028,19 @@ textarea:focus {
     font-size: 2.35rem;
   }
 
+  .auth-layout {
+    display: flex;
+    flex-direction: column;
+  }
+
+  #loginForm {
+    order: 1;
+  }
+
+  #registerForm {
+    order: 2;
+  }
+
   .breadcrumbs {
     margin-bottom: 16px;
     font-size: 0.72rem;
