@@ -81,16 +81,6 @@ function getLabelBlock(order) {
         <small>${[order.carrier, order.service].filter(Boolean).join(" - ") || "Shippo label"}${order.shippoTrackingNumber ? ` - ${order.shippoTrackingNumber}` : ""}</small>
       </div>
       <div class="admin-label-actions" aria-label="Label actions">
-        <a
-          class="icon-button admin-label-icon pdf"
-          href="${order.labelUrl}"
-          target="_blank"
-          rel="noreferrer"
-          aria-label="Open PDF label"
-          title="Open PDF label"
-        >
-          <i class="fa-regular fa-file-pdf" aria-hidden="true"></i>
-        </a>
         <button
           class="icon-button admin-label-icon print admin-order-action"
           data-action="print-label"
