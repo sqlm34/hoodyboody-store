@@ -3,6 +3,29 @@ let products = window.NITKA_PRODUCTS || [];
 const CART_STORAGE_KEY = "nitka-cart";
 const FREE_DELIVERY_THRESHOLD = 10000;
 const FREE_DELIVERY_LABEL = "$100";
+const CATEGORY_ORDER = ["outerwear", "tops", "accessories"];
+const CATEGORY_META = {
+  outerwear: {
+    eyebrow: "outerwear",
+    title: "Jackets",
+    copy: "Layered linen, bomber and denim pieces with embroidery that holds the whole look together."
+  },
+  tops: {
+    eyebrow: "tops",
+    title: "Tops",
+    copy: "Hoodies and shirts with clean stitched details for everyday wear and custom styling."
+  },
+  accessories: {
+    eyebrow: "accessories",
+    title: "Accessories",
+    copy: "Small embroidered pieces that finish the outfit without feeling loud."
+  }
+};
+const ALL_CATALOG_META = {
+  eyebrow: "all pieces",
+  title: "All catalog",
+  copy: "Browse every embroidered piece from the current collection."
+};
 
 function loadStoredCart() {
   try {
@@ -173,6 +196,12 @@ async function loadProducts() {
 }
 
 const catalogGrid = document.querySelector("#catalogGrid");
+const catalogSections = document.querySelector("#catalogSections");
+const catalogView = document.querySelector("#catalogView");
+const catalogViewEyebrow = document.querySelector("#catalogViewEyebrow");
+const catalogViewTitle = document.querySelector("#catalogViewTitle");
+const catalogViewCopy = document.querySelector("#catalogViewCopy");
+const catalogReset = document.querySelector("#catalogReset");
 const filterButtons = document.querySelectorAll(".filter");
 const cartDrawer = document.querySelector(".cart-drawer");
 const cartItems = document.querySelector("#cartItems");
@@ -214,11 +243,105 @@ function syncCatalogCardHeights() {
   });
 }
 
+function getCategoryMeta(type) {
+  const fallbackTitle = String(type || "collection")
+    .replace(/[-_]+/g, " ")
+    .replace(/\b\w/g, (letter) => letter.toUpperCase());
+
+  return CATEGORY_META[type] || {
+    eyebrow: "collection",
+    title: fallbackTitle,
+    copy: "A focused edit from the current embroidered collection."
+  };
+}
+
+function getCatalogTypes() {
+  const typeSet = new Set(products.map((product) => product.type).filter(Boolean));
+  return Array.from(typeSet).sort((a, b) => {
+    const aIndex = CATEGORY_ORDER.indexOf(a);
+    const bIndex = CATEGORY_ORDER.indexOf(b);
+    if (aIndex !== -1 || bIndex !== -1) {
+      return (aIndex === -1 ? 99 : aIndex) - (bIndex === -1 ? 99 : bIndex);
+    }
+    return a.localeCompare(b);
+  });
+}
+
+function getCategoryProducts(type) {
+  return products.filter((product) => product.type === type);
+}
+
+function getCategoryImage(type) {
+  const product = getCategoryProducts(type)[0] || products[0] || {};
+  return product.image || "assets/embroidered-collection.png";
+}
+
+function getCategoryFocus(type) {
+  const product = getCategoryProducts(type)[0] || products[0] || {};
+  return product.focus || "center";
+}
+
+function setCatalogFilter(filter, options = {}) {
+  state.filter = filter;
+  filterButtons.forEach((button) => {
+    button.classList.toggle("active", button.dataset.filter === filter);
+  });
+  renderCatalog();
+
+  if (options.scroll && catalogView) {
+    catalogView.scrollIntoView({ behavior: "smooth", block: "start" });
+  }
+}
+
+function renderCatalogSections() {
+  if (!catalogSections) return;
+
+  catalogSections.innerHTML = getCatalogTypes()
+    .map((type) => {
+      const meta = getCategoryMeta(type);
+      const count = getCategoryProducts(type).length;
+      const active = state.filter === type ? " active" : "";
+
+      return `
+        <button
+          class="catalog-section-card${active}"
+          type="button"
+          data-category="${escapeHtml(type)}"
+          style="--category-image: url('${escapeHtml(getCategoryImage(type))}'); --focus: ${escapeHtml(getCategoryFocus(type))}"
+          aria-pressed="${state.filter === type ? "true" : "false"}"
+        >
+          <span class="catalog-section-photo" aria-hidden="true"></span>
+          <span class="catalog-section-content">
+            <span class="catalog-section-kicker">${escapeHtml(meta.eyebrow)} - ${count} ${count === 1 ? "piece" : "pieces"}</span>
+            <span class="catalog-section-title">${escapeHtml(meta.title)}</span>
+            <span class="catalog-section-copy">${escapeHtml(meta.copy)}</span>
+            <span class="catalog-section-action">Open catalog</span>
+          </span>
+        </button>
+      `;
+    })
+    .join("");
+}
+
+function updateCatalogViewHead(visibleCount) {
+  const meta = state.filter === "all" ? ALL_CATALOG_META : getCategoryMeta(state.filter);
+  catalogViewEyebrow.textContent = meta.eyebrow;
+  catalogViewTitle.textContent = meta.title;
+  catalogViewCopy.textContent =
+    state.filter === "all"
+      ? `${meta.copy} ${visibleCount} pieces available now.`
+      : `${meta.copy} ${visibleCount} ${visibleCount === 1 ? "piece" : "pieces"} in this category.`;
+  catalogReset.hidden = state.filter === "all";
+}
+
 function renderCatalog() {
   const visibleProducts =
     state.filter === "all"
       ? products
       : products.filter((product) => product.type === state.filter);
+
+  renderCatalogSections();
+  updateCatalogViewHead(visibleProducts.length);
 
   catalogGrid.innerHTML = visibleProducts
     .map(
@@ -355,11 +478,18 @@ function closeCart() {
 
 filterButtons.forEach((button) => {
   button.addEventListener("click", () => {
-    filterButtons.forEach((item) => item.classList.remove("active"));
-    button.classList.add("active");
-    state.filter = button.dataset.filter;
-    renderCatalog();
+    setCatalogFilter(button.dataset.filter, { scroll: true });
   });
+});
+
+catalogSections.addEventListener("click", (event) => {
+  const section = event.target.closest("[data-category]");
+  if (!section || !catalogSections.contains(section)) return;
+  setCatalogFilter(section.dataset.category, { scroll: true });
+});
+
+catalogReset.addEventListener("click", () => {
+  setCatalogFilter("all", { scroll: true });
 });
 
 catalogGrid.addEventListener("click", (event) => {

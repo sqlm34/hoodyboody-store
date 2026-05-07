@@ -379,7 +379,8 @@ h3 {
 }
 
 .section-head,
-.catalog-grid,
+.catalog-sections,
+.catalog-view,
 .custom-inner,
 .order-inner {
   width: min(1180px, 100%);
@@ -392,6 +393,14 @@ h3 {
   justify-content: space-between;
   gap: 24px;
   margin-bottom: 28px;
+}
+
+.section-copy {
+  max-width: 620px;
+  margin: 10px 0 0;
+  color: var(--muted);
+  font-size: 1.02rem;
+  line-height: 1.5;
 }
 
 .filters {
@@ -420,6 +429,127 @@ h3 {
 .filter:focus-visible {
   color: var(--white);
   background: var(--indigo);
+}
+
+.catalog-sections {
+  display: grid;
+  gap: 18px;
+}
+
+.catalog-section-card {
+  --category-bg: linear-gradient(135deg, #f7f8f5 0%, #e4eee8 100%);
+  display: grid;
+  grid-template-columns: minmax(220px, 38%) minmax(0, 1fr);
+  width: 100%;
+  min-height: 238px;
+  overflow: hidden;
+  border: 1px solid rgba(22, 26, 29, 0.12);
+  border-radius: 8px;
+  padding: 0;
+  text-align: left;
+  color: var(--ink);
+  background: var(--category-bg);
+  box-shadow: 0 16px 42px rgba(22, 26, 29, 0.08);
+  cursor: pointer;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease, transform 0.2s ease;
+}
+
+.catalog-section-card[data-category="outerwear"] {
+  --category-bg: linear-gradient(135deg, #e9f0ea 0%, #f6eee1 100%);
+}
+
+.catalog-section-card[data-category="tops"] {
+  --category-bg: linear-gradient(135deg, #edf1f7 0%, #f7f0eb 100%);
+}
+
+.catalog-section-card[data-category="accessories"] {
+  --category-bg: linear-gradient(135deg, #f4efe7 0%, #e8f2ef 100%);
+}
+
+.catalog-section-card:hover,
+.catalog-section-card:focus-visible,
+.catalog-section-card.active {
+  border-color: rgba(31, 107, 90, 0.38);
+  box-shadow: 0 22px 50px rgba(22, 26, 29, 0.13);
+  transform: translateY(-2px);
+  outline: none;
+}
+
+.catalog-section-photo {
+  min-height: 238px;
+  background-image: var(--category-image, url("assets/embroidered-collection.png"));
+  background-position: var(--focus, center);
+  background-repeat: no-repeat;
+  background-size: cover;
+}
+
+.catalog-section-content {
+  display: grid;
+  align-content: center;
+  gap: 14px;
+  min-width: 0;
+  padding: clamp(24px, 4vw, 54px);
+}
+
+.catalog-section-kicker {
+  color: var(--pine);
+  font-size: 0.78rem;
+  font-weight: 850;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.catalog-section-title {
+  max-width: 620px;
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: clamp(2.1rem, 5vw, 4.8rem);
+  line-height: 0.94;
+}
+
+.catalog-section-copy {
+  max-width: 560px;
+  color: var(--muted);
+  font-size: 1.02rem;
+  line-height: 1.55;
+}
+
+.catalog-section-action {
+  width: fit-content;
+  border-bottom: 1px solid currentColor;
+  color: var(--ink);
+  font-size: 0.86rem;
+  font-weight: 850;
+  text-transform: uppercase;
+}
+
+.catalog-view {
+  display: grid;
+  gap: 18px;
+  margin-top: 34px;
+}
+
+.catalog-view-head {
+  display: flex;
+  align-items: end;
+  justify-content: space-between;
+  gap: 18px;
+  border-top: 1px solid var(--line);
+  padding-top: 24px;
+}
+
+.catalog-view-head h3,
+.catalog-view-head p {
+  margin: 0;
+}
+
+.catalog-view-head h3 {
+  font-size: clamp(2rem, 4vw, 3.4rem);
+}
+
+.catalog-view-head p:not(.eyebrow) {
+  max-width: 650px;
+  margin-top: 8px;
+  color: var(--muted);
 }
 
 .catalog-grid {
@@ -2514,6 +2644,15 @@ textarea:focus {
     align-items: start;
   }
 
+  .catalog-view-head {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .catalog-view-head .button {
+    width: 100%;
+  }
+
   .catalog-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
@@ -2628,6 +2767,23 @@ textarea:focus {
 
   .catalog-grid {
     grid-template-columns: 1fr;
+  }
+
+  .catalog-section-card {
+    grid-template-columns: 1fr;
+    min-height: 0;
+  }
+
+  .catalog-section-photo {
+    min-height: 190px;
+  }
+
+  .catalog-section-content {
+    padding: 22px;
+  }
+
+  .catalog-section-title {
+    font-size: 2.35rem;
   }
 
   .product-card {
