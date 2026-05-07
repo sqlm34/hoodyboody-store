@@ -362,6 +362,11 @@ h3 {
   padding: 72px 32px;
 }
 
+.shop-band {
+  padding-inline: 0;
+  padding-bottom: 0;
+}
+
 .shop-band,
 .order-band {
   background: var(--paper);
@@ -395,6 +400,10 @@ h3 {
   justify-content: space-between;
   gap: 24px;
   margin-bottom: 28px;
+}
+
+.shop-band .section-head {
+  width: min(1180px, calc(100% - 64px));
 }
 
 .section-copy {
@@ -435,30 +444,34 @@ h3 {
 
 .catalog-sections {
   display: grid;
-  gap: 18px;
+  width: 100%;
+  max-width: none;
+  gap: 0;
+  margin-inline: 0;
 }
 
 .catalog-section-card {
   --category-bg: linear-gradient(135deg, #f7f8f5 0%, #e4eee8 100%);
   display: grid;
-  grid-template-columns: minmax(220px, 38%) minmax(0, 1fr);
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   width: 100%;
-  min-height: 238px;
+  min-height: clamp(320px, 38vw, 520px);
   overflow: hidden;
-  border: 1px solid rgba(22, 26, 29, 0.12);
-  border-radius: 8px;
+  border: 0;
+  border-top: 1px solid rgba(22, 26, 29, 0.14);
+  border-radius: 0;
   padding: 0;
   text-align: left;
   text-decoration: none;
   color: var(--ink);
   background: var(--category-bg);
-  box-shadow: 0 16px 42px rgba(22, 26, 29, 0.08);
+  box-shadow: none;
   cursor: pointer;
-  transition: border-color 0.2s ease, box-shadow 0.2s ease, transform 0.2s ease;
+  transition: background-color 0.2s ease;
 }
 
 .catalog-section-card.reverse {
-  grid-template-columns: minmax(0, 1fr) minmax(220px, 38%);
+  grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
 .catalog-section-card.reverse .catalog-section-photo {
@@ -486,14 +499,16 @@ h3 {
 .catalog-section-card:hover,
 .catalog-section-card:focus-visible,
 .catalog-section-card.active {
-  border-color: rgba(31, 107, 90, 0.38);
-  box-shadow: 0 22px 50px rgba(22, 26, 29, 0.13);
-  transform: translateY(-2px);
+  box-shadow: inset 0 0 0 1px rgba(31, 107, 90, 0.28);
   outline: none;
 }
 
+.catalog-section-card:last-child {
+  border-bottom: 1px solid rgba(22, 26, 29, 0.14);
+}
+
 .catalog-section-photo {
-  min-height: 238px;
+  min-height: inherit;
   background-image: var(--category-image, url("assets/embroidered-collection.png"));
   background-position: var(--focus, center);
   background-repeat: no-repeat;
@@ -505,7 +520,8 @@ h3 {
   align-content: center;
   gap: 14px;
   min-width: 0;
-  padding: clamp(24px, 4vw, 54px);
+  min-height: inherit;
+  padding: clamp(28px, 5vw, 76px);
 }
 
 .catalog-section-kicker {
@@ -521,6 +537,7 @@ h3 {
   font-family: Georgia, "Times New Roman", serif;
   font-size: clamp(2.1rem, 5vw, 4.8rem);
   line-height: 0.94;
+  overflow-wrap: anywhere;
 }
 
 .catalog-section-copy {
@@ -2948,6 +2965,15 @@ textarea:focus {
     padding: 54px 16px;
   }
 
+  .shop-band {
+    padding-inline: 0;
+    padding-bottom: 0;
+  }
+
+  .shop-band .section-head {
+    width: calc(100% - 32px);
+  }
+
   .checkout-page,
   .category-page,
   .product-page {
@@ -2971,26 +2997,40 @@ textarea:focus {
   }
 
   .catalog-section-card {
-    grid-template-columns: 1fr;
-    min-height: 0;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    min-height: clamp(220px, 72vw, 320px);
   }
 
-  .catalog-section-card.reverse .catalog-section-photo,
+  .catalog-section-card.reverse .catalog-section-photo {
+    grid-column: 2;
+    grid-row: 1;
+  }
+
   .catalog-section-card.reverse .catalog-section-content {
-    grid-column: auto;
-    grid-row: auto;
+    grid-column: 1;
+    grid-row: 1;
   }
 
   .catalog-section-photo {
-    min-height: 190px;
+    min-height: inherit;
   }
 
   .catalog-section-content {
-    padding: 22px;
+    gap: 8px;
+    padding: clamp(14px, 4vw, 22px);
+  }
+
+  .catalog-section-kicker {
+    font-size: 0.62rem;
+  }
+
+  .catalog-section-copy {
+    font-size: 0.74rem;
+    line-height: 1.42;
   }
 
   .catalog-section-title {
-    font-size: 2.35rem;
+    font-size: clamp(1.25rem, 6.2vw, 2rem);
   }
 
   .category-hero {
