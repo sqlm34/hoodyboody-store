@@ -85,13 +85,13 @@ textarea {
 .brand {
   display: inline-flex;
   align-items: center;
-  gap: 10px;
+  gap: 0;
   min-width: 0;
   font-weight: 750;
 }
 
 .brand-mark {
-  display: inline-grid;
+  display: none;
   width: 34px;
   height: 34px;
   place-items: center;
