@@ -158,8 +158,15 @@ function renderProductStock(productId) {
   `;
 }
 
-function getProductUrl(productId) {
-  return `product.html?id=${encodeURIComponent(productId)}`;
+function getProductUrl(productId, type = "") {
+  const productParams = new URLSearchParams({ id: productId });
+  const categoryType = type || (state.filter !== "all" ? state.filter : "");
+
+  if (CATEGORY_PAGES[categoryType]) {
+    productParams.set("category", categoryType);
+  }
+
+  return `product.html?${productParams.toString()}`;
 }
 
 function getCategoryUrl(type) {
@@ -401,7 +408,7 @@ function renderCatalog() {
       (product) => `
         <article
           class="product-card"
-          data-product-url="${getProductUrl(product.id)}"
+          data-product-url="${getProductUrl(product.id, product.type)}"
           role="link"
           tabindex="0"
           aria-label="View details for ${escapeHtml(product.title)}"

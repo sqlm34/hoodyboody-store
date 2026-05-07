@@ -2,11 +2,17 @@ const CART_STORAGE_KEY = "nitka-cart";
 const DEFAULT_IMAGE_URL = "assets/embroidered-collection.png";
 const FREE_DELIVERY_THRESHOLD = 10000;
 const FREE_DELIVERY_LABEL = "$100";
+const CATEGORY_PAGES = {
+  outerwear: "outerwear.html",
+  tops: "tops.html",
+  accessories: "accessories.html"
+};
 
 let products = window.NITKA_PRODUCTS || [];
 const params = new URLSearchParams(window.location.search);
 let product = products.find((item) => item.id === params.get("id"));
 
+const backLink = document.querySelector(".back-link");
 const productContent = document.querySelector("#productContent");
 const productNotFound = document.querySelector("#productNotFound");
 const reviewsSection = document.querySelector("#reviewsSection");
@@ -95,6 +101,21 @@ async function loadProducts() {
   } catch {
     product = products.find((item) => item.id === params.get("id"));
   }
+}
+
+function getReturnCategoryType() {
+  const requestedCategory = params.get("category");
+  if (CATEGORY_PAGES[requestedCategory]) return requestedCategory;
+  if (CATEGORY_PAGES[product?.type]) return product.type;
+  return "";
+}
+
+function updateBackLink() {
+  if (!backLink) return;
+
+  const categoryType = getReturnCategoryType();
+  backLink.href = categoryType ? CATEGORY_PAGES[categoryType] : "index.html#catalog";
+  backLink.textContent = "Back to catalog";
 }
 
 function loadCart() {
@@ -545,6 +566,8 @@ function toggleZoom(event) {
 }
 
 function renderProduct() {
+  updateBackLink();
+
   if (!product) {
     productNotFound.hidden = false;
     return;
