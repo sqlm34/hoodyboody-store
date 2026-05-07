@@ -4,6 +4,11 @@ const ordersDashboard = document.querySelector("#ordersDashboard");
 const ordersList = document.querySelector("#ordersList");
 const ordersSummary = document.querySelector("#ordersSummary");
 const ordersRefresh = document.querySelector("#ordersRefresh");
+const ordersDateFrom = document.querySelector("#ordersDateFrom");
+const ordersDateTo = document.querySelector("#ordersDateTo");
+const ordersDateClear = document.querySelector("#ordersDateClear");
+
+let allOrders = [];
 
 const money = new Intl.NumberFormat("en-US", {
   style: "currency",
@@ -55,6 +60,35 @@ function orderItemsText(order) {
     .join(", ");
 }
 
+function dateBoundary(value, endOfDay = false) {
+  if (!value) return null;
+  const [year, month, day] = value.split("-").map(Number);
+  if (!year || !month || !day) return null;
+
+  return new Date(year, month - 1, day, endOfDay ? 23 : 0, endOfDay ? 59 : 0, endOfDay ? 59 : 0, endOfDay ? 999 : 0).getTime();
+}
+
+function orderDateValue(order) {
+  const date = new Date(order.createdAt || order.paidAt || 0).getTime();
+  return Number.isFinite(date) ? date : 0;
+}
+
+function getFilteredOrders() {
+  const from = dateBoundary(ordersDateFrom?.value || "");
+  const to = dateBoundary(ordersDateTo?.value || "", true);
+
+  return allOrders.filter((order) => {
+    const orderDate = orderDateValue(order);
+    if (from && orderDate < from) return false;
+    if (to && orderDate > to) return false;
+    return true;
+  });
+}
+
+function hasDateFilter() {
+  return Boolean(ordersDateFrom?.value || ordersDateTo?.value);
+}
+
 function getLabelBlock(order) {
   if (!order.labelUrl) {
     const retryButton =
@@ -97,10 +131,18 @@ function getLabelBlock(order) {
 }
 
 function renderOrders(orders) {
-  ordersSummary.textContent = orders.length ? `${orders.length} paid order${orders.length === 1 ? "" : "s"}` : "No paid orders yet.";
+  const filtered = hasDateFilter();
+  const countText = `${orders.length} paid order${orders.length === 1 ? "" : "s"}`;
+  ordersSummary.textContent = orders.length
+    ? filtered
+      ? `${countText} in selected dates`
+      : countText
+    : filtered
+      ? "No paid orders for selected dates."
+      : "No paid orders yet.";
 
   if (!orders.length) {
-    ordersList.innerHTML = `<div class="checkout-panel admin-empty-state">No paid orders yet.</div>`;
+    ordersList.innerHTML = `<div class="checkout-panel admin-empty-state">${filtered ? "No paid orders for selected dates." : "No paid orders yet."}</div>`;
     return;
   }
 
@@ -185,7 +227,8 @@ async function loadOrders() {
 
   try {
     const data = await api("/api/admin/orders");
-    renderOrders(data.orders || []);
+    allOrders = data.orders || [];
+    renderOrders(getFilteredOrders());
     showDashboard();
   } catch (error) {
     if (error.status === 401) {
@@ -196,6 +239,16 @@ async function loadOrders() {
   } finally {
     ordersRefresh.disabled = false;
   }
+}
+
+function handleDateFilterChange() {
+  renderOrders(getFilteredOrders());
+}
+
+function clearDateFilter() {
+  ordersDateFrom.value = "";
+  ordersDateTo.value = "";
+  renderOrders(allOrders);
 }
 
 async function handleOrderAction(event) {
@@ -242,6 +295,9 @@ async function handleOrderAction(event) {
 }
 
 ordersRefresh.addEventListener("click", loadOrders);
+ordersDateFrom?.addEventListener("change", handleDateFilterChange);
+ordersDateTo?.addEventListener("change", handleDateFilterChange);
+ordersDateClear?.addEventListener("click", clearDateFilter);
 ordersList.addEventListener("click", handleOrderAction);
 ordersList.addEventListener("change", handleOrderAction);
 loadOrders();

@@ -28,10 +28,25 @@
     </header>
 
     <main class="checkout-page admin-page">
-      <section class="checkout-hero admin-hero" aria-labelledby="ordersTitle">
-        <p class="eyebrow">owner dashboard</p>
-        <h1 id="ordersTitle">Orders</h1>
-        <p>Paid customer orders, Stripe totals, Shippo labels and tracking numbers.</p>
+      <section class="checkout-hero admin-hero admin-orders-hero" aria-labelledby="ordersTitle">
+        <div class="admin-hero-copy">
+          <p class="eyebrow">owner dashboard</p>
+          <h1 id="ordersTitle">Orders</h1>
+          <p>Paid customer orders, Stripe totals, Shippo labels and tracking numbers.</p>
+        </div>
+        <form class="admin-date-filter" id="ordersDateFilter" aria-label="Filter orders by date">
+          <label>
+            <span>From</span>
+            <input id="ordersDateFrom" type="date" />
+          </label>
+          <label>
+            <span>To</span>
+            <input id="ordersDateTo" type="date" />
+          </label>
+          <button class="icon-button admin-date-clear" id="ordersDateClear" type="button" aria-label="Clear date filter" title="Clear date filter">
+            <i class="fa-solid fa-xmark" aria-hidden="true"></i>
+          </button>
+        </form>
       </section>
 
       <section class="admin-locked checkout-panel" id="ordersLocked" hidden>

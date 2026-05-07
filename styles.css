@@ -2045,6 +2045,57 @@ textarea:focus {
   width: min(1240px, 100%);
 }
 
+.admin-orders-hero {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 24px;
+}
+
+.admin-hero-copy {
+  min-width: 0;
+}
+
+.admin-date-filter {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: flex-end;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-left: auto;
+}
+
+.admin-date-filter label {
+  display: grid;
+  gap: 6px;
+  min-width: 144px;
+  color: var(--muted);
+  font-size: 0.74rem;
+  font-weight: 850;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.admin-date-filter input {
+  min-height: 42px;
+  border-radius: 8px;
+  background: #fff;
+  color: var(--ink);
+}
+
+.admin-date-clear {
+  width: 42px;
+  height: 42px;
+  border-color: rgba(27, 34, 31, 0.14);
+  color: var(--muted);
+  background: rgba(255, 255, 255, 0.78);
+}
+
+.admin-date-clear:hover {
+  color: var(--ink);
+  background: #fff;
+}
+
 .admin-orders-toolbar {
   display: flex;
   align-items: center;
@@ -2846,6 +2897,7 @@ textarea:focus {
   .inventory-actions,
   .inventory-head,
   .admin-order-head,
+  .admin-orders-hero,
   .admin-orders-toolbar,
   .admin-catalog-shortcut,
   .admin-inline-head {
@@ -2856,6 +2908,17 @@ textarea:focus {
   .admin-order-status,
   .admin-orders-toolbar .button {
     width: 100%;
+  }
+
+  .admin-date-filter {
+    width: 100%;
+    justify-content: stretch;
+    margin-left: 0;
+  }
+
+  .admin-date-filter label {
+    flex: 1 1 140px;
+    min-width: 0;
   }
 
   .admin-review-card div,
