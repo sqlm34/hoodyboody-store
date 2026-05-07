@@ -381,6 +381,8 @@ h3 {
 .section-head,
 .catalog-sections,
 .catalog-view,
+.category-hero,
+.category-catalog,
 .custom-inner,
 .order-inner {
   width: min(1180px, 100%);
@@ -447,11 +449,26 @@ h3 {
   border-radius: 8px;
   padding: 0;
   text-align: left;
+  text-decoration: none;
   color: var(--ink);
   background: var(--category-bg);
   box-shadow: 0 16px 42px rgba(22, 26, 29, 0.08);
   cursor: pointer;
   transition: border-color 0.2s ease, box-shadow 0.2s ease, transform 0.2s ease;
+}
+
+.catalog-section-card.reverse {
+  grid-template-columns: minmax(0, 1fr) minmax(220px, 38%);
+}
+
+.catalog-section-card.reverse .catalog-section-photo {
+  grid-column: 2;
+  grid-row: 1;
+}
+
+.catalog-section-card.reverse .catalog-section-content {
+  grid-column: 1;
+  grid-row: 1;
 }
 
 .catalog-section-card[data-category="outerwear"] {
@@ -557,6 +574,117 @@ h3 {
   grid-template-columns: repeat(3, minmax(0, 1fr));
   align-items: stretch;
   gap: 18px;
+}
+
+.category-page {
+  display: grid;
+  gap: 34px;
+  padding: 116px 32px 72px;
+}
+
+.category-hero {
+  --category-bg: linear-gradient(135deg, #f7f8f5 0%, #e4eee8 100%);
+  --category-image: url("assets/embroidered-collection.png");
+  display: grid;
+  grid-template-columns: minmax(240px, 0.42fr) minmax(0, 1fr);
+  min-height: 420px;
+  overflow: hidden;
+  border: 1px solid rgba(22, 26, 29, 0.12);
+  border-radius: 8px;
+  background: var(--category-bg);
+  box-shadow: 0 18px 50px rgba(22, 26, 29, 0.08);
+}
+
+.category-hero[data-category="outerwear"] {
+  --category-bg: linear-gradient(135deg, #e9f0ea 0%, #f6eee1 100%);
+}
+
+.category-hero[data-category="tops"] {
+  --category-bg: linear-gradient(135deg, #edf1f7 0%, #f7f0eb 100%);
+}
+
+.category-hero[data-category="accessories"] {
+  --category-bg: linear-gradient(135deg, #f4efe7 0%, #e8f2ef 100%);
+}
+
+.category-hero-photo {
+  min-height: 420px;
+  background-image: var(--category-image);
+  background-position: var(--focus, center);
+  background-repeat: no-repeat;
+  background-size: cover;
+}
+
+.category-hero-content {
+  display: grid;
+  align-content: center;
+  gap: 14px;
+  min-width: 0;
+  padding: clamp(28px, 5vw, 64px);
+}
+
+.category-hero-content .back-link {
+  margin-bottom: 8px;
+}
+
+.category-hero-content h1 {
+  max-width: 720px;
+  margin: 0;
+  color: var(--ink);
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: clamp(2.8rem, 7vw, 6rem);
+  line-height: 0.92;
+}
+
+.category-hero-content p:not(.eyebrow) {
+  max-width: 620px;
+  margin: 0;
+  color: var(--muted);
+  font-size: 1.05rem;
+}
+
+.category-catalog {
+  display: grid;
+  gap: 18px;
+}
+
+.category-catalog-head {
+  display: flex;
+  align-items: end;
+  justify-content: space-between;
+  gap: 18px;
+  border-top: 1px solid var(--line);
+  padding-top: 24px;
+}
+
+.category-catalog-head h2,
+.category-catalog-head p {
+  margin: 0;
+}
+
+.category-catalog-head h2 {
+  font-size: clamp(2rem, 4vw, 3.4rem);
+}
+
+.catalog-empty {
+  grid-column: 1 / -1;
+  display: grid;
+  gap: 12px;
+  justify-items: start;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 24px;
+  background: var(--white);
+  box-shadow: 0 10px 28px rgba(22, 26, 29, 0.06);
+}
+
+.catalog-empty h3,
+.catalog-empty p {
+  margin: 0;
+}
+
+.catalog-empty p {
+  color: var(--muted);
 }
 
 .product-card {
@@ -1975,12 +2103,73 @@ textarea:focus {
   gap: 12px;
 }
 
-.admin-label-tools,
 .admin-label-empty {
   display: flex;
   align-items: center;
   gap: 10px;
   flex-wrap: wrap;
+}
+
+.admin-label-tools.compact {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 10px 12px;
+  background: #fbfcfb;
+}
+
+.admin-label-meta {
+  display: grid;
+  min-width: 0;
+  gap: 3px;
+}
+
+.admin-label-meta strong,
+.admin-label-meta small {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.admin-label-meta small {
+  color: var(--muted);
+  font-size: 0.82rem;
+  font-weight: 650;
+}
+
+.admin-label-actions {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 8px;
+}
+
+.admin-label-icon {
+  width: 38px;
+  height: 38px;
+  min-height: 38px;
+  border-color: var(--line);
+  border-radius: 8px;
+  color: var(--ink);
+  background: var(--white);
+}
+
+.admin-label-icon.pdf {
+  color: #a64e3d;
+}
+
+.admin-label-icon.print {
+  color: var(--pine);
+}
+
+.admin-label-icon:hover,
+.admin-label-icon:focus-visible {
+  border-color: rgba(31, 107, 90, 0.42);
+  background: #eef7f3;
 }
 
 .admin-label-empty {
@@ -2644,17 +2833,27 @@ textarea:focus {
     align-items: start;
   }
 
-  .catalog-view-head {
+  .catalog-view-head,
+  .category-catalog-head {
     align-items: flex-start;
     flex-direction: column;
   }
 
-  .catalog-view-head .button {
+  .catalog-view-head .button,
+  .category-catalog-head .button {
     width: 100%;
   }
 
   .catalog-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .category-hero {
+    grid-template-columns: 1fr;
+  }
+
+  .category-hero-photo {
+    min-height: 280px;
   }
 
   .product-card {
@@ -2744,11 +2943,13 @@ textarea:focus {
   .custom-band,
   .order-band,
   .checkout-page,
+  .category-page,
   .product-page {
     padding: 54px 16px;
   }
 
   .checkout-page,
+  .category-page,
   .product-page {
     padding-top: 96px;
   }
@@ -2774,6 +2975,12 @@ textarea:focus {
     min-height: 0;
   }
 
+  .catalog-section-card.reverse .catalog-section-photo,
+  .catalog-section-card.reverse .catalog-section-content {
+    grid-column: auto;
+    grid-row: auto;
+  }
+
   .catalog-section-photo {
     min-height: 190px;
   }
@@ -2784,6 +2991,22 @@ textarea:focus {
 
   .catalog-section-title {
     font-size: 2.35rem;
+  }
+
+  .category-hero {
+    min-height: 0;
+  }
+
+  .category-hero-photo {
+    min-height: 220px;
+  }
+
+  .category-hero-content {
+    padding: 24px;
+  }
+
+  .category-hero-content h1 {
+    font-size: 2.6rem;
   }
 
   .product-card {
@@ -2807,6 +3030,16 @@ textarea:focus {
 
   .admin-label-preview {
     min-height: 280px;
+  }
+
+  .admin-label-tools.compact {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .admin-label-actions {
+    width: 100%;
+    justify-content: flex-end;
   }
 
   .cart-item {

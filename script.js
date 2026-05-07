@@ -26,6 +26,21 @@ const ALL_CATALOG_META = {
   title: "All catalog",
   copy: "Browse every embroidered piece from the current collection."
 };
+const CATEGORY_PAGES = {
+  outerwear: "outerwear.html",
+  tops: "tops.html",
+  accessories: "accessories.html"
+};
+const PAGE_CATEGORY_TYPES = Object.fromEntries(
+  Object.entries(CATEGORY_PAGES).map(([type, page]) => [page, type])
+);
+const pageParams = new URLSearchParams(window.location.search);
+const categoryPageRoot = document.querySelector("[data-category-page]");
+const isCategoryPage = Boolean(categoryPageRoot);
+const pathPageName = window.location.pathname.split("/").pop() || "";
+const pageCategoryType = categoryPageRoot?.dataset.categoryType || PAGE_CATEGORY_TYPES[pathPageName];
+const requestedCategoryType = pageParams.get("type") || pageCategoryType;
+const initialCatalogFilter = isCategoryPage && requestedCategoryType ? requestedCategoryType : "all";
 
 function loadStoredCart() {
   try {
@@ -44,7 +59,7 @@ function persistCart() {
 }
 
 const state = {
-  filter: "all",
+  filter: initialCatalogFilter,
   cart: loadStoredCart(),
   reviewSummary: {},
   inventory: null,
@@ -147,6 +162,10 @@ function getProductUrl(productId) {
   return `product.html?id=${encodeURIComponent(productId)}`;
 }
 
+function getCategoryUrl(type) {
+  return CATEGORY_PAGES[type] || `category.html?type=${encodeURIComponent(type)}`;
+}
+
 function getCartProductId(item) {
   if (item.productId) return item.productId;
   if (item.baseProductId) return item.baseProductId;
@@ -202,6 +221,8 @@ const catalogViewEyebrow = document.querySelector("#catalogViewEyebrow");
 const catalogViewTitle = document.querySelector("#catalogViewTitle");
 const catalogViewCopy = document.querySelector("#catalogViewCopy");
 const catalogReset = document.querySelector("#catalogReset");
+const categoryHero = document.querySelector("#categoryHero");
+const categoryCatalogTitle = document.querySelector("#categoryCatalogTitle");
 const filterButtons = document.querySelectorAll(".filter");
 const cartDrawer = document.querySelector(".cart-drawer");
 const cartItems = document.querySelector("#cartItems");
@@ -297,18 +318,17 @@ function renderCatalogSections() {
   if (!catalogSections) return;
 
   catalogSections.innerHTML = getCatalogTypes()
-    .map((type) => {
+    .map((type, index) => {
       const meta = getCategoryMeta(type);
       const count = getCategoryProducts(type).length;
-      const active = state.filter === type ? " active" : "";
+      const reverse = index % 2 === 1 ? " reverse" : "";
 
       return `
-        <button
-          class="catalog-section-card${active}"
-          type="button"
+        <a
+          class="catalog-section-card${reverse}"
+          href="${getCategoryUrl(type)}"
           data-category="${escapeHtml(type)}"
           style="--category-image: url('${escapeHtml(getCategoryImage(type))}'); --focus: ${escapeHtml(getCategoryFocus(type))}"
-          aria-pressed="${state.filter === type ? "true" : "false"}"
         >
           <span class="catalog-section-photo" aria-hidden="true"></span>
           <span class="catalog-section-content">
@@ -317,13 +337,15 @@ function renderCatalogSections() {
             <span class="catalog-section-copy">${escapeHtml(meta.copy)}</span>
             <span class="catalog-section-action">Open catalog</span>
           </span>
-        </button>
+        </a>
       `;
     })
     .join("");
 }
 
 function updateCatalogViewHead(visibleCount) {
+  if (!catalogViewEyebrow || !catalogViewTitle || !catalogViewCopy) return;
+
   const meta = state.filter === "all" ? ALL_CATALOG_META : getCategoryMeta(state.filter);
   catalogViewEyebrow.textContent = meta.eyebrow;
   catalogViewTitle.textContent = meta.title;
@@ -331,17 +353,48 @@ function updateCatalogViewHead(visibleCount) {
     state.filter === "all"
       ? `${meta.copy} ${visibleCount} pieces available now.`
       : `${meta.copy} ${visibleCount} ${visibleCount === 1 ? "piece" : "pieces"} in this category.`;
-  catalogReset.hidden = state.filter === "all";
+  if (catalogReset) {
+    catalogReset.hidden = state.filter === "all";
+  }
+  if (categoryCatalogTitle) {
+    categoryCatalogTitle.textContent = `${meta.title} products`;
+  }
+  if (isCategoryPage) {
+    document.title = `${meta.title} | HOODYBOODY`;
+  }
+}
+
+function renderCategoryHero() {
+  if (!categoryHero) return;
+
+  const heroType = state.filter === "all" ? getCatalogTypes()[0] : state.filter;
+  categoryHero.dataset.category = heroType || "collection";
+  categoryHero.style.setProperty("--category-image", `url('${getCategoryImage(heroType)}')`);
+  categoryHero.style.setProperty("--focus", getCategoryFocus(heroType));
 }
 
 function renderCatalog() {
+  renderCatalogSections();
+  if (!catalogGrid) return;
+
   const visibleProducts =
     state.filter === "all"
       ? products
       : products.filter((product) => product.type === state.filter);
 
-  renderCatalogSections();
   updateCatalogViewHead(visibleProducts.length);
+  renderCategoryHero();
+
+  if (!visibleProducts.length) {
+    catalogGrid.innerHTML = `
+      <div class="catalog-empty">
+        <h3>No products in this category yet</h3>
+        <p>Choose another category or return to the main catalog sections.</p>
+        <a class="button primary" href="index.html#catalog">All categories</a>
+      </div>
+    `;
+    return;
+  }
 
   catalogGrid.innerHTML = visibleProducts
     .map(
@@ -482,35 +535,33 @@ filterButtons.forEach((button) => {
   });
 });
 
-catalogSections.addEventListener("click", (event) => {
-  const section = event.target.closest("[data-category]");
-  if (!section || !catalogSections.contains(section)) return;
-  setCatalogFilter(section.dataset.category, { scroll: true });
-});
+if (catalogReset) {
+  catalogReset.addEventListener("click", () => {
+    setCatalogFilter("all", { scroll: true });
+  });
+}
 
-catalogReset.addEventListener("click", () => {
-  setCatalogFilter("all", { scroll: true });
-});
+if (catalogGrid) {
+  catalogGrid.addEventListener("click", (event) => {
+    if (event.target.closest("a, button, input, textarea, select")) return;
 
-catalogGrid.addEventListener("click", (event) => {
-  if (event.target.closest("a, button, input, textarea, select")) return;
+    const card = event.target.closest(".product-card[data-product-url]");
+    if (!card || !catalogGrid.contains(card)) return;
 
-  const card = event.target.closest(".product-card[data-product-url]");
-  if (!card || !catalogGrid.contains(card)) return;
+    window.location.href = card.dataset.productUrl;
+  });
 
-  window.location.href = card.dataset.productUrl;
-});
+  catalogGrid.addEventListener("keydown", (event) => {
+    if (event.key !== "Enter" && event.key !== " ") return;
+    if (event.target.closest("a, button, input, textarea, select")) return;
 
-catalogGrid.addEventListener("keydown", (event) => {
-  if (event.key !== "Enter" && event.key !== " ") return;
-  if (event.target.closest("a, button, input, textarea, select")) return;
+    const card = event.target.closest(".product-card[data-product-url]");
+    if (!card || !catalogGrid.contains(card)) return;
 
-  const card = event.target.closest(".product-card[data-product-url]");
-  if (!card || !catalogGrid.contains(card)) return;
-
-  event.preventDefault();
-  window.location.href = card.dataset.productUrl;
-});
+    event.preventDefault();
+    window.location.href = card.dataset.productUrl;
+  });
+}
 
 window.addEventListener("resize", syncCatalogCardHeights);
 
@@ -518,24 +569,29 @@ if (document.fonts && document.fonts.ready) {
   document.fonts.ready.then(syncCatalogCardHeights).catch(() => {});
 }
 
-cartItems.addEventListener("click", (event) => {
-  const quantityButton = event.target.closest("[data-qty]");
-  if (!quantityButton) return;
+if (cartItems) {
+  cartItems.addEventListener("click", (event) => {
+    const quantityButton = event.target.closest("[data-qty]");
+    if (!quantityButton) return;
 
-  updateQuantity(quantityButton.dataset.qty, Number(quantityButton.dataset.delta));
-});
+    updateQuantity(quantityButton.dataset.qty, Number(quantityButton.dataset.delta));
+  });
+}
 
-document.querySelector(".cart-toggle").addEventListener("click", openCart);
-document.querySelector(".cart-close").addEventListener("click", closeCart);
-scrim.addEventListener("click", closeCart);
+document.querySelector(".cart-toggle")?.addEventListener("click", openCart);
+document.querySelector(".cart-close")?.addEventListener("click", closeCart);
+scrim?.addEventListener("click", closeCart);
 
-document.querySelector(".add-more-link").addEventListener("click", () => {
+document.querySelector(".add-more-link")?.addEventListener("click", () => {
   closeCart();
-  document.querySelector("#catalog").scrollIntoView({ behavior: "smooth", block: "start" });
-  history.pushState(null, "", "#catalog");
+  const catalogTarget = document.querySelector("#categoryCatalog") || document.querySelector("#catalog");
+  catalogTarget?.scrollIntoView({ behavior: "smooth", block: "start" });
+  if (catalogTarget?.id) {
+    history.pushState(null, "", `#${catalogTarget.id}`);
+  }
 });
 
-checkoutLink.addEventListener("click", (event) => {
+checkoutLink?.addEventListener("click", (event) => {
   event.preventDefault();
   if (state.cart.length === 0) return;
 
@@ -560,6 +616,8 @@ function formatFileSize(bytes) {
 }
 
 function renderFilePreview() {
+  if (!filePreview) return;
+
   filePreview.innerHTML = state.uploads
     .map((upload) => {
       const thumb = upload.previewUrl
@@ -579,7 +637,7 @@ function renderFilePreview() {
     .join("");
 }
 
-customFiles.addEventListener("change", () => {
+customFiles?.addEventListener("change", () => {
   state.uploads.forEach((upload) => {
     if (upload.previewUrl) URL.revokeObjectURL(upload.previewUrl);
   });
@@ -598,7 +656,7 @@ customFiles.addEventListener("change", () => {
   renderFilePreview();
 });
 
-document.querySelector("#customAdd").addEventListener("click", () => {
+document.querySelector("#customAdd")?.addEventListener("click", () => {
   const base = document.querySelector("#baseSelect").value;
   const motif = document.querySelector("#motifInput").value.trim() || "signature motif";
   const fileSummary = state.uploads.length
@@ -615,7 +673,7 @@ document.querySelector("#customAdd").addEventListener("click", () => {
   });
 });
 
-document.querySelector(".order-form").addEventListener("submit", (event) => {
+document.querySelector(".order-form")?.addEventListener("submit", (event) => {
   event.preventDefault();
   const phoneInput = event.currentTarget.elements.phone;
 

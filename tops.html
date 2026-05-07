@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="robots" content="noindex, nofollow, noarchive" />
+    <title>Tops | HOODYBOODY</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css" />
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body class="category-body">
+    <header class="topbar checkout-topbar" aria-label="Category navigation">
+      <a class="brand" href="index.html" aria-label="HOODYBOODY">
+        <span class="brand-mark">HB</span>
+        <span>HOODYBOODY</span>
+      </a>
+      <nav class="nav-links" aria-label="Site sections">
+        <a href="index.html#catalog">Categories</a>
+        <a href="index.html#custom">Embroidery</a>
+        <a href="index.html#order">Order</a>
+      </nav>
+      <div class="top-actions">
+        <a class="account-pill login-link" href="auth.html" hidden>Login</a>
+        <a class="account-pill cabinet-link" href="account.html" hidden>Cabinet</a>
+        <a class="account-pill admin-link" href="admin.html" hidden>Owner</a>
+        <button class="account-pill as-button logout-button" type="button" hidden>Logout</button>
+        <button class="icon-button cart-toggle" type="button" aria-label="Open cart">
+          <i class="fa-solid fa-bag-shopping" aria-hidden="true"></i>
+          <span class="cart-count" aria-live="polite">0</span>
+        </button>
+      </div>
+    </header>
+
+    <main class="category-page" data-category-page data-category-type="tops">
+      <section class="category-hero" id="categoryHero" aria-labelledby="catalogViewTitle">
+        <span class="category-hero-photo" aria-hidden="true"></span>
+        <div class="category-hero-content">
+          <a class="back-link" href="index.html#catalog">Back to categories</a>
+          <p class="eyebrow" id="catalogViewEyebrow">tops</p>
+          <h1 id="catalogViewTitle">Tops</h1>
+          <p id="catalogViewCopy">Loading selected pieces.</p>
+        </div>
+      </section>
+
+      <section class="category-catalog" id="categoryCatalog" aria-label="Tops products">
+        <div class="category-catalog-head">
+          <div>
+            <p class="eyebrow">selected category</p>
+            <h2 id="categoryCatalogTitle">Tops products</h2>
+          </div>
+          <a class="button ghost dark" href="index.html#catalog">All categories</a>
+        </div>
+        <div class="catalog-grid" id="catalogGrid" aria-live="polite"></div>
+      </section>
+    </main>
+
+    <aside class="cart-drawer" aria-label="Cart" aria-hidden="true">
+      <div class="cart-head">
+        <h2>Cart</h2>
+        <button class="icon-button cart-close" type="button" aria-label="Close cart">
+          <i class="fa-solid fa-xmark" aria-hidden="true"></i>
+        </button>
+      </div>
+      <div class="cart-items" id="cartItems"></div>
+      <div class="cart-empty" id="cartEmpty">Empty for now</div>
+      <div class="free-delivery-notice" id="cartDeliveryNotice" aria-live="polite" hidden></div>
+      <div class="cart-total">
+        <span>Total</span>
+        <strong id="cartTotal">$0.00</strong>
+      </div>
+      <div class="cart-actions">
+        <button class="button ghost dark wide add-more-link" type="button">add more</button>
+        <a class="button primary wide icon-only checkout-link" href="checkout.html" aria-disabled="true" aria-label="Checkout" title="Checkout">
+          <i class="fa-solid fa-credit-card" aria-hidden="true"></i>
+          <span class="visually-hidden">Checkout</span>
+        </a>
+      </div>
+    </aside>
+    <div class="scrim" hidden></div>
+
+    <script src="session-nav.js"></script>
+    <script src="products.js"></script>
+    <script src="script.js"></script>
+  </body>
+</html>

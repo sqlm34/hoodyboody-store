@@ -75,17 +75,34 @@ function getLabelBlock(order) {
   }
 
   return `
-    <div class="admin-label-tools">
-      <a class="button ghost dark" href="${order.labelUrl}" target="_blank" rel="noreferrer">
-        <i class="fa-regular fa-file-pdf" aria-hidden="true"></i>
-        <span>PDF label</span>
-      </a>
-      <button class="button primary admin-order-action" data-action="print-label" data-label-url="${order.labelUrl}" type="button">
-        <i class="fa-solid fa-print" aria-hidden="true"></i>
-        <span>Print label</span>
-      </button>
+    <div class="admin-label-tools compact">
+      <div class="admin-label-meta">
+        <strong>Shipping label</strong>
+        <small>${[order.carrier, order.service].filter(Boolean).join(" - ") || "Shippo label"}${order.shippoTrackingNumber ? ` - ${order.shippoTrackingNumber}` : ""}</small>
+      </div>
+      <div class="admin-label-actions" aria-label="Label actions">
+        <a
+          class="icon-button admin-label-icon pdf"
+          href="${order.labelUrl}"
+          target="_blank"
+          rel="noreferrer"
+          aria-label="Open PDF label"
+          title="Open PDF label"
+        >
+          <i class="fa-regular fa-file-pdf" aria-hidden="true"></i>
+        </a>
+        <button
+          class="icon-button admin-label-icon print admin-order-action"
+          data-action="print-label"
+          data-label-url="${order.labelUrl}"
+          type="button"
+          aria-label="Open and print label"
+          title="Open and print label"
+        >
+          <i class="fa-solid fa-print" aria-hidden="true"></i>
+        </button>
+      </div>
     </div>
-    <iframe class="admin-label-preview" title="Shippo label preview" src="${order.labelUrl}"></iframe>
   `;
 }
 
@@ -200,7 +217,17 @@ async function handleOrderAction(event) {
   if (target.dataset.action === "print-label") {
     const url = target.dataset.labelUrl;
     const popup = window.open(url, "_blank", "noopener,noreferrer");
-    if (popup) popup.addEventListener("load", () => popup.print(), { once: true });
+    if (popup) {
+      let printed = false;
+      const printLabel = () => {
+        if (printed || popup.closed) return;
+        printed = true;
+        popup.focus();
+        popup.print();
+      };
+      popup.addEventListener("load", printLabel, { once: true });
+      setTimeout(printLabel, 1200);
+    }
     return;
   }
 
