@@ -356,6 +356,50 @@ h3 {
   font-size: 1.12rem;
 }
 
+.breadcrumbs {
+  width: min(1180px, 100%);
+  margin: 0 auto 22px;
+  color: var(--muted);
+  font-size: 0.78rem;
+  font-weight: 780;
+}
+
+.breadcrumbs ol {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.breadcrumbs li {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.breadcrumbs li:not(:last-child)::after {
+  color: rgba(89, 97, 106, 0.62);
+  content: "/";
+}
+
+.breadcrumbs a {
+  color: inherit;
+  text-decoration: none;
+}
+
+.breadcrumbs a:hover,
+.breadcrumbs a:focus-visible {
+  color: var(--pine);
+}
+
+.breadcrumbs [aria-current="page"] {
+  color: var(--ink);
+}
+
 .shop-band,
 .custom-band,
 .order-band {
@@ -2982,6 +3026,11 @@ textarea:focus {
 
   .checkout-hero h1 {
     font-size: 2.35rem;
+  }
+
+  .breadcrumbs {
+    margin-bottom: 16px;
+    font-size: 0.72rem;
   }
 
   .form-grid {
