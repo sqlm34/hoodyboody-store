@@ -298,7 +298,10 @@ function createOrderController(context) {
     ensureInternalTrackingId(order);
 
     try {
-      const label = await shippoService.createLabelForOrder(order, { requireSavedRate: options.requireSavedRate });
+      const label = await shippoService.createLabelForOrder(order, {
+        requireSavedRate: options.requireSavedRate,
+        refreshStaleRate: options.refreshStaleRate
+      });
       attachShippingLabel(order, label);
       await notifyOrderStatus(order, "label_created", "label created / ready to ship");
       logger.info("Shippo label created.", { orderId: order.id, trackingNumber: label.trackingNumber });
@@ -389,7 +392,7 @@ function createOrderController(context) {
         return;
       }
 
-      await ensureShippingLabel(order, { allowManualPurchase: true, requireSavedRate: true });
+      await ensureShippingLabel(order, { allowManualPurchase: true, requireSavedRate: true, refreshStaleRate: true });
       await writeDbAsync(db);
       res.status(200).json({ order: publicAdminOrder(order) });
     } catch (error) {

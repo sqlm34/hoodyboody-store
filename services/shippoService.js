@@ -242,6 +242,55 @@ function wait(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
+function collectShippoErrorMessages(value, path = "", messages = [], seen = new Set()) {
+  if (value == null) return messages;
+
+  if (typeof value === "string") {
+    const text = value.trim();
+    if (text) messages.push(path ? `${path}: ${text}` : text);
+    return messages;
+  }
+
+  if (typeof value === "number") {
+    messages.push(path ? `${path}: ${value}` : String(value));
+    return messages;
+  }
+
+  if (Array.isArray(value)) {
+    value.forEach((item) => collectShippoErrorMessages(item, path, messages, seen));
+    return messages;
+  }
+
+  if (typeof value !== "object" || seen.has(value)) return messages;
+  seen.add(value);
+
+  const priorityKeys = ["detail", "message", "messages", "errors", "error", "text", "__all__", "non_field_errors"];
+  const skipKeys = new Set(["object_id", "object_created", "object_updated", "id", "status", "was_test"]);
+
+  for (const key of priorityKeys) {
+    if (Object.prototype.hasOwnProperty.call(value, key)) {
+      collectShippoErrorMessages(value[key], path, messages, seen);
+    }
+  }
+
+  for (const [key, nestedValue] of Object.entries(value)) {
+    if (priorityKeys.includes(key) || skipKeys.has(key)) continue;
+    const nextPath = path ? `${path}.${key}` : key;
+    collectShippoErrorMessages(nestedValue, nextPath, messages, seen);
+  }
+
+  return messages;
+}
+
+function getShippoErrorMessage(data, fallback = "Shippo request failed.") {
+  const messages = collectShippoErrorMessages(data)
+    .map((message) => message.replace(/\s+/g, " ").trim())
+    .filter(Boolean);
+  const uniqueMessages = [...new Set(messages)];
+
+  return uniqueMessages.join("; ") || fallback;
+}
+
 function rateSearchText(rate) {
   return `${rate.carrier || ""} ${rate.service || ""} ${rate.serviceToken || ""} ${(rate.attributes || []).join(" ")}`;
 }
@@ -314,6 +363,38 @@ function selectExpressRate(rates = []) {
 function getLabelPurchaseMode(subtotal, config = {}) {
   const policy = normalizeFreeShippingConfig(config);
   return subtotal >= policy.thresholdCents ? "manual" : "automatic";
+}
+
+function selectRateForShippingType(rates = [], optionType = "") {
+  const type = String(optionType || "").trim().toLowerCase();
+
+  if (type === "express") return selectExpressRate(rates);
+  if (type === "standard" || type === "free") return selectStandardRate(rates);
+
+  return null;
+}
+
+function findRateByCarrierService(rates = [], savedRate = {}) {
+  const savedCarrier = String(savedRate.carrier || "").trim().toLowerCase();
+  const savedService = String(savedRate.service || "").trim().toLowerCase();
+
+  if (!savedCarrier && !savedService) return null;
+
+  return (
+    rates.find((rate) => {
+      const carrier = String(rate.carrier || "").trim().toLowerCase();
+      const service = String(rate.service || "").trim().toLowerCase();
+      return (!savedCarrier || carrier === savedCarrier) && (!savedService || service === savedService);
+    }) || null
+  );
+}
+
+function isSavedRatePurchaseError(error) {
+  const statusCode = Number(error?.statusCode) || 0;
+  if ([400, 404, 410, 422].includes(statusCode)) return true;
+
+  const message = String(error?.message || "").toLowerCase();
+  return /(rate|shipment|transaction|expired|invalid|not found|not available|purchase)/.test(message);
 }
 
 function shippingOptionFromRate({ type, title, rate, customerShippingPrice, shippingDiscount = 0, freeShippingApplied = false, labelPurchaseMode = "automatic" }) {
@@ -436,10 +517,14 @@ function saveSelectedShippingOption(delivery = {}, options = []) {
   };
 }
 
-function createShippoService({ apiKey, shippingOrigin, freeShippingConfig, logger }) {
+function createShippoService({ apiKey, shippingOrigin, freeShippingConfig, logger, requestClient }) {
   const serviceFreeShippingConfig = normalizeFreeShippingConfig(freeShippingConfig);
 
   function requestOnce(method, apiPath, payload = null) {
+    if (typeof requestClient === "function") {
+      return Promise.resolve().then(() => requestClient(method, apiPath, payload));
+    }
+
     const body = payload ? JSON.stringify(payload) : "";
 
     return new Promise((resolve, reject) => {
@@ -476,8 +561,10 @@ function createShippoService({ apiKey, shippingOrigin, freeShippingConfig, logge
               return;
             }
 
-            const error = new Error(data.detail || data.message || data.error?.message || "Shippo request failed.");
+            const error = new Error(getShippoErrorMessage(data, responseBody || "Shippo request failed."));
             error.statusCode = res.statusCode;
+            error.response = data;
+            error.responseBody = responseBody;
             reject(error);
           });
         }
@@ -573,6 +660,24 @@ function createShippoService({ apiKey, shippingOrigin, freeShippingConfig, logge
     return selectStandardRate(rates) || rates.find((rate) => rate.attributes.includes("BESTVALUE")) || rates[0];
   }
 
+  async function refreshSelectedRateForOrder(order, savedRate = {}) {
+    const shipment = await createShipmentForOrder(order);
+    const rates = normalizeRates(shipment);
+    const delivery = order.delivery || {};
+    const shippingType = delivery.shippingOptionType || delivery.shippingType || delivery.typeCode || "";
+    const typedRate = selectRateForShippingType(rates, shippingType);
+    const matchingRate = findRateByCarrierService(rates, savedRate);
+    const refreshedRate = typedRate || matchingRate || selectRate(rates);
+
+    logger?.info("Refreshed Shippo rate before manual label purchase.", {
+      orderId: order.id,
+      oldRateId: savedRate.id || "",
+      newRateId: refreshedRate.id
+    });
+
+    return refreshedRate;
+  }
+
   async function purchaseShippingLabelAfterPayment(order, options = {}) {
     const paid = String(order.payment?.status || order.status || "").toLowerCase() === "paid" || ["processing", "label_created", "ready_to_ship"].includes(String(order.status || "").toLowerCase());
     if (!paid) throw new Error("Shipping label can only be purchased after payment.");
@@ -595,15 +700,34 @@ function createShippoService({ apiKey, shippingOrigin, freeShippingConfig, logge
       selectedRate = selectRate(normalizeRates(shipment));
     }
 
-    const transaction = await request("POST", "/transactions/", {
-      rate: selectedRate.id,
-      async: false,
-      label_file_type: "PDF",
-      metadata: String(order.number || order.id || "").slice(0, 100)
-    });
+    const buyRate = (rate) =>
+      request("POST", "/transactions/", {
+        rate: rate.id,
+        async: false,
+        label_file_type: "PDF",
+        metadata: String(order.number || order.id || "").slice(0, 100)
+      });
+
+    let transaction;
+
+    try {
+      transaction = await buyRate(selectedRate);
+    } catch (error) {
+      if (!options.refreshStaleRate || !selectedRate.id || !isSavedRatePurchaseError(error)) {
+        throw error;
+      }
+
+      logger?.warn("Saved Shippo rate could not be purchased; refreshing rate and retrying label purchase.", {
+        orderId: order.id,
+        rateId: selectedRate.id,
+        message: error.message
+      });
+      selectedRate = await refreshSelectedRateForOrder(order, selectedRate);
+      transaction = await buyRate(selectedRate);
+    }
 
     if (String(transaction.status || "").toUpperCase() !== "SUCCESS") {
-      const message = transaction.messages?.[0]?.text || transaction.messages?.[0]?.message || "Shippo did not create a label.";
+      const message = getShippoErrorMessage(transaction.messages, "Shippo did not create a label.");
       throw new Error(message);
     }
 
@@ -633,6 +757,7 @@ function createShippoService({ apiKey, shippingOrigin, freeShippingConfig, logge
     request,
     saveSelectedShippingOption,
     getFreeShippingEligibility,
+    getShippoErrorMessage,
     selectExpressRate,
     selectRate,
     selectStandardRate,
@@ -652,6 +777,7 @@ module.exports = {
   buildShippoParcelsFromCart,
   createShippoService,
   getFreeShippingEligibility,
+  getShippoErrorMessage,
   getLabelPurchaseMode,
   normalizeProductShippingFields,
   normalizeFreeShippingConfig,

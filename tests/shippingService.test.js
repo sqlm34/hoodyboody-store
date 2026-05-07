@@ -6,6 +6,7 @@ const {
   buildShippoParcelsFromCart,
   createShippoService,
   getFreeShippingEligibility,
+  getShippoErrorMessage,
   validateProductShippingFields
 } = require("../services/shippoService");
 const { canBuyLabel } = require("../models/orderModel");
@@ -165,6 +166,129 @@ test("label purchase is blocked before payment", async () => {
       }),
     /only be purchased after payment/
   );
+});
+
+test("Shippo nested errors are shown as readable admin messages", () => {
+  const message = getShippoErrorMessage({
+    detail: {
+      rate: ["Object not found."],
+      address_to: {
+        zip: ["Enter a valid ZIP code."]
+      }
+    },
+    messages: [{ text: "Rate expired." }]
+  });
+
+  assert.equal(message, "rate: Object not found.; address_to.zip: Enter a valid ZIP code.; Rate expired.");
+});
+
+test("manual label purchase refreshes stale saved Shippo rate before retrying", async () => {
+  const calls = [];
+  const shippo = createShippoService({
+    apiKey: "test-key",
+    shippingOrigin: {
+      name: "HoodyBoody",
+      street1: "6463 Bayside South Drive",
+      city: "Indianapolis",
+      state: "IN",
+      zip: "46250",
+      country: "US"
+    },
+    requestClient: async (method, apiPath, payload) => {
+      calls.push({ method, apiPath, payload });
+
+      if (method === "POST" && apiPath === "/transactions/" && payload.rate === "rate-old") {
+        const error = new Error("rate: Object not found.");
+        error.statusCode = 404;
+        throw error;
+      }
+
+      if (method === "POST" && apiPath === "/shipments/") {
+        return {
+          object_id: "shipment-new",
+          rates: [
+            {
+              object_id: "rate-fresh",
+              provider: "USPS",
+              servicelevel: { name: "Ground Advantage", token: "usps_ground_advantage" },
+              amount: "8.20",
+              currency: "USD",
+              estimated_days: 4,
+              attributes: []
+            }
+          ]
+        };
+      }
+
+      if (method === "POST" && apiPath === "/transactions/" && payload.rate === "rate-fresh") {
+        return {
+          status: "SUCCESS",
+          object_id: "transaction-fresh",
+          label_url: "https://labels.test/fresh.pdf",
+          tracking_number: "9400100000000000000000",
+          tracking_url_provider: "https://tracking.test/9400100000000000000000",
+          shipment: "shipment-new",
+          rate: {
+            provider: "USPS",
+            servicelevel: { name: "Ground Advantage" }
+          }
+        };
+      }
+
+      throw new Error(`Unexpected Shippo call: ${method} ${apiPath}`);
+    }
+  });
+
+  const label = await shippo.purchaseShippingLabelAfterPayment(
+    {
+      id: "order-1",
+      number: "HB-1",
+      status: "paid",
+      payment: { status: "paid" },
+      customer: {
+        name: "Customer",
+        email: "customer@example.com",
+        phone: "3175550199"
+      },
+      delivery: {
+        type: "shipping",
+        address: "1 Main St",
+        city: "Indianapolis",
+        state: "IN",
+        zip: "46250",
+        phone: "3175550199",
+        email: "customer@example.com",
+        shippoRateId: "rate-old",
+        carrier: "USPS",
+        service: "Ground Advantage",
+        shippingOptionType: "standard",
+        realShippoCost: 750
+      },
+      items: [
+        {
+          id: "hoodie",
+          title: "Hoodie",
+          quantity: 1,
+          shipping: {
+            weight_value: 18,
+            weight_unit: "oz",
+            length: 15,
+            width: 12,
+            height: 3,
+            dimension_unit: "in",
+            package_type: "soft_pack"
+          }
+        }
+      ]
+    },
+    { requireSavedRate: true, refreshStaleRate: true }
+  );
+
+  assert.equal(label.shippoRateId, "rate-fresh");
+  assert.equal(label.shippoShipmentId, "shipment-new");
+  assert.equal(label.labelUrl, "https://labels.test/fresh.pdf");
+  assert.equal(calls.filter((call) => call.apiPath === "/transactions/").length, 2);
+  assert.equal(calls.some((call) => call.apiPath === "/shipments/"), true);
 });
 
 test("manual Buy Label is available only for paid manual orders without label", () => {
