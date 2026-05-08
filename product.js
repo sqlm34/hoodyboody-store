@@ -1,7 +1,8 @@
 const CART_STORAGE_KEY = "nitka-cart";
 const DEFAULT_IMAGE_URL = "assets/embroidered-collection.png";
-const FREE_DELIVERY_THRESHOLD = 10000;
-const FREE_DELIVERY_LABEL = "$100";
+const DISCOUNT_THRESHOLD = 20000;
+const DISCOUNT_LABEL = "10%";
+const DISCOUNT_RATE = 0.1;
 const CATEGORY_PAGES = {
   outerwear: "outerwear.html",
   tops: "tops.html",
@@ -158,23 +159,40 @@ function getStockForCartItem(item, cart = loadCart()) {
   return null;
 }
 
+function getDiscountedUnitAmount(price, discountApplies) {
+  const amount = Math.max(0, Math.round(Number(price) || 0));
+  return discountApplies ? Math.max(1, Math.round(amount * (1 - DISCOUNT_RATE))) : amount;
+}
+
+function getCartDiscount(cart, subtotal) {
+  const discountApplies = subtotal >= DISCOUNT_THRESHOLD;
+  if (!discountApplies) return 0;
+
+  return cart.reduce((sum, item) => {
+    const quantity = Math.max(1, Math.floor(Number(item.quantity) || 1));
+    return sum + Math.max(0, item.price - getDiscountedUnitAmount(item.price, discountApplies)) * quantity;
+  }, 0);
+}
+
 function renderCartDrawer() {
   if (!cartItems || !cartEmpty || !cartTotal || !checkoutLink || !cartDeliveryNotice) return;
 
   const cart = loadCart();
   const itemCount = cart.reduce((sum, item) => sum + item.quantity, 0);
-  const total = cart.reduce((sum, item) => sum + item.price * item.quantity, 0);
-  const remainingForFreeDelivery = Math.max(0, FREE_DELIVERY_THRESHOLD - total);
+  const subtotal = cart.reduce((sum, item) => sum + item.price * item.quantity, 0);
+  const discount = getCartDiscount(cart, subtotal);
+  const total = Math.max(0, subtotal - discount);
+  const remainingForDiscount = Math.max(0, DISCOUNT_THRESHOLD - subtotal);
 
   cartTotal.textContent = formatPrice(total);
   cartEmpty.classList.toggle("visible", cart.length === 0);
   checkoutLink.setAttribute("aria-disabled", cart.length === 0 ? "true" : "false");
   cartDeliveryNotice.hidden = cart.length === 0;
-  cartDeliveryNotice.classList.toggle("success", cart.length > 0 && remainingForFreeDelivery === 0);
+  cartDeliveryNotice.classList.toggle("success", cart.length > 0 && remainingForDiscount === 0);
   cartDeliveryNotice.textContent =
-    remainingForFreeDelivery > 0
-      ? `Add ${formatPrice(remainingForFreeDelivery)} more to get free delivery from ${FREE_DELIVERY_LABEL}.`
-      : `Free delivery from ${FREE_DELIVERY_LABEL} is available for this order.`;
+    remainingForDiscount > 0
+      ? `Add ${formatPrice(remainingForDiscount)} more to get ${DISCOUNT_LABEL} off your order.`
+      : `${DISCOUNT_LABEL} discount applied. You saved ${formatPrice(discount)}.`;
 
   cartItems.innerHTML = cart
     .map((item) => {

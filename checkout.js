@@ -1,4 +1,6 @@
 const CART_STORAGE_KEY = "nitka-cart";
+const DISCOUNT_THRESHOLD = 20000;
+const DISCOUNT_RATE = 0.1;
 const formatPrice = (value) =>
   new Intl.NumberFormat("en-US", {
     style: "currency",
@@ -34,6 +36,8 @@ let shippingRateTimer = null;
 const summaryItems = document.querySelector("#summaryItems");
 const summaryEmpty = document.querySelector("#summaryEmpty");
 const itemsTotal = document.querySelector("#itemsTotal");
+const discountRow = document.querySelector("#discountRow");
+const discountTotal = document.querySelector("#discountTotal");
 const deliveryTotal = document.querySelector("#deliveryTotal");
 const checkoutTotal = document.querySelector("#checkoutTotal");
 const checkoutDeliveryNotice = document.querySelector("#checkoutDeliveryNotice");
@@ -82,6 +86,23 @@ function getItemsTotal() {
   return cart.reduce((sum, item) => sum + item.price * item.quantity, 0);
 }
 
+function discountApplies() {
+  return getItemsTotal() >= DISCOUNT_THRESHOLD;
+}
+
+function getDiscountedUnitAmount(price) {
+  const amount = Math.max(0, Math.round(Number(price) || 0));
+  return discountApplies() ? Math.max(1, Math.round(amount * (1 - DISCOUNT_RATE))) : amount;
+}
+
+function getProductDiscount() {
+  if (!discountApplies()) return 0;
+  return cart.reduce((sum, item) => {
+    const quantity = Math.max(1, Math.floor(Number(item.quantity) || 1));
+    return sum + Math.max(0, Math.round(Number(item.price || 0) || 0) - getDiscountedUnitAmount(item.price)) * quantity;
+  }, 0);
+}
+
 function sanitizeField(input) {
   if (input.name === "zip") {
     input.value = input.value.replace(/\D/g, "").slice(0, 5);
@@ -112,8 +133,10 @@ function updateSubmitState() {
 
 function renderSummary() {
   const subtotal = getItemsTotal();
+  const discount = getProductDiscount();
+  const discountedSubtotal = Math.max(0, subtotal - discount);
   const delivery = cart.length ? getDeliveryPrice() : 0;
-  const total = subtotal + delivery;
+  const total = discountedSubtotal + delivery;
 
   summaryEmpty.hidden = cart.length > 0;
   checkoutDeliveryNotice.hidden = cart.length === 0 || getDeliveryType() === "pickup";
@@ -140,7 +163,11 @@ function renderSummary() {
     .join("");
 
   itemsTotal.textContent = formatPrice(subtotal);
-  deliveryTotal.textContent = delivery ? formatPrice(delivery) : "Free";
+  if (discountRow && discountTotal) {
+    discountRow.hidden = discount <= 0;
+    discountTotal.textContent = `-${formatPrice(discount)}`;
+  }
+  deliveryTotal.textContent = delivery ? formatPrice(delivery) : getDeliveryType() === "pickup" ? "Pickup" : "$0.00";
   checkoutTotal.textContent = formatPrice(total);
   updateSubmitState();
 }
@@ -182,7 +209,7 @@ function renderShippingRates() {
         .map((rate) => {
           const days = rate.deliveryDays || rate.estimated_days ? `, ${rate.deliveryDays || rate.estimated_days} days` : "";
           const price = rate.customerShippingPrice ?? rate.customer_shipping_price ?? rate.displayPrice ?? rate.display_price ?? rate.price ?? 0;
-          const priceLabel = price ? formatPrice(price) : "Free";
+          const priceLabel = formatPrice(price);
           return `<option value="${escapeHtml(rate.id)}">${escapeHtml(rate.title || "Shipping")} - ${priceLabel}${days}</option>`;
         })
         .join("")
@@ -311,8 +338,10 @@ function getCheckoutPayload() {
   const deliveryInput = document.querySelector('input[name="delivery"]:checked');
   const paymentInput = checkoutForm.elements.payment;
   const subtotal = getItemsTotal();
+  const discount = getProductDiscount();
+  const discountedSubtotal = Math.max(0, subtotal - discount);
   const delivery = getDeliveryPrice();
-  const total = subtotal + delivery;
+  const total = discountedSubtotal + delivery;
 
   return {
     items: cart,
@@ -338,12 +367,10 @@ function getCheckoutPayload() {
       customer_shipping_price: selectedShippingRate?.customerShippingPrice ?? selectedShippingRate?.customer_shipping_price ?? delivery,
       realShippoCost: selectedShippingRate?.realShippoAmount ?? selectedShippingRate?.real_shippo_amount ?? delivery,
       real_shippo_cost: selectedShippingRate?.realShippoAmount ?? selectedShippingRate?.real_shippo_amount ?? delivery,
-      shippingDiscount: selectedShippingRate?.shippingDiscount ?? selectedShippingRate?.shipping_discount ?? 0,
-      shipping_discount: selectedShippingRate?.shippingDiscount ?? selectedShippingRate?.shipping_discount ?? 0,
-      freeShippingApplied: selectedShippingRate?.freeShippingApplied ?? selectedShippingRate?.free_shipping_applied ?? false,
-      free_shipping_applied: selectedShippingRate?.freeShippingApplied ?? selectedShippingRate?.free_shipping_applied ?? false,
-      labelPurchaseMode: selectedShippingRate?.labelPurchaseMode || selectedShippingRate?.label_purchase_mode || "",
-      label_purchase_mode: selectedShippingRate?.labelPurchaseMode || selectedShippingRate?.label_purchase_mode || "",
+      shippingDiscount: 0,
+      shipping_discount: 0,
+      labelPurchaseMode: "automatic",
+      label_purchase_mode: "automatic",
       carrier: selectedShippingRate?.carrier || "",
       service: selectedShippingRate?.service || "",
       deliveryDays: selectedShippingRate?.deliveryDays || selectedShippingRate?.estimated_days || null,
@@ -354,7 +381,7 @@ function getCheckoutPayload() {
       type: paymentInput?.value || "card",
       provider: "stripe"
     },
-    totals: { subtotal, delivery, total }
+    totals: { subtotal, discount, productDiscount: discount, discountedSubtotal, delivery, total }
   };
 }
 

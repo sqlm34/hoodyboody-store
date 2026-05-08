@@ -118,9 +118,8 @@ function attachShippingLabel(order, label = {}) {
     service: label.service || "",
     realShippingCost: Math.max(0, Math.round(Number(label.realShippingCost || label.realShippoCost || order.delivery?.realShippoCost || order.delivery?.real_shippo_cost || 0) || 0)),
     customerShippingPrice: getCustomerShippingPrice(order),
-    shippingDiscount: getShippingDiscount(order),
-    freeShippingApplied: Boolean(order.delivery?.freeShippingApplied || order.delivery?.free_shipping_applied || getShippingDiscount(order) > 0),
-    labelPurchaseMode: getLabelPurchaseMode(order),
+    shippingDiscount: 0,
+    labelPurchaseMode: "automatic",
     status: "label_created",
     createdAt: order.shipping?.createdAt || now,
     updatedAt: now,
@@ -185,43 +184,19 @@ function getRealShippingCost(order) {
 }
 
 function getShippingDiscount(order) {
-  const delivery = order.delivery || {};
-  const shipping = order.shipping || {};
-  return Math.max(0, Math.round(Number(shipping.shippingDiscount || delivery.shippingDiscount || delivery.shipping_discount || Math.max(0, getRealShippingCost(order) - getCustomerShippingPrice(order))) || 0));
+  return 0;
 }
 
 function getLabelPurchaseMode(order) {
-  const delivery = order.delivery || {};
-  const shipping = order.shipping || {};
-  return String(shipping.labelPurchaseMode || delivery.labelPurchaseMode || delivery.label_purchase_mode || (getOrderSubtotal(order) >= 10000 ? "manual" : "automatic")).trim();
-}
-
-function isPaid(order) {
-  const status = normalizeStatus(order.status);
-  return (
-    normalizeStatus(order.payment?.status || order.status) === ORDER_STATUS.PAID &&
-    ![ORDER_STATUS.CANCELLED, ORDER_STATUS.REFUNDED].includes(status)
-  );
-}
-
-function shouldBuyLabelManually(order) {
-  return getLabelPurchaseMode(order) === "manual";
-}
-
-function canBuyLabel(order) {
-  const shipping = order.shipping || {};
-  const delivery = order.delivery || {};
-  return (
-    shouldBuyLabelManually(order) &&
-    isPaid(order) &&
-    String(delivery.type || "").toLowerCase() === "shipping" &&
-    !(shipping.labelUrl || shipping.labelPdfUrl) &&
-    Boolean(delivery.shippoRateId || delivery.shippo_rate_id)
-  );
+  return "automatic";
 }
 
 function isCustomerPaidShipping(order) {
-  return getOrderSubtotal(order) < 10000 && getRealShippingCost(order) > 0 && getCustomerShippingPrice(order) >= getRealShippingCost(order);
+  return false;
+}
+
+function getProductDiscount(order) {
+  return Math.max(0, Math.round(Number(order.totals?.discount || order.totals?.productDiscount || 0) || 0));
 }
 
 function publicAdminOrder(order) {
@@ -244,6 +219,7 @@ function publicAdminOrder(order) {
     items: Array.isArray(order.items) ? order.items : [],
     amount: getOrderAmount(order),
     subtotal: getOrderSubtotal(order),
+    productDiscount: getProductDiscount(order),
     shippingType: delivery.shippingType || delivery.shippingOptionType || "",
     shippingAmount: getCustomerShippingPrice(order),
     customerShippingPrice: getCustomerShippingPrice(order),
@@ -255,10 +231,8 @@ function publicAdminOrder(order) {
     carrier: shipping.carrier || delivery.carrier || tracking.company || "",
     service: shipping.service || delivery.service || "",
     realShippingCost: getRealShippingCost(order),
-    shippingDiscount: getShippingDiscount(order),
-    freeShippingApplied: Boolean(shipping.freeShippingApplied || delivery.freeShippingApplied || delivery.free_shipping_applied || getShippingDiscount(order) > 0),
+    shippingDiscount: 0,
     labelPurchaseMode: getLabelPurchaseMode(order),
-    canBuyLabel: canBuyLabel(order),
     shippingPaidByCustomer: isCustomerPaidShipping(order),
     labelUrl: shipping.labelUrl || shipping.labelPdfUrl || "",
     trackingUrl: shipping.trackingUrl || tracking.url || "",
@@ -305,7 +279,6 @@ function updateOrderStatus(order, status) {
 module.exports = {
   ORDER_STATUS,
   attachShippingLabel,
-  canBuyLabel,
   ensureInternalTrackingId,
   findOrderByPaymentIntent,
   findOrderByPendingId,
@@ -317,6 +290,5 @@ module.exports = {
   publicAdminOrder,
   recordShippingError,
   removePendingStripeOrder,
-  shouldBuyLabelManually,
   updateOrderStatus
 };

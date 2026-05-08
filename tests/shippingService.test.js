@@ -5,11 +5,9 @@ const {
   buildShippingOptions,
   buildShippoParcelsFromCart,
   createShippoService,
-  getFreeShippingEligibility,
   getShippoErrorMessage,
   validateProductShippingFields
 } = require("../services/shippoService");
-const { canBuyLabel } = require("../models/orderModel");
 
 const standardRate = {
   id: "rate-standard",
@@ -35,7 +33,7 @@ const expressRate = {
   attributes: []
 };
 
-test("standard shipping is paid below the free shipping threshold", () => {
+test("standard shipping uses the real Shippo price", () => {
   const options = buildShippingOptions({ rates: [standardRate, expressRate], subtotal: 8000 });
 
   assert.equal(options[0].type, "standard");
@@ -44,7 +42,7 @@ test("standard shipping is paid below the free shipping threshold", () => {
   assert.equal(options[0].realShippoAmount, 750);
 });
 
-test("free shipping starts at 100 USD and still keeps real Shippo cost", () => {
+test("standard shipping remains paid above 100 USD", () => {
   const options = buildShippingOptions({
     rates: [standardRate, expressRate],
     subtotal: 12000,
@@ -52,13 +50,13 @@ test("free shipping starts at 100 USD and still keeps real Shippo cost", () => {
     parcels: [{ weight: "1", length: "12", width: "10", height: "2" }]
   });
 
-  assert.equal(options[0].type, "free");
-  assert.equal(options[0].title, "Free Shipping");
-  assert.equal(options[0].customerShippingPrice, 0);
+  assert.equal(options[0].type, "standard");
+  assert.equal(options[0].title, "Standard Shipping");
+  assert.equal(options[0].customerShippingPrice, 750);
   assert.equal(options[0].realShippoAmount, 750);
   assert.equal(options[0].shippoRateId, "rate-standard");
-  assert.equal(options[0].shippingDiscount, 750);
-  assert.equal(options[0].labelPurchaseMode, "manual");
+  assert.equal(options[0].shippingDiscount, 0);
+  assert.equal(options[0].labelPurchaseMode, "automatic");
 });
 
 test("express shipping is always paid when available", () => {
@@ -75,7 +73,7 @@ test("express shipping is always paid when available", () => {
   assert.equal(express.realShippoAmount, 2199);
 });
 
-test("free shipping coverage becomes a partial shipping discount above 10 USD", () => {
+test("standard shipping keeps the real Shippo price without a delivery subsidy", () => {
   const options = buildShippingOptions({
     rates: [{ ...standardRate, price: 1600 }, expressRate],
     subtotal: 12000,
@@ -83,13 +81,13 @@ test("free shipping coverage becomes a partial shipping discount above 10 USD", 
     parcels: [{ weight: "1", length: "12", width: "10", height: "2" }]
   });
 
-  assert.equal(options[0].title, "Shipping Discount");
-  assert.equal(options[0].customerShippingPrice, 600);
+  assert.equal(options[0].title, "Standard Shipping");
+  assert.equal(options[0].customerShippingPrice, 1600);
   assert.equal(options[0].realShippoAmount, 1600);
-  assert.equal(options[0].shippingDiscount, 1000);
+  assert.equal(options[0].shippingDiscount, 0);
 });
 
-test("free shipping is not available outside continental US", () => {
+test("shipping is still paid outside continental US", () => {
   const options = buildShippingOptions({
     rates: [standardRate, expressRate],
     subtotal: 12000,
@@ -99,17 +97,6 @@ test("free shipping is not available outside continental US", () => {
 
   assert.equal(options[0].type, "standard");
   assert.equal(options[0].customerShippingPrice, 750);
-});
-
-test("oversized shipments do not receive free shipping discount", () => {
-  const eligibility = getFreeShippingEligibility({
-    subtotal: 12000,
-    destination: { state: "IN", country: "US" },
-    parcels: [{ weight: "12", length: "12", width: "10", height: "2" }]
-  });
-
-  assert.equal(eligibility.eligible, false);
-  assert.equal(eligibility.reason, "oversized");
 });
 
 test("physical products without shipping dimensions block checkout", () => {
@@ -182,7 +169,7 @@ test("Shippo nested errors are shown as readable admin messages", () => {
   assert.equal(message, "rate: Object not found.; address_to.zip: Enter a valid ZIP code.; Rate expired.");
 });
 
-test("manual label purchase refreshes stale saved Shippo rate before retrying", async () => {
+test("label purchase refreshes stale saved Shippo rate before retrying", async () => {
   const calls = [];
   const shippo = createShippoService({
     apiKey: "test-key",
@@ -289,23 +276,4 @@ test("manual label purchase refreshes stale saved Shippo rate before retrying", 
   assert.equal(label.labelUrl, "https://labels.test/fresh.pdf");
   assert.equal(calls.filter((call) => call.apiPath === "/transactions/").length, 2);
   assert.equal(calls.some((call) => call.apiPath === "/shipments/"), true);
-});
-
-test("manual Buy Label is available only for paid manual orders without label", () => {
-  const order = {
-    status: "paid",
-    payment: { status: "paid" },
-    totals: { subtotal: 12000 },
-    delivery: {
-      type: "shipping",
-      labelPurchaseMode: "manual",
-      shippoRateId: "rate-standard"
-    },
-    shipping: {}
-  };
-
-  assert.equal(canBuyLabel(order), true);
-  assert.equal(canBuyLabel({ ...order, payment: { status: "pending" }, status: "pending" }), false);
-  assert.equal(canBuyLabel({ ...order, shipping: { labelUrl: "https://label.test" } }), false);
-  assert.equal(canBuyLabel({ ...order, delivery: { ...order.delivery, labelPurchaseMode: "automatic" } }), false);
 });

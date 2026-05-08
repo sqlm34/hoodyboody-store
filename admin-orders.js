@@ -91,19 +91,10 @@ function hasDateFilter() {
 
 function getLabelBlock(order) {
   if (!order.labelUrl) {
-    const retryButton =
-      order.canBuyLabel
-        ? `<button class="button primary admin-order-action" data-action="buy-label" data-order-id="${order.id}" type="button">
-            <i class="fa-solid fa-tag" aria-hidden="true"></i>
-            <span>Buy Label</span>
-          </button>`
-        : "";
-
     return `
       <div class="admin-label-empty">
         <span>No Shippo label yet</span>
         ${order.shippingError ? `<small>${order.shippingError}</small>` : ""}
-        ${retryButton}
       </div>
     `;
   }
@@ -149,7 +140,6 @@ function renderOrders(orders) {
   ordersList.innerHTML = orders
     .map(
       (order) => {
-        const paidShippingClass = order.shippingPaidByCustomer ? " shipping-paid-by-customer" : "";
         return `
         <article class="admin-order-card checkout-panel">
           <div class="admin-order-head">
@@ -165,7 +155,7 @@ function renderOrders(orders) {
             </select>
           </div>
 
-          <div class="admin-order-grid admin-shipping-payment-block${paidShippingClass}">
+          <div class="admin-order-grid admin-shipping-payment-block">
             <div>
               <span>Items</span>
               <strong>${orderItemsText(order) || "No items"}</strong>
@@ -187,12 +177,8 @@ function renderOrders(orders) {
               <strong>${formatMoney(order.realShippingCost || 0)}</strong>
             </div>
             <div>
-              <span>Shipping discount</span>
-              <strong>${formatMoney(order.shippingDiscount || 0)}</strong>
-            </div>
-            <div>
-              <span>Label purchase</span>
-              <strong>${order.labelPurchaseMode || "automatic"}</strong>
+              <span>Product discount</span>
+              <strong>${formatMoney(order.productDiscount || 0)}</strong>
             </div>
             <div>
               <span>Order ID</span>
@@ -270,18 +256,6 @@ async function handleOrderAction(event) {
       };
       popup.addEventListener("load", printLabel, { once: true });
       setTimeout(printLabel, 1200);
-    }
-    return;
-  }
-
-  if (target.dataset.action === "buy-label") {
-    target.disabled = true;
-    try {
-      await api(`/api/admin/orders/${encodeURIComponent(target.dataset.orderId)}/label`, { method: "POST", body: "{}" });
-      await loadOrders();
-    } catch (error) {
-      ordersSummary.textContent = error.message;
-      target.disabled = false;
     }
     return;
   }

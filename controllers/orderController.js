@@ -15,7 +15,6 @@ const {
   publicAdminOrder,
   recordShippingError,
   removePendingStripeOrder,
-  shouldBuyLabelManually,
   updateOrderStatus
 } = require("../models/orderModel");
 
@@ -96,12 +95,10 @@ function buildFallbackPayloadFromStripe({ stripeSession, paymentIntent }) {
       customer_shipping_price: Number(metadata.customer_shipping_price || metadata.shipping_price || "") || deliveryPrice,
       realShippoCost: Number(metadata.real_shippo_cost || "") || deliveryPrice,
       real_shippo_cost: Number(metadata.real_shippo_cost || "") || deliveryPrice,
-      shippingDiscount: Number(metadata.shipping_discount || "") || 0,
-      shipping_discount: Number(metadata.shipping_discount || "") || 0,
-      freeShippingApplied: metadata.free_shipping_applied === "true",
-      free_shipping_applied: metadata.free_shipping_applied === "true",
-      labelPurchaseMode: metadata.label_purchase_mode || "",
-      label_purchase_mode: metadata.label_purchase_mode || "",
+      shippingDiscount: 0,
+      shipping_discount: 0,
+      labelPurchaseMode: "automatic",
+      label_purchase_mode: "automatic",
       shippingOptionId: metadata.shipping_option_id || "",
       shippingOptionType: metadata.shipping_option_type || "",
       shippingTitle: metadata.shipping_title || "",
@@ -114,6 +111,9 @@ function buildFallbackPayloadFromStripe({ stripeSession, paymentIntent }) {
     items,
     totals: {
       subtotal,
+      discount: Number(metadata.product_discount || "") || 0,
+      productDiscount: Number(metadata.product_discount || "") || 0,
+      discountedSubtotal: Number(metadata.discounted_subtotal || "") || Math.max(0, subtotal - (Number(metadata.product_discount || "") || 0)),
       delivery: Number(metadata.shipping_price || "") || deliveryPrice,
       total
     }
@@ -283,13 +283,6 @@ function createOrderController(context) {
       return { skipped: true, reason: "Shipping label already exists." };
     }
 
-    if (shouldBuyLabelManually(order) && !options.allowManualPurchase) {
-      order.shipping ||= {};
-      order.shipping.labelPurchaseMode = "manual";
-      order.shipping.status = order.shipping.status || "label_pending_manual";
-      return { skipped: true, reason: "Manual label purchase is required for this order." };
-    }
-
     if (options.requireSavedRate && !(order.delivery?.shippoRateId || order.delivery?.shippo_rate_id)) {
       throw new Error("Saved Shippo rate id is required before buying this label.");
     }
@@ -381,25 +374,6 @@ function createOrderController(context) {
     }
   }
 
-  async function retryOrderLabel(req, res) {
-    try {
-      const db = await readDbAsync();
-      requireAdmin(req, db);
-      const order = db.orders.find((item) => item.id === req.params.orderId || item.number === req.params.orderId);
-
-      if (!order) {
-        res.status(404).json({ message: "Order not found." });
-        return;
-      }
-
-      await ensureShippingLabel(order, { allowManualPurchase: true, requireSavedRate: true, refreshStaleRate: true });
-      await writeDbAsync(db);
-      res.status(200).json({ order: publicAdminOrder(order) });
-    } catch (error) {
-      res.status(error.status || 400).json({ message: error.message || "Request error." });
-    }
-  }
-
   async function patchOrderStatus(req, res) {
     try {
       const db = await readDbAsync();
@@ -433,8 +407,7 @@ function createOrderController(context) {
     handleStripeWebhook,
     listAdminOrders,
     patchOrderStatus,
-    processStripeEvent,
-    retryOrderLabel
+    processStripeEvent
   };
 }
 

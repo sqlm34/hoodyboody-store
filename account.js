@@ -129,7 +129,7 @@ function renderOrders(orders) {
       const items = (order.items || []).map((item) => escapeHtml(item.title)).join(", ");
       const tracking = order.delivery?.tracking || {};
       const deliverySource = `${order.delivery?.shippingTitle || ""} ${order.delivery?.shippingType || ""} ${order.delivery?.shippingOptionType || ""}`;
-      const deliveryLabel = /standard|free|discount/i.test(deliverySource) ? "Standard AliExpress" : tracking.company || "being clarified";
+      const deliveryLabel = /standard/i.test(deliverySource) ? "Standard AliExpress" : tracking.company || "being clarified";
       tracking.company = deliveryLabel;
 
       return `

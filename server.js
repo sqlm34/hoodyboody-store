@@ -9,9 +9,7 @@ const { createAdminOrderRouter } = require("./routes/adminOrderRoutes");
 const { createStripeWebhookRouter } = require("./routes/stripeWebhookRoutes");
 const {
   createShippoService,
-  getLabelPurchaseMode,
   normalizeProductShippingFields,
-  normalizeFreeShippingConfig,
   saveSelectedShippingOption,
   validateProductShippingFields
 } = require("./services/shippoService");
@@ -74,14 +72,8 @@ const hasPostgresDb = Boolean(
 );
 const postgresDbKey = process.env.NITKA_POSTGRES_DB_KEY || localEnv.NITKA_POSTGRES_DB_KEY || "default";
 const sessionMaxAgeSeconds = 60 * 60 * 24 * 30;
-const freeShippingConfig = normalizeFreeShippingConfig({
-  thresholdUsd: process.env.FREE_SHIPPING_THRESHOLD || localEnv.FREE_SHIPPING_THRESHOLD || 100,
-  coverageLimitUsd: process.env.FREE_SHIPPING_COVERAGE_LIMIT || localEnv.FREE_SHIPPING_COVERAGE_LIMIT || 10,
-  maxWeightLb: process.env.FREE_SHIPPING_MAX_WEIGHT_LB || localEnv.FREE_SHIPPING_MAX_WEIGHT_LB || 10,
-  maxLengthIn: process.env.FREE_SHIPPING_MAX_LENGTH_IN || localEnv.FREE_SHIPPING_MAX_LENGTH_IN || 18,
-  maxWidthIn: process.env.FREE_SHIPPING_MAX_WIDTH_IN || localEnv.FREE_SHIPPING_MAX_WIDTH_IN || 18,
-  maxHeightIn: process.env.FREE_SHIPPING_MAX_HEIGHT_IN || localEnv.FREE_SHIPPING_MAX_HEIGHT_IN || 18
-});
+const productDiscountThreshold = 20000;
+const productDiscountRate = 0.1;
 const shippingOrigin = {
   name: process.env.SHIPPING_FROM_NAME || localEnv.SHIPPING_FROM_NAME || "HOODYBOODY",
   street1: process.env.SHIPPING_FROM_STREET1 || localEnv.SHIPPING_FROM_STREET1 || "6463 Bayside South Drive",
@@ -93,7 +85,7 @@ const shippingOrigin = {
   phone: process.env.SHIPPING_FROM_PHONE || localEnv.SHIPPING_FROM_PHONE || "4153334444",
   email: process.env.SHIPPING_FROM_EMAIL || localEnv.SHIPPING_FROM_EMAIL || adminEmail
 };
-const checkoutShippoService = createShippoService({ apiKey: shippoApiKey, shippingOrigin, freeShippingConfig });
+const checkoutShippoService = createShippoService({ apiKey: shippoApiKey, shippingOrigin });
 const defaultShippingByType = {
   accessories: {
     weight_value: 10,
@@ -1155,13 +1147,41 @@ function getCartSubtotal(items, db) {
     : 0;
 }
 
+function getDiscountedUnitAmount(price, discountApplies) {
+  const amount = Math.max(0, Math.round(Number(price) || 0));
+  return discountApplies ? Math.max(1, Math.round(amount * (1 - productDiscountRate))) : amount;
+}
+
+function getCartPricing(items, db) {
+  const productLookup = getProductLookup(db);
+  const normalizedItems = Array.isArray(items) ? items : [];
+  const subtotal = getCartSubtotal(normalizedItems, db);
+  const discountApplies = subtotal >= productDiscountThreshold;
+  const discountedSubtotal = normalizedItems.reduce((sum, item) => {
+    const productId = getCartProductId(item, productLookup);
+    const product = productId ? productLookup[productId] : null;
+    const price = Math.max(0, Math.round(Number(product?.price ?? item.price) || 0));
+    const quantity = Math.max(1, Math.floor(Number(item.quantity) || 1));
+    return sum + getDiscountedUnitAmount(price, discountApplies) * quantity;
+  }, 0);
+  const productDiscount = discountApplies ? Math.max(0, subtotal - discountedSubtotal) : 0;
+
+  return {
+    subtotal,
+    productDiscount,
+    discountedSubtotal,
+    discountRate: productDiscountRate,
+    discountThreshold: productDiscountThreshold
+  };
+}
+
 async function normalizeCheckoutBody(body, db) {
   const normalized = {
     ...body,
     delivery: { ...(body.delivery || {}) },
     totals: { ...(body.totals || {}) }
   };
-  const subtotal = getCartSubtotal(normalized.items, db);
+  const pricing = getCartPricing(normalized.items, db);
 
   let deliveryPrice = Math.max(0, Math.round(Number(normalized.delivery.price) || 0));
   if (normalized.delivery.type === "shipping") {
@@ -1178,10 +1198,9 @@ async function normalizeCheckoutBody(body, db) {
     const shipmentRates = await checkoutShippoService.request("GET", `/shipments/${encodeURIComponent(shipmentId)}/rates/USD`);
     const options = checkoutShippoService.buildShippingOptions({
       rates: publicShippoRates(shipmentRates),
-      subtotal,
+      subtotal: pricing.subtotal,
       destination: normalized.delivery,
-      parcels: checkoutShippoService.buildShippoParcelsFromCart(normalized.items, publicProducts(db)),
-      freeShippingConfig
+      parcels: checkoutShippoService.buildShippoParcelsFromCart(normalized.items, publicProducts(db))
     });
     normalized.delivery = saveSelectedShippingOption(
       {
@@ -1195,9 +1214,12 @@ async function normalizeCheckoutBody(body, db) {
   }
 
   normalized.totals = {
-    subtotal,
+    subtotal: pricing.subtotal,
+    discount: pricing.productDiscount,
+    productDiscount: pricing.productDiscount,
+    discountedSubtotal: pricing.discountedSubtotal,
     delivery: deliveryPrice,
-    total: subtotal + deliveryPrice
+    total: pricing.discountedSubtotal + deliveryPrice
   };
 
   return normalized;
@@ -1213,9 +1235,9 @@ function getCartProductId(item, inventory) {
     .find((productId) => String(item.id || "").startsWith(`${productId}-`));
 }
 
-function getStripeLineItem(item, product) {
+function getStripeLineItem(item, product, discountApplies = false) {
   const title = String(product?.title || item.title || "Custom item").trim().slice(0, 120);
-  const unitAmount = getStripeUnitAmount(product?.price ?? item.price);
+  const unitAmount = getStripeUnitAmount(getDiscountedUnitAmount(product?.price ?? item.price, discountApplies));
   const productDescription = String(product?.description || "").trim();
   const itemDescription = String(item.description || "").trim();
   const description = product
@@ -1243,25 +1265,16 @@ function getOrderShippingFields(delivery = {}, totals = {}) {
     0,
     Math.round(Number(delivery.customerShippingPrice ?? delivery.customer_shipping_price ?? delivery.price ?? totals.delivery ?? 0) || 0)
   );
-  const realShippoCost = Math.max(
-    0,
-    Math.round(Number(delivery.realShippoCost ?? delivery.real_shippo_cost ?? delivery.realShippoAmount ?? customerShippingPrice) || 0)
-  );
-  const shippingDiscount = Math.max(0, Math.round(Number(delivery.shippingDiscount ?? delivery.shipping_discount ?? Math.max(0, realShippoCost - customerShippingPrice)) || 0));
-  const labelPurchaseMode =
-    delivery.type === "shipping"
-      ? String(delivery.labelPurchaseMode || delivery.label_purchase_mode || getLabelPurchaseMode(subtotal, freeShippingConfig)).trim()
-      : "";
+  const realShippoCost = customerShippingPrice;
 
   return {
     subtotal,
     customerShippingPrice,
     realShippoCost,
-    shippingDiscount,
-    labelPurchaseMode,
+    shippingDiscount: 0,
+    labelPurchaseMode: delivery.type === "shipping" ? "automatic" : "",
     shippingOptionType: String(delivery.shippingOptionType || delivery.shippingType || "").trim(),
-    shippingTitle: String(delivery.shippingTitle || "").trim(),
-    freeShippingApplied: Boolean(delivery.freeShippingApplied || delivery.free_shipping_applied || shippingDiscount > 0)
+    shippingTitle: String(delivery.shippingTitle || "").trim()
   };
 }
 
@@ -1306,8 +1319,12 @@ function createOrderFromPayload(db, user, body, overrides = {}) {
   }
 
   const delivery = body.delivery || {};
+  const pricing = getCartPricing(items, db);
   const baseTotals = {
-    subtotal: Math.max(0, Math.round(Number(body.totals?.subtotal ?? getCartSubtotal(items, db)) || 0)),
+    subtotal: pricing.subtotal,
+    discount: pricing.productDiscount,
+    productDiscount: pricing.productDiscount,
+    discountedSubtotal: pricing.discountedSubtotal,
     delivery: Math.max(0, Math.round(Number(body.totals?.delivery ?? delivery.price ?? 0) || 0)),
     total: Math.max(0, Math.round(Number(body.totals?.total ?? 0) || 0))
   };
@@ -1315,8 +1332,11 @@ function createOrderFromPayload(db, user, body, overrides = {}) {
   const totals = {
     ...body.totals,
     subtotal: shippingFields.subtotal,
+    discount: pricing.productDiscount,
+    productDiscount: pricing.productDiscount,
+    discountedSubtotal: pricing.discountedSubtotal,
     delivery: shippingFields.customerShippingPrice,
-    total: shippingFields.subtotal + shippingFields.customerShippingPrice
+    total: pricing.discountedSubtotal + shippingFields.customerShippingPrice
   };
   const paymentType = String(body.payment?.type || "").trim();
   const isDeferredPayment = paymentType === "invoice" || paymentType === "sbp";
@@ -1339,10 +1359,8 @@ function createOrderFromPayload(db, user, body, overrides = {}) {
       customer_shipping_price: shippingFields.customerShippingPrice,
       realShippoCost: shippingFields.realShippoCost,
       real_shippo_cost: shippingFields.realShippoCost,
-      shippingDiscount: shippingFields.shippingDiscount,
-      shipping_discount: shippingFields.shippingDiscount,
-      freeShippingApplied: shippingFields.freeShippingApplied,
-      free_shipping_applied: shippingFields.freeShippingApplied,
+      shippingDiscount: 0,
+      shipping_discount: 0,
       labelPurchaseMode: shippingFields.labelPurchaseMode,
       label_purchase_mode: shippingFields.labelPurchaseMode,
       tracking
@@ -1358,9 +1376,8 @@ function createOrderFromPayload(db, user, body, overrides = {}) {
       labelPurchaseMode: shippingFields.labelPurchaseMode,
       customerShippingPrice: shippingFields.customerShippingPrice,
       realShippingCost: shippingFields.realShippoCost,
-      shippingDiscount: shippingFields.shippingDiscount,
-      freeShippingApplied: shippingFields.freeShippingApplied,
-      status: shippingFields.labelPurchaseMode === "manual" ? "label_pending_manual" : ""
+      shippingDiscount: 0,
+      status: ""
     },
     notifications: { sent: [] },
     status: orderStatus,
@@ -1559,11 +1576,12 @@ async function handleApi(req, res) {
       let lineIndex = 0;
       const requestedInventory = {};
       const productLookup = getProductLookup(db);
+      const discountApplies = Math.max(0, Math.round(Number(body.totals?.discount || body.totals?.productDiscount || 0) || 0)) > 0;
 
       for (const item of items) {
         const productId = getCartProductId(item, productLookup);
         const product = productId ? productLookup[productId] : null;
-        const lineItem = getStripeLineItem(item, product);
+        const lineItem = getStripeLineItem(item, product, discountApplies);
         const quantity = Math.max(1, Math.floor(Number(item.quantity) || 1));
 
         if (!lineItem) continue;
@@ -1628,12 +1646,13 @@ async function handleApi(req, res) {
       params.append("metadata[delivery_zip]", String(body.delivery?.zip || ""));
       params.append("metadata[delivery_address]", String(body.delivery?.address || ""));
       params.append("metadata[subtotal]", String(body.totals?.subtotal || 0));
+      params.append("metadata[product_discount]", String(body.totals?.discount || body.totals?.productDiscount || 0));
+      params.append("metadata[discounted_subtotal]", String(body.totals?.discountedSubtotal || 0));
       params.append("metadata[shipping_price]", String(body.totals?.delivery || body.delivery?.price || 0));
       params.append("metadata[customer_shipping_price]", String(body.delivery?.customerShippingPrice ?? body.delivery?.price ?? 0));
       params.append("metadata[real_shippo_cost]", String(body.delivery?.realShippoCost ?? body.delivery?.real_shippo_cost ?? 0));
-      params.append("metadata[shipping_discount]", String(body.delivery?.shippingDiscount ?? body.delivery?.shipping_discount ?? 0));
-      params.append("metadata[free_shipping_applied]", String(Boolean(body.delivery?.freeShippingApplied || body.delivery?.free_shipping_applied)));
-      params.append("metadata[label_purchase_mode]", String(body.delivery?.labelPurchaseMode || body.delivery?.label_purchase_mode || ""));
+      params.append("metadata[shipping_discount]", "0");
+      params.append("metadata[label_purchase_mode]", "automatic");
       params.append("metadata[shipping_option_id]", String(body.delivery?.shippingOptionId || ""));
       params.append("metadata[shipping_option_type]", String(body.delivery?.shippingOptionType || ""));
       params.append("metadata[shipping_title]", String(body.delivery?.shippingTitle || ""));
