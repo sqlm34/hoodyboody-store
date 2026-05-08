@@ -644,48 +644,18 @@ h3 {
 }
 
 .category-hero {
-  --category-bg: linear-gradient(135deg, #f7f8f5 0%, #e4eee8 100%);
-  --category-image: url("assets/embroidered-collection.png");
-  display: grid;
-  grid-template-columns: minmax(240px, 0.42fr) minmax(0, 1fr);
-  min-height: 420px;
-  overflow: hidden;
-  border: 1px solid rgba(22, 26, 29, 0.12);
-  border-radius: 8px;
-  background: var(--category-bg);
-  box-shadow: 0 18px 50px rgba(22, 26, 29, 0.08);
-}
-
-.category-hero[data-category="outerwear"] {
-  --category-bg: linear-gradient(135deg, #e9f0ea 0%, #f6eee1 100%);
-}
-
-.category-hero[data-category="tops"] {
-  --category-bg: linear-gradient(135deg, #edf1f7 0%, #f7f0eb 100%);
-}
-
-.category-hero[data-category="accessories"] {
-  --category-bg: linear-gradient(135deg, #f4efe7 0%, #e8f2ef 100%);
-}
-
-.category-hero-photo {
-  min-height: 420px;
-  background-image: var(--category-image);
-  background-position: var(--focus, center);
-  background-repeat: no-repeat;
-  background-size: cover;
+  display: block;
+  padding: clamp(28px, 6vw, 72px) 0 clamp(16px, 3vw, 34px);
+  border-bottom: 1px solid var(--line);
 }
 
 .category-hero-content {
   display: grid;
-  align-content: center;
-  gap: 14px;
+  gap: 18px;
   min-width: 0;
-  padding: clamp(28px, 5vw, 64px);
-}
-
-.category-hero-content .back-link {
-  margin-bottom: 8px;
+  max-width: 820px;
+  padding-left: clamp(18px, 3vw, 42px);
+  border-left: 2px solid rgba(31, 107, 90, 0.32);
 }
 
 .category-hero-content h1 {
@@ -693,15 +663,16 @@ h3 {
   margin: 0;
   color: var(--ink);
   font-family: Georgia, "Times New Roman", serif;
-  font-size: clamp(2.8rem, 7vw, 6rem);
-  line-height: 0.92;
+  font-size: clamp(2.7rem, 6vw, 5.4rem);
+  line-height: 0.95;
 }
 
 .category-hero-content p:not(.eyebrow) {
-  max-width: 620px;
+  max-width: 700px;
   margin: 0;
   color: var(--muted);
-  font-size: 1.05rem;
+  font-size: clamp(1rem, 1.5vw, 1.22rem);
+  line-height: 1.7;
 }
 
 .category-catalog {
@@ -2972,14 +2943,6 @@ textarea:focus {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
-  .category-hero {
-    grid-template-columns: 1fr;
-  }
-
-  .category-hero-photo {
-    min-height: 280px;
-  }
-
   .product-card {
     grid-template-rows: 220px 1fr;
   }
@@ -3158,16 +3121,9 @@ textarea:focus {
     font-size: clamp(1.25rem, 6.2vw, 2rem);
   }
 
-  .category-hero {
-    min-height: 0;
-  }
-
-  .category-hero-photo {
-    min-height: 220px;
-  }
-
   .category-hero-content {
-    padding: 24px;
+    gap: 14px;
+    padding-left: 18px;
   }
 
   .category-hero-content h1 {

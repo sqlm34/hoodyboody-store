@@ -351,10 +351,12 @@ function renderCatalogSections() {
 }
 
 function updateCatalogViewHead(visibleCount) {
-  if (!catalogViewEyebrow || !catalogViewTitle || !catalogViewCopy) return;
+  if (!catalogViewTitle || !catalogViewCopy) return;
 
   const meta = state.filter === "all" ? ALL_CATALOG_META : getCategoryMeta(state.filter);
-  catalogViewEyebrow.textContent = meta.eyebrow;
+  if (catalogViewEyebrow) {
+    catalogViewEyebrow.textContent = meta.eyebrow;
+  }
   catalogViewTitle.textContent = meta.title;
   catalogViewCopy.textContent =
     state.filter === "all"
