@@ -33,7 +33,7 @@ const quantityMinus = document.querySelector("#quantityMinus");
 const quantityPlus = document.querySelector("#quantityPlus");
 const productQuantity = document.querySelector("#productQuantity");
 const productAdd = document.querySelector("#productAdd");
-const productPay = document.querySelector("#productPay");
+const productGoCart = document.querySelector("#productGoCart");
 const productNote = document.querySelector("#productNote");
 const productCartLink = document.querySelector("#productCartLink");
 const productCartCount = document.querySelector("#productCartCount");
@@ -131,7 +131,7 @@ function loadCart() {
 function saveCart(cart) {
   localStorage.setItem(CART_STORAGE_KEY, JSON.stringify(cart));
   updateCartLink();
-  updateProductPayState(cart);
+  updateProductGoCartState(cart);
   renderCartDrawer();
 }
 
@@ -156,9 +156,9 @@ function isCurrentProductInCart(cart = loadCart()) {
   return Boolean(product?.id && getCartQuantityForProductId(product.id, cart) > 0);
 }
 
-function updateProductPayState(cart = loadCart()) {
-  if (!productPay) return;
-  productPay.disabled = !isCurrentProductInCart(cart);
+function updateProductGoCartState(cart = loadCart()) {
+  if (!productGoCart) return;
+  productGoCart.disabled = !isCurrentProductInCart(cart);
 }
 
 function getStockForCartItem(item, cart = loadCart()) {
@@ -239,7 +239,7 @@ function renderCartDrawer() {
     .join("");
 
   updateCartLink();
-  updateProductPayState(cart);
+  updateProductGoCartState(cart);
   if (itemCount === 0 && cartDrawer?.classList.contains("open")) {
     checkoutLink.setAttribute("aria-disabled", "true");
   }
@@ -655,9 +655,9 @@ quantityPlus.addEventListener("click", () => setQuantity(selectedQuantity + 1));
 
 productAdd.addEventListener("click", addToCart);
 
-productPay?.addEventListener("click", () => {
-  if (productPay.disabled) return;
-  window.location.href = "checkout.html";
+productGoCart?.addEventListener("click", () => {
+  if (productGoCart.disabled) return;
+  openCart();
 });
 
 productCartLink.addEventListener("click", (event) => {
