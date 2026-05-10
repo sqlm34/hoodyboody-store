@@ -6,6 +6,7 @@ const path = require("path");
 const crypto = require("crypto");
 const { createOrderController } = require("./controllers/orderController");
 const { createAdminOrderRouter } = require("./routes/adminOrderRoutes");
+const { createSeoAdminRouter } = require("./routes/seoRoutes");
 const { createStripeWebhookRouter } = require("./routes/stripeWebhookRoutes");
 const {
   createShippoService,
@@ -14,6 +15,16 @@ const {
   validateProductShippingFields
 } = require("./services/shippoService");
 const { sendOrderStatusEmail } = require("./services/emailService");
+const {
+  buildSitemapUrls,
+  ensureSeoDefaults,
+  findRedirectForRequest,
+  generateRobotsTxt,
+  injectSeoHead,
+  renderSitemapIndex,
+  renderSitemapXml,
+  resolveSeoMetadata
+} = require("./services/seoService");
 let PgPool = null;
 let StsClient = null;
 let AssumeRoleWithWebIdentityCommand = null;
@@ -294,7 +305,26 @@ const defaultCategories = [
     seoDescription: "Shop embroidered accessories and small goods from HOODYBOODY."
   }
 ];
-const emptyDb = { users: [], sessions: [], orders: [], reviews: [], inventory: {}, inventoryLog: [], pendingStripeOrders: [], products: [], productImages: {} };
+const emptyDb = {
+  users: [],
+  sessions: [],
+  orders: [],
+  reviews: [],
+  inventory: {},
+  inventoryLog: [],
+  pendingStripeOrders: [],
+  products: [],
+  productImages: {},
+  categories: [],
+  seoGlobalSettings: null,
+  seoEntries: [],
+  seoTemplates: [],
+  seoRedirects: [],
+  seoCodeSnippets: [],
+  seoAuditLogs: [],
+  mediaSeo: [],
+  seoSitemap: null
+};
 const memoryDb = process.env.NITKA_DB_PATH === ":memory:" || (process.env.VERCEL && !hasRedisDb && !hasPostgresDb) ? JSON.parse(JSON.stringify(emptyDb)) : null;
 const dbPath = memoryDb ? "" : path.resolve(root, process.env.NITKA_DB_PATH || "data/db.json");
 const dataDir = memoryDb ? "" : path.dirname(dbPath);
@@ -356,6 +386,7 @@ function ensureDbDefaults(db) {
   db.pendingStripeOrders ||= [];
   db.products ||= [];
   db.productImages ||= {};
+  if (ensureSeoDefaults(db)) changed = true;
   if (!Object.prototype.hasOwnProperty.call(db, "categories")) {
     db.categories = JSON.parse(JSON.stringify(defaultCategories));
     changed = true;
@@ -478,6 +509,14 @@ function writeDb(db) {
     memoryDb.products = db.products;
     memoryDb.productImages = db.productImages;
     memoryDb.categories = db.categories;
+    memoryDb.seoGlobalSettings = db.seoGlobalSettings;
+    memoryDb.seoEntries = db.seoEntries;
+    memoryDb.seoTemplates = db.seoTemplates;
+    memoryDb.seoRedirects = db.seoRedirects;
+    memoryDb.seoCodeSnippets = db.seoCodeSnippets;
+    memoryDb.seoAuditLogs = db.seoAuditLogs;
+    memoryDb.mediaSeo = db.mediaSeo;
+    memoryDb.seoSitemap = db.seoSitemap;
     return;
   }
 
@@ -802,7 +841,7 @@ function getReviewSummary(reviews) {
 }
 
 function isAdmin(user) {
-  return user?.role === "admin";
+  return user?.role === "admin" || user?.role === "superadmin";
 }
 
 function publicInventory(inventory) {
@@ -2487,7 +2526,7 @@ async function handleApi(req, res) {
   }
 }
 
-async function serveStatic(req, res) {
+async function serveStatic(req, res, db = null) {
   const urlPath = decodeURIComponent(req.url.split("?")[0]);
   const requestedPath = urlPath === "/" ? "/index.html" : urlPath;
   const filePath = path.resolve(root, `.${requestedPath}`);
@@ -2501,6 +2540,41 @@ async function serveStatic(req, res) {
 
   fs.readFile(filePath, async (error, content) => {
     if (error) {
+      if (db && req.method === "GET" && !path.extname(requestedPath)) {
+        try {
+          const metadata = resolveSeoMetadata(db, req, getRequestOrigin(req));
+          if (metadata.entry?.route_path) {
+            const pageHtml = `
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body>
+    <header class="topbar checkout-topbar" aria-label="Page navigation">
+      <a class="brand" href="/index.html" aria-label="HOODYBOODY"><span>HOODYBOODY</span></a>
+    </header>
+    <main class="checkout-page">
+      <section class="checkout-hero">
+        <p class="eyebrow">${escapeHtmlAttribute(metadata.context.entity_type || "page")}</p>
+        <h1>${escapeHtmlAttribute(metadata.h1 || metadata.title)}</h1>
+        <p>${escapeHtmlAttribute(metadata.description || "")}</p>
+      </section>
+      ${metadata.entry.seo_content_top ? `<section class="checkout-panel">${escapeHtmlAttribute(metadata.entry.seo_content_top)}</section>` : ""}
+      ${metadata.entry.seo_content_bottom ? `<section class="checkout-panel">${escapeHtmlAttribute(metadata.entry.seo_content_bottom)}</section>` : ""}
+    </main>
+  </body>
+</html>`;
+            res.writeHead(200, { "Content-Type": "text/html; charset=utf-8" });
+            res.end(injectSeoHead(pageHtml, metadata));
+            return;
+          }
+        } catch {
+          // Fall through to the regular 404 below.
+        }
+      }
       res.writeHead(404, { "Content-Type": "text/plain; charset=utf-8" });
       res.end("File not found");
       return;
@@ -2509,28 +2583,10 @@ async function serveStatic(req, res) {
     const ext = path.extname(filePath).toLowerCase();
     let responseContent = content;
 
-    if (requestedPath === "/product.html") {
+    if (ext === ".html" && !requestedPath.startsWith("/admin") && !requestedPath.includes("admin-")) {
       try {
-        const db = await readDbAsync();
-        const productId = new URL(req.url, getRequestOrigin(req)).searchParams.get("id");
-        const product = getProduct(productId, db);
-
-        if (product) {
-          const title = product.seoTitle || `${product.title} | HOODYBOODY`;
-          const description = product.seoDescription || product.longDescription || product.description;
-          const image = absoluteUrl(req, product.image);
-          const productUrl = `${getRequestOrigin(req).replace(/\/$/, "")}/product.html?id=${encodeURIComponent(product.id)}`;
-          const seo = `
-    <title>${escapeHtmlAttribute(title)}</title>
-    <meta name="description" content="${escapeHtmlAttribute(description)}" />
-    <meta property="og:title" content="${escapeHtmlAttribute(title)}" />
-    <meta property="og:description" content="${escapeHtmlAttribute(description)}" />
-    <meta property="og:type" content="product" />
-    <meta property="og:url" content="${escapeHtmlAttribute(productUrl)}" />
-    ${image ? `<meta property="og:image" content="${escapeHtmlAttribute(image)}" />` : ""}
-    <link rel="canonical" href="${escapeHtmlAttribute(productUrl)}" />`;
-          responseContent = Buffer.from(content.toString("utf8").replace(/<title>.*?<\/title>/, seo));
-        }
+        const metadata = resolveSeoMetadata(db || (await readDbAsync()), req, getRequestOrigin(req));
+        responseContent = Buffer.from(injectSeoHead(content.toString("utf8"), metadata));
       } catch {
         responseContent = content;
       }
@@ -2541,13 +2597,48 @@ async function serveStatic(req, res) {
   });
 }
 
-function appHandler(req, res) {
+async function appHandler(req, res) {
   if (req.url.startsWith("/api/")) {
     handleApi(req, res);
     return;
   }
 
-  serveStatic(req, res);
+  const db = await readDbAsync();
+  const redirectResult = findRedirectForRequest(db, req.url);
+  if (redirectResult && req.method === "GET") {
+    redirectResult.redirect.hit_count = Number(redirectResult.redirect.hit_count || 0) + 1;
+    redirectResult.redirect.last_hit_at = new Date().toISOString();
+    await writeDbAsync(db);
+    res.writeHead(redirectResult.redirect.status_code || 301, { Location: redirectResult.targetUrl });
+    res.end();
+    return;
+  }
+
+  const pathname = new URL(req.url, getRequestOrigin(req)).pathname;
+  if (pathname === "/robots.txt") {
+    res.writeHead(200, { "Content-Type": "text/plain; charset=utf-8" });
+    res.end(generateRobotsTxt(db, getRequestOrigin(req)));
+    return;
+  }
+
+  if (pathname === "/sitemap.xml" || pathname === "/sitemap-pages.xml" || pathname === "/sitemap-products.xml" || pathname === "/sitemap-categories.xml" || pathname === "/sitemap-blog.xml") {
+    let urls = buildSitemapUrls(db, getRequestOrigin(req));
+    if (pathname === "/sitemap-pages.xml") urls = urls.filter((item) => !item.loc.includes("product.html") && !item.loc.includes("category.html") && !/\/(outerwear|tops|accessories)\.html$/.test(item.loc));
+    if (pathname === "/sitemap-products.xml") urls = urls.filter((item) => item.loc.includes("product.html"));
+    if (pathname === "/sitemap-categories.xml") urls = urls.filter((item) => item.loc.includes("category.html") || /\/(outerwear|tops|accessories)\.html$/.test(item.loc));
+    if (pathname === "/sitemap-blog.xml") urls = [];
+    res.writeHead(200, { "Content-Type": "application/xml; charset=utf-8" });
+    res.end(renderSitemapXml(urls));
+    return;
+  }
+
+  if (pathname === "/sitemap-index.xml") {
+    res.writeHead(200, { "Content-Type": "application/xml; charset=utf-8" });
+    res.end(renderSitemapIndex(getRequestOrigin(req)));
+    return;
+  }
+
+  serveStatic(req, res, db);
 }
 
 const orderController = createOrderController({
@@ -2565,12 +2656,17 @@ const expressApp = express();
 
 expressApp.use("/api", createStripeWebhookRouter({ express, orderController }));
 expressApp.use("/api", createAdminOrderRouter({ express, orderController }));
+expressApp.use("/api/admin/seo", createSeoAdminRouter({ express, readDbAsync, writeDbAsync, getSessionUser, adminEmail, getRequestOrigin }));
 expressApp.get("/admin/orders", (req, res) => {
   res.sendFile(path.join(root, "admin-orders.html"));
 });
 
 expressApp.get("/admin/categories", (req, res) => {
   res.sendFile(path.join(root, "admin-categories.html"));
+});
+
+expressApp.get("/admin/seo", (req, res) => {
+  res.sendFile(path.join(root, "admin-seo.html"));
 });
 expressApp.use((req, res) => appHandler(req, res));
 

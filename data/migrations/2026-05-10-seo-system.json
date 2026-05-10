@@ -1,0 +1,17 @@
+{
+  "id": "2026-05-10-seo-system",
+  "description": "Adds SEO settings, entries, templates, redirects, snippets, audit log, media SEO and sitemap state to the existing single-document store.",
+  "storage": "json_document",
+  "appliedBy": "ensureDbDefaults",
+  "fields": [
+    "seoGlobalSettings",
+    "seoEntries",
+    "seoTemplates",
+    "seoRedirects",
+    "seoCodeSnippets",
+    "seoAuditLogs",
+    "mediaSeo",
+    "seoSitemap"
+  ],
+  "notes": "The project stores all persistent data in one JSON-compatible document for local JSON, Redis and Postgres modes. The migration is applied idempotently by server startup."
+}
