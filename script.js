@@ -4,24 +4,56 @@ const CART_STORAGE_KEY = "nitka-cart";
 const DISCOUNT_THRESHOLD = 20000;
 const DISCOUNT_LABEL = "10%";
 const DISCOUNT_RATE = 0.1;
-const CATEGORY_ORDER = ["outerwear", "tops", "accessories"];
-const CATEGORY_META = {
-  outerwear: {
+const DEFAULT_CATEGORIES = [
+  {
+    id: "outerwear",
     eyebrow: "outerwear",
     title: "Jackets",
-    copy: "Layered linen, bomber and denim pieces with embroidery that holds the whole look together."
+    description: "Layered linen, bomber and denim pieces with embroidery that holds the whole look together.",
+    image: "assets/embroidered-collection.png",
+    focus: "38% 45%",
+    background: "linear-gradient(135deg, #e9f0ea 0%, #f6eee1 100%)",
+    sortOrder: 10
   },
-  tops: {
+  {
+    id: "tops",
     eyebrow: "tops",
     title: "Tops",
-    copy: "Hoodies and shirts with clean stitched details for everyday wear and custom styling."
+    description: "Hoodies and shirts with clean stitched details for everyday wear and custom styling.",
+    image: "assets/embroidered-collection.png",
+    focus: "56% 35%",
+    background: "linear-gradient(135deg, #edf1f7 0%, #f7f0eb 100%)",
+    sortOrder: 20
   },
-  accessories: {
+  {
+    id: "accessories",
     eyebrow: "accessories",
     title: "Accessories",
-    copy: "Small embroidered pieces that finish the outfit without feeling loud."
+    description: "Small embroidered pieces that finish the outfit without feeling loud.",
+    image: "assets/embroidered-collection.png",
+    focus: "44% 68%",
+    background: "linear-gradient(135deg, #f4efe7 0%, #e8f2ef 100%)",
+    sortOrder: 30
   }
-};
+];
+let categoryDefinitions = [...DEFAULT_CATEGORIES];
+let categoriesLoaded = false;
+let CATEGORY_ORDER = categoryDefinitions.map((category) => category.id);
+let CATEGORY_META = Object.fromEntries(
+  categoryDefinitions.map((category) => [
+    category.id,
+    {
+      eyebrow: category.eyebrow,
+      title: category.title,
+      copy: category.description,
+      image: category.image,
+      focus: category.focus,
+      background: category.background,
+      seoTitle: category.seoTitle,
+      seoDescription: category.seoDescription
+    }
+  ])
+);
 const ALL_CATALOG_META = {
   eyebrow: "all pieces",
   title: "All catalog",
@@ -100,6 +132,57 @@ async function api(path, options = {}) {
   return data;
 }
 
+function applyCategories(nextCategories) {
+  const normalized = Array.isArray(nextCategories)
+    ? nextCategories
+        .map((category) => ({
+          id: String(category.id || "").trim(),
+          eyebrow: String(category.eyebrow || category.title || "collection").trim(),
+          title: String(category.title || category.id || "Category").trim(),
+          description: String(category.description || category.copy || "").trim(),
+          image: String(category.image || "").trim(),
+          focus: String(category.focus || "center").trim(),
+          background: String(category.background || "").trim(),
+          seoTitle: String(category.seoTitle || "").trim(),
+          seoDescription: String(category.seoDescription || "").trim(),
+          sortOrder: Number(category.sortOrder) || 100
+        }))
+        .filter((category) => category.id && category.title)
+        .sort((a, b) => a.sortOrder - b.sortOrder || a.title.localeCompare(b.title))
+    : [];
+
+  categoryDefinitions = normalized;
+  CATEGORY_ORDER = categoryDefinitions.map((category) => category.id);
+  CATEGORY_META = Object.fromEntries(
+    categoryDefinitions.map((category) => [
+      category.id,
+      {
+        eyebrow: category.eyebrow,
+        title: category.title,
+        copy: category.description,
+        image: category.image,
+        focus: category.focus,
+        background: category.background,
+        seoTitle: category.seoTitle,
+        seoDescription: category.seoDescription
+      }
+    ])
+  );
+}
+
+async function loadCategories() {
+  try {
+    const data = await api("/api/categories");
+    applyCategories(data.categories);
+    categoriesLoaded = true;
+  } catch {
+    applyCategories(DEFAULT_CATEGORIES);
+    categoriesLoaded = false;
+  }
+
+  renderCatalog();
+}
+
 function getReviewWord(count) {
   return count === 1 ? "review" : "reviews";
 }
@@ -163,7 +246,7 @@ function getProductUrl(productId, type = "") {
   const productParams = new URLSearchParams({ id: productId });
   const categoryType = type || (state.filter !== "all" ? state.filter : "");
 
-  if (CATEGORY_PAGES[categoryType]) {
+  if (categoryType) {
     productParams.set("category", categoryType);
   }
 
@@ -284,7 +367,19 @@ function getCategoryMeta(type) {
   };
 }
 
+function isKnownCategory(type) {
+  return categoryDefinitions.some((category) => category.id === type);
+}
+
 function getCatalogTypes() {
+  if (categoriesLoaded) {
+    return categoryDefinitions.map((category) => category.id);
+  }
+
+  if (categoryDefinitions.length) {
+    return categoryDefinitions.map((category) => category.id);
+  }
+
   const typeSet = new Set(products.map((product) => product.type).filter(Boolean));
   return Array.from(typeSet).sort((a, b) => {
     const aIndex = CATEGORY_ORDER.indexOf(a);
@@ -301,13 +396,23 @@ function getCategoryProducts(type) {
 }
 
 function getCategoryImage(type) {
+  const metaImage = CATEGORY_META[type]?.image;
+  if (metaImage) return metaImage;
+
   const product = getCategoryProducts(type)[0] || products[0] || {};
   return product.image || "assets/embroidered-collection.png";
 }
 
 function getCategoryFocus(type) {
+  const metaFocus = CATEGORY_META[type]?.focus;
+  if (metaFocus) return metaFocus;
+
   const product = getCategoryProducts(type)[0] || products[0] || {};
   return product.focus || "center";
+}
+
+function getCategoryBackground(type) {
+  return CATEGORY_META[type]?.background || "linear-gradient(135deg, #f7f8f5 0%, #e4eee8 100%)";
 }
 
 function setCatalogFilter(filter, options = {}) {
@@ -336,7 +441,7 @@ function renderCatalogSections() {
           class="catalog-section-card${reverse}"
           href="${getCategoryUrl(type)}"
           data-category="${escapeHtml(type)}"
-          style="--category-image: url('${escapeHtml(getCategoryImage(type))}'); --focus: ${escapeHtml(getCategoryFocus(type))}"
+          style="--category-image: url('${escapeHtml(getCategoryImage(type))}'); --focus: ${escapeHtml(getCategoryFocus(type))}; --category-bg: ${escapeHtml(getCategoryBackground(type))}"
         >
           <span class="catalog-section-photo" aria-hidden="true"></span>
           <span class="catalog-section-content">
@@ -354,7 +459,16 @@ function renderCatalogSections() {
 function updateCatalogViewHead(visibleCount) {
   if (!catalogViewTitle || !catalogViewCopy) return;
 
-  const meta = state.filter === "all" ? ALL_CATALOG_META : getCategoryMeta(state.filter);
+  const categoryMissing = categoriesLoaded && state.filter !== "all" && !isKnownCategory(state.filter);
+  const meta = categoryMissing
+    ? {
+        eyebrow: "category removed",
+        title: "Category unavailable",
+        copy: "This category is no longer available on the site."
+      }
+    : state.filter === "all"
+      ? ALL_CATALOG_META
+      : getCategoryMeta(state.filter);
   if (catalogViewEyebrow) {
     catalogViewEyebrow.textContent = meta.eyebrow;
   }
@@ -370,7 +484,10 @@ function updateCatalogViewHead(visibleCount) {
     categoryCatalogTitle.textContent = `${meta.title} products`;
   }
   if (isCategoryPage) {
-    document.title = `${meta.title} | HOODYBOODY`;
+    document.title = meta.seoTitle || `${meta.title} | HOODYBOODY`;
+    const descriptionTag = document.querySelector('meta[name="description"]') || document.head.appendChild(document.createElement("meta"));
+    descriptionTag.setAttribute("name", "description");
+    descriptionTag.setAttribute("content", meta.seoDescription || meta.copy || `${meta.title} products from HOODYBOODY.`);
   }
 }
 
@@ -381,6 +498,7 @@ function renderCategoryHero() {
   categoryHero.dataset.category = heroType || "collection";
   categoryHero.style.setProperty("--category-image", `url('${getCategoryImage(heroType)}')`);
   categoryHero.style.setProperty("--focus", getCategoryFocus(heroType));
+  categoryHero.style.setProperty("--category-bg", getCategoryBackground(heroType));
 }
 
 function renderCatalog() {
@@ -388,7 +506,9 @@ function renderCatalog() {
   if (!catalogGrid) return;
 
   const visibleProducts =
-    state.filter === "all"
+    categoriesLoaded && state.filter !== "all" && !isKnownCategory(state.filter)
+      ? []
+      : state.filter === "all"
       ? products
       : products.filter((product) => product.type === state.filter);
 
@@ -720,7 +840,7 @@ document.querySelector(".order-form")?.addEventListener("submit", (event) => {
   document.querySelector(".form-note").textContent = "Thank you! We will contact you to confirm your order details.";
 });
 
-loadProducts().then(() => {
+Promise.all([loadCategories(), loadProducts()]).then(() => {
   loadReviewSummary();
   loadInventory();
 });

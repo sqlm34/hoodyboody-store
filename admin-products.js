@@ -3,6 +3,11 @@ let products = window.NITKA_PRODUCTS || [];
 const DEFAULT_IMAGE_URL = "assets/embroidered-collection.png";
 const DEFAULT_SIZE_OPTIONS = ["XXS", "XS", "S", "M", "L", "XL", "XXL", "One size"];
 const PACKAGE_TYPE_OPTIONS = ["parcel", "soft_pack", "padded_envelope", "box", "tube", "custom"];
+const DEFAULT_CATEGORY_OPTIONS = [
+  { id: "outerwear", title: "Outerwear" },
+  { id: "tops", title: "Tops" },
+  { id: "accessories", title: "Accessories" }
+];
 const PHOTO_FOCUS_OPTIONS = [
   { label: "Top left", value: "20% 20%" },
   { label: "Top", value: "50% 20%" },
@@ -27,6 +32,7 @@ const createProductCard = document.querySelector("#createProductCard");
 
 let inventory = {};
 let reviews = [];
+let categories = [...DEFAULT_CATEGORY_OPTIONS];
 let statusTimer = 0;
 let selectedProductId = "";
 let editorMode = "grid";
@@ -140,7 +146,7 @@ function getBlankProduct() {
   return {
     id: "",
     title: "New product card",
-    type: "tops",
+    type: categories[0]?.id || "tops",
     badge: "new",
     description: "Short product description.",
     price: 0,
@@ -165,6 +171,24 @@ function getBlankProduct() {
       required: true
     }
   };
+}
+
+function getCategoryOptions(currentType = "") {
+  const options = Array.isArray(categories) && categories.length ? [...categories] : [...DEFAULT_CATEGORY_OPTIONS];
+  if (currentType && !options.some((category) => category.id === currentType)) {
+    options.push({ id: currentType, title: `Legacy: ${currentType}` });
+  }
+  return options;
+}
+
+function renderCategorySelect(product) {
+  return `
+    <select name="type">
+      ${getCategoryOptions(product.type)
+        .map((category) => `<option value="${escapeHtml(category.id)}" ${product.type === category.id ? "selected" : ""}>${escapeHtml(category.title)}</option>`)
+        .join("")}
+    </select>
+  `;
 }
 
 function getProductReviews(productId) {
@@ -465,11 +489,7 @@ function renderProductForm(product, mode = "edit") {
           </label>
           <label>
             Category
-            <select name="type">
-              <option value="outerwear" ${product.type === "outerwear" ? "selected" : ""}>Outerwear</option>
-              <option value="tops" ${product.type === "tops" ? "selected" : ""}>Tops</option>
-              <option value="accessories" ${product.type === "accessories" ? "selected" : ""}>Accessories</option>
-            </select>
+            ${renderCategorySelect(product)}
           </label>
           <label>
             Badge
@@ -557,11 +577,7 @@ function renderLegacyProductsEditor() {
               </label>
               <label>
                 Category
-                <select name="type">
-                  <option value="outerwear" ${product.type === "outerwear" ? "selected" : ""}>Outerwear</option>
-                  <option value="tops" ${product.type === "tops" ? "selected" : ""}>Tops</option>
-                  <option value="accessories" ${product.type === "accessories" ? "selected" : ""}>Accessories</option>
-                </select>
+                ${renderCategorySelect(product)}
               </label>
               <label>
                 Badge
@@ -725,15 +741,17 @@ async function loadEditorData(options = {}) {
   if (!options.silent) setProductsStatus("Refreshing owner data...");
 
   try {
-    const [productsData, inventoryData, reviewsData] = await Promise.all([
+    const [productsData, inventoryData, reviewsData, categoriesData] = await Promise.all([
       api("/api/admin/products"),
       api("/api/admin/inventory"),
-      api("/api/admin/reviews")
+      api("/api/admin/reviews"),
+      api("/api/admin/categories")
     ]);
 
     products = productsData.products || [];
     inventory = inventoryData.inventory || {};
     reviews = reviewsData.reviews || [];
+    categories = categoriesData.categories || DEFAULT_CATEGORY_OPTIONS;
     showDashboard();
     renderProductsEditor();
     if (!options.silent) setProductsStatus("Owner product data refreshed successfully.");

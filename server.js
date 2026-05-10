@@ -256,6 +256,44 @@ const defaultProducts = [
     ]
   }
 ];
+const defaultCategories = [
+  {
+    id: "outerwear",
+    title: "Jackets",
+    eyebrow: "outerwear",
+    description: "Layered linen, bomber and denim pieces with embroidery that holds the whole look together.",
+    image: "assets/embroidered-collection.png",
+    focus: "38% 45%",
+    background: "linear-gradient(135deg, #e9f0ea 0%, #f6eee1 100%)",
+    sortOrder: 10,
+    seoTitle: "Jackets | HOODYBOODY",
+    seoDescription: "Shop embroidered jackets, bombers and outerwear from HOODYBOODY."
+  },
+  {
+    id: "tops",
+    title: "Tops",
+    eyebrow: "tops",
+    description: "Hoodies and shirts with clean stitched details for everyday wear and custom styling.",
+    image: "assets/embroidered-collection.png",
+    focus: "56% 35%",
+    background: "linear-gradient(135deg, #edf1f7 0%, #f7f0eb 100%)",
+    sortOrder: 20,
+    seoTitle: "Tops | HOODYBOODY",
+    seoDescription: "Shop embroidered hoodies, shirts and tops from HOODYBOODY."
+  },
+  {
+    id: "accessories",
+    title: "Accessories",
+    eyebrow: "accessories",
+    description: "Small embroidered pieces that finish the outfit without feeling loud.",
+    image: "assets/embroidered-collection.png",
+    focus: "44% 68%",
+    background: "linear-gradient(135deg, #f4efe7 0%, #e8f2ef 100%)",
+    sortOrder: 30,
+    seoTitle: "Accessories | HOODYBOODY",
+    seoDescription: "Shop embroidered accessories and small goods from HOODYBOODY."
+  }
+];
 const emptyDb = { users: [], sessions: [], orders: [], reviews: [], inventory: {}, inventoryLog: [], pendingStripeOrders: [], products: [], productImages: {} };
 const memoryDb = process.env.NITKA_DB_PATH === ":memory:" || (process.env.VERCEL && !hasRedisDb && !hasPostgresDb) ? JSON.parse(JSON.stringify(emptyDb)) : null;
 const dbPath = memoryDb ? "" : path.resolve(root, process.env.NITKA_DB_PATH || "data/db.json");
@@ -318,6 +356,20 @@ function ensureDbDefaults(db) {
   db.pendingStripeOrders ||= [];
   db.products ||= [];
   db.productImages ||= {};
+  if (!Object.prototype.hasOwnProperty.call(db, "categories")) {
+    db.categories = JSON.parse(JSON.stringify(defaultCategories));
+    changed = true;
+  } else if (!Array.isArray(db.categories)) {
+    db.categories = [];
+    changed = true;
+  }
+
+  const categoriesBefore = JSON.stringify(db.categories);
+  db.categories = db.categories
+    .map((category, index) => sanitizeCategory(category, category))
+    .filter((category) => category.category)
+    .map(({ category }, index) => ({ ...category, sortOrder: Number.isFinite(Number(category.sortOrder)) ? Number(category.sortOrder) : (index + 1) * 10 }));
+  if (categoriesBefore !== JSON.stringify(db.categories)) changed = true;
 
   if (!db.products.length) {
     db.products = JSON.parse(JSON.stringify(defaultProducts));
@@ -425,6 +477,7 @@ function writeDb(db) {
     memoryDb.pendingStripeOrders = db.pendingStripeOrders;
     memoryDb.products = db.products;
     memoryDb.productImages = db.productImages;
+    memoryDb.categories = db.categories;
     return;
   }
 
@@ -767,6 +820,62 @@ function publicInventory(inventory) {
       ];
     })
   );
+}
+
+function slugifyCategoryId(value) {
+  const slug = String(value || "")
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 48);
+
+  return slug || `category-${Date.now().toString(36)}`;
+}
+
+function sanitizeCategory(body = {}, currentCategory = {}) {
+  const id = slugifyCategoryId(currentCategory.id || body.id || body.title);
+  const title = String(body.title || currentCategory.title || "").trim().slice(0, 90);
+  const eyebrow = String(body.eyebrow || currentCategory.eyebrow || title || "collection").trim().slice(0, 40);
+  const description = String(body.description || currentCategory.description || "").trim().slice(0, 360);
+  const image = String(body.image || currentCategory.image || "assets/embroidered-collection.png").trim().slice(0, 500);
+  const focus = String(body.focus || currentCategory.focus || "center").trim().slice(0, 40);
+  const background = String(body.background || currentCategory.background || "linear-gradient(135deg, #f7f8f5 0%, #e4eee8 100%)")
+    .trim()
+    .slice(0, 220);
+  const sortOrder = Math.round(Number(body.sortOrder ?? currentCategory.sortOrder ?? 100));
+  const seoTitle = String(body.seoTitle || currentCategory.seoTitle || `${title} | HOODYBOODY`).trim().slice(0, 160);
+  const seoDescription = String(body.seoDescription || currentCategory.seoDescription || description).trim().slice(0, 260);
+
+  if (!id || !title || !description) {
+    return { category: null, message: "Fill category title and description." };
+  }
+
+  return {
+    category: {
+      id,
+      title,
+      eyebrow,
+      description,
+      image,
+      focus,
+      background,
+      sortOrder: Number.isFinite(sortOrder) ? sortOrder : 100,
+      seoTitle,
+      seoDescription
+    }
+  };
+}
+
+function publicCategory(category) {
+  return sanitizeCategory(category, category).category;
+}
+
+function publicCategories(db) {
+  return (Array.isArray(db.categories) ? db.categories : [])
+    .map(publicCategory)
+    .filter(Boolean)
+    .sort((a, b) => (Number(a.sortOrder) || 0) - (Number(b.sortOrder) || 0) || a.title.localeCompare(b.title));
 }
 
 function publicProduct(product) {
@@ -1510,6 +1619,11 @@ async function handleApi(req, res) {
       return;
     }
 
+    if (url.pathname === "/api/categories" && method === "GET") {
+      sendJson(res, 200, { categories: publicCategories(db) });
+      return;
+    }
+
     if (url.pathname.startsWith("/api/product-images/") && method === "GET") {
       const imageId = decodeURIComponent(url.pathname.slice("/api/product-images/".length));
       const image = db.productImages?.[imageId];
@@ -1803,6 +1917,125 @@ async function handleApi(req, res) {
 
       await writeDbAsync(db);
       sendJson(res, 200, { inventory: publicInventory(db.inventory)[productId] });
+      return;
+    }
+
+    if (url.pathname === "/api/admin/categories" && method === "GET") {
+      const user = getSessionUser(req, db);
+      if (!user) {
+        sendJson(res, 401, { message: "You must be logged in as the store owner." });
+        return;
+      }
+
+      if (!isAdmin(user)) {
+        sendJson(res, 403, { message: "Only the store owner can manage categories." });
+        return;
+      }
+
+      sendJson(res, 200, { categories: publicCategories(db) });
+      return;
+    }
+
+    if (url.pathname === "/api/admin/categories" && method === "POST") {
+      const user = getSessionUser(req, db);
+      if (!user) {
+        sendJson(res, 401, { message: "You must be logged in as the store owner." });
+        return;
+      }
+
+      if (!isAdmin(user)) {
+        sendJson(res, 403, { message: "Only the store owner can manage categories." });
+        return;
+      }
+
+      const body = await readJson(req);
+      const categoryPatch = sanitizeCategory(body, {});
+      const nextCategory = categoryPatch.category;
+
+      if (!nextCategory) {
+        sendJson(res, 400, { message: categoryPatch.message || "Fill category fields correctly." });
+        return;
+      }
+
+      if (db.categories.some((category) => category.id === nextCategory.id)) {
+        sendJson(res, 409, { message: "A category with this slug already exists." });
+        return;
+      }
+
+      nextCategory.createdAt = new Date().toISOString();
+      nextCategory.updatedAt = nextCategory.createdAt;
+      nextCategory.updatedBy = user.id;
+      db.categories.push(nextCategory);
+
+      await writeDbAsync(db);
+      sendJson(res, 201, { category: publicCategory(nextCategory), categories: publicCategories(db) });
+      return;
+    }
+
+    if (url.pathname === "/api/admin/categories" && method === "PATCH") {
+      const user = getSessionUser(req, db);
+      if (!user) {
+        sendJson(res, 401, { message: "You must be logged in as the store owner." });
+        return;
+      }
+
+      if (!isAdmin(user)) {
+        sendJson(res, 403, { message: "Only the store owner can manage categories." });
+        return;
+      }
+
+      const body = await readJson(req);
+      const categoryId = String(body.categoryId || body.id || "").trim();
+      const categoryIndex = db.categories.findIndex((category) => category.id === categoryId);
+
+      if (categoryIndex === -1) {
+        sendJson(res, 404, { message: "Category not found." });
+        return;
+      }
+
+      const categoryPatch = sanitizeCategory(body, db.categories[categoryIndex]);
+      const nextCategory = categoryPatch.category;
+
+      if (!nextCategory) {
+        sendJson(res, 400, { message: categoryPatch.message || "Fill category fields correctly." });
+        return;
+      }
+
+      nextCategory.id = db.categories[categoryIndex].id;
+      nextCategory.createdAt = db.categories[categoryIndex].createdAt || "";
+      nextCategory.updatedAt = new Date().toISOString();
+      nextCategory.updatedBy = user.id;
+      db.categories[categoryIndex] = nextCategory;
+
+      await writeDbAsync(db);
+      sendJson(res, 200, { category: publicCategory(nextCategory), categories: publicCategories(db) });
+      return;
+    }
+
+    if (url.pathname === "/api/admin/categories" && method === "DELETE") {
+      const user = getSessionUser(req, db);
+      if (!user) {
+        sendJson(res, 401, { message: "You must be logged in as the store owner." });
+        return;
+      }
+
+      if (!isAdmin(user)) {
+        sendJson(res, 403, { message: "Only the store owner can manage categories." });
+        return;
+      }
+
+      const body = await readJson(req);
+      const categoryId = String(body.categoryId || body.id || "").trim();
+      const categoryIndex = db.categories.findIndex((category) => category.id === categoryId);
+
+      if (categoryIndex === -1) {
+        sendJson(res, 404, { message: "Category not found." });
+        return;
+      }
+
+      db.categories.splice(categoryIndex, 1);
+      await writeDbAsync(db);
+      sendJson(res, 200, { categories: publicCategories(db), productCount: db.products.filter((product) => product.type === categoryId).length });
       return;
     }
 
@@ -2334,6 +2567,10 @@ expressApp.use("/api", createStripeWebhookRouter({ express, orderController }));
 expressApp.use("/api", createAdminOrderRouter({ express, orderController }));
 expressApp.get("/admin/orders", (req, res) => {
   res.sendFile(path.join(root, "admin-orders.html"));
+});
+
+expressApp.get("/admin/categories", (req, res) => {
+  res.sendFile(path.join(root, "admin-categories.html"));
 });
 expressApp.use((req, res) => appHandler(req, res));
 

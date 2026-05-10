@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="robots" content="noindex, nofollow, noarchive" />
+    <title>Edit categories | HOODYBOODY</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css" />
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <header class="topbar checkout-topbar" aria-label="Owner navigation">
+      <a class="brand" href="index.html" aria-label="HOODYBOODY">
+        <span class="brand-mark">HB</span>
+        <span>HOODYBOODY</span>
+      </a>
+      <nav class="nav-links" aria-label="Sections">
+        <a href="admin.html">Owner cabinet</a>
+        <a href="admin-products.html">Product cards</a>
+        <a href="/admin/orders">Orders</a>
+      </nav>
+      <div class="top-actions">
+        <a class="account-pill login-link" href="auth.html" hidden>Login</a>
+        <a class="account-pill cabinet-link" href="account.html" hidden>Cabinet</a>
+        <a class="account-pill admin-link" href="admin.html" hidden>Owner</a>
+        <button class="account-pill as-button logout-button" type="button" hidden>Logout</button>
+      </div>
+    </header>
+
+    <main class="checkout-page admin-page">
+      <section class="checkout-hero admin-hero" aria-labelledby="admin-categories-title">
+        <p class="eyebrow">owner dashboard</p>
+        <h1 id="admin-categories-title">Edit categories</h1>
+        <p>Add, update or remove homepage category sections and their SEO data.</p>
+      </section>
+
+      <section class="admin-locked checkout-panel" id="adminCategoriesLocked" hidden>
+        <h2>Access denied</h2>
+        <p id="adminCategoriesLockedText">This page is available only to the store owner.</p>
+        <a class="button primary" href="auth.html?next=/admin-categories.html">Login as owner</a>
+      </section>
+
+      <section class="checkout-panel admin-catalog-panel" id="adminCategoriesDashboard" hidden>
+        <div class="admin-orders-toolbar">
+          <div>
+            <h2>Homepage categories</h2>
+            <p>Each saved category appears as a section on the home page and opens its own catalog page.</p>
+          </div>
+          <div class="admin-toolbar">
+            <a class="button ghost dark" href="admin.html">Back to owner cabinet</a>
+            <button class="button primary" type="button" id="createCategory">Create category</button>
+            <button class="button ghost dark" type="button" id="reloadCategories">Refresh</button>
+          </div>
+        </div>
+        <div class="admin-categories-list" id="adminCategoriesList"></div>
+        <p class="form-note" id="adminCategoriesNote" role="status" aria-live="polite"></p>
+      </section>
+    </main>
+
+    <script src="session-nav.js"></script>
+    <script src="admin-categories.js"></script>
+  </body>
+</html>

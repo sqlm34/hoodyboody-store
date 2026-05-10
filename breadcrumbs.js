@@ -4,6 +4,7 @@
     tops: { title: "Tops", url: "tops.html" },
     accessories: { title: "Accessories", url: "accessories.html" }
   };
+  let categories = Object.entries(CATEGORY_PAGES).map(([id, meta]) => ({ id, title: meta.title, url: meta.url }));
   const PAGE_CATEGORY_TYPES = Object.fromEntries(
     Object.entries(CATEGORY_PAGES).map(([type, meta]) => [meta.url, type])
   );
@@ -53,16 +54,38 @@
     }
   }
 
+  async function getCategories() {
+    try {
+      const data = await api("/api/categories");
+      categories = Array.isArray(data.categories)
+        ? data.categories.map((category) => ({
+            id: category.id,
+            title: category.title,
+            url: CATEGORY_PAGES[category.id]?.url || `category.html?type=${encodeURIComponent(category.id)}`
+          }))
+        : categories;
+    } catch {
+      return categories;
+    }
+
+    return categories;
+  }
+
+  function getCategoryMeta(type) {
+    return categories.find((category) => category.id === type) || null;
+  }
+
   function getCategoryType(product) {
     const requestedCategory = params.get("category") || params.get("type");
-    if (CATEGORY_PAGES[requestedCategory]) return requestedCategory;
-    if (PAGE_CATEGORY_TYPES[pageName]) return PAGE_CATEGORY_TYPES[pageName];
-    if (CATEGORY_PAGES[product?.type]) return product.type;
+    if (getCategoryMeta(requestedCategory)) return requestedCategory;
+    if (PAGE_CATEGORY_TYPES[pageName] && getCategoryMeta(PAGE_CATEGORY_TYPES[pageName])) return PAGE_CATEGORY_TYPES[pageName];
+    if (getCategoryMeta(product?.type)) return product.type;
     return "";
   }
 
   function addCategoryTrail(trail, categoryType) {
-    if (!CATEGORY_PAGES[categoryType]) return trail;
+    const category = getCategoryMeta(categoryType);
+    if (!category) return trail;
 
     return [
       ...trail,
@@ -71,8 +94,8 @@
         url: "index.html#catalog"
       },
       {
-        name: CATEGORY_PAGES[categoryType].title,
-        url: CATEGORY_PAGES[categoryType].url
+        name: category.title,
+        url: category.url
       }
     ];
   }
@@ -85,7 +108,7 @@
     }
 
     if (pageName === "product.html") {
-      const products = await getProducts();
+      const [products] = await Promise.all([getProducts(), getCategories()]);
       const product = products.find((item) => item.id === params.get("id"));
       const categoryType = getCategoryType(product);
       trail = addCategoryTrail(trail, categoryType);
@@ -96,6 +119,7 @@
       return trail;
     }
 
+    await getCategories();
     const categoryType = getCategoryType();
     if (categoryType) {
       return addCategoryTrail(trail, categoryType);

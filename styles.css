@@ -2288,6 +2288,70 @@ textarea:focus {
   gap: 14px;
 }
 
+.admin-categories-list {
+  display: grid;
+  gap: 16px;
+}
+
+.admin-category-form {
+  display: grid;
+  grid-template-columns: minmax(220px, 0.36fr) minmax(0, 1fr);
+  align-items: stretch;
+  gap: 20px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 16px;
+  background: #fff;
+}
+
+.admin-category-preview {
+  display: grid;
+  align-content: end;
+  gap: 8px;
+  min-height: 280px;
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 18px;
+  color: var(--ink);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.08), rgba(255, 255, 255, 0.72)),
+    var(--category-image, url("assets/embroidered-collection.png")) center / cover no-repeat,
+    var(--category-bg, #f8faf8);
+  background-position: center, var(--focus, center), center;
+}
+
+.admin-category-preview span {
+  color: var(--muted);
+  font-size: 0.78rem;
+  font-weight: 900;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.admin-category-preview strong {
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: clamp(1.9rem, 4vw, 3rem);
+  line-height: 0.98;
+}
+
+.admin-category-fields {
+  display: grid;
+  gap: 12px;
+}
+
+.danger-button {
+  border-color: rgba(166, 78, 61, 0.28);
+  color: #a64e3d;
+}
+
+.danger-button:hover,
+.danger-button:focus-visible {
+  border-color: #a64e3d;
+  color: #fff;
+  background: #a64e3d;
+}
+
 .admin-product-picker {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
@@ -2868,6 +2932,7 @@ textarea:focus {
   .inventory-stats,
   .inventory-row,
   .admin-order-grid,
+  .admin-category-form,
   .admin-product-form {
     grid-template-columns: 1fr;
   }

@@ -107,16 +107,20 @@ async function loadProducts() {
 
 function getReturnCategoryType() {
   const requestedCategory = params.get("category");
-  if (CATEGORY_PAGES[requestedCategory]) return requestedCategory;
-  if (CATEGORY_PAGES[product?.type]) return product.type;
+  if (requestedCategory) return requestedCategory;
+  if (product?.type) return product.type;
   return "";
+}
+
+function getCategoryUrl(type) {
+  return CATEGORY_PAGES[type] || `category.html?type=${encodeURIComponent(type)}`;
 }
 
 function updateBackLink() {
   if (!backLink) return;
 
   const categoryType = getReturnCategoryType();
-  backLink.href = categoryType ? CATEGORY_PAGES[categoryType] : "index.html#catalog";
+  backLink.href = categoryType ? getCategoryUrl(categoryType) : "index.html#catalog";
   backLink.textContent = "Back to catalog";
 }
 
