@@ -152,13 +152,13 @@ function getCartQuantityForProductId(productId, cart = loadCart()) {
   return cart.reduce((sum, item) => (getCartProductId(item) === productId ? sum + item.quantity : sum), 0);
 }
 
-function isCurrentProductInCart(cart = loadCart()) {
-  return Boolean(product?.id && getCartQuantityForProductId(product.id, cart) > 0);
+function hasCartItems(cart = loadCart()) {
+  return cart.some((item) => Number(item.quantity) > 0);
 }
 
 function updateProductGoCartState(cart = loadCart()) {
   if (!productGoCart) return;
-  productGoCart.disabled = !isCurrentProductInCart(cart);
+  productGoCart.disabled = !hasCartItems(cart);
 }
 
 function getStockForCartItem(item, cart = loadCart()) {
