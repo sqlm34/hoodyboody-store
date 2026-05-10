@@ -2805,6 +2805,19 @@ textarea:focus {
   font-size: 1.35rem;
 }
 
+.product-action-row {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.product-pay-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+
 .reviews-section {
   display: grid;
   gap: 16px;
@@ -3181,6 +3194,10 @@ textarea:focus {
 
   .product-page-info h1 {
     font-size: 2.15rem;
+  }
+
+  .product-action-row {
+    grid-template-columns: 1fr;
   }
 
   .thumbnail {

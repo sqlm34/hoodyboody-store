@@ -33,6 +33,7 @@ const quantityMinus = document.querySelector("#quantityMinus");
 const quantityPlus = document.querySelector("#quantityPlus");
 const productQuantity = document.querySelector("#productQuantity");
 const productAdd = document.querySelector("#productAdd");
+const productPay = document.querySelector("#productPay");
 const productNote = document.querySelector("#productNote");
 const productCartLink = document.querySelector("#productCartLink");
 const productCartCount = document.querySelector("#productCartCount");
@@ -130,6 +131,7 @@ function loadCart() {
 function saveCart(cart) {
   localStorage.setItem(CART_STORAGE_KEY, JSON.stringify(cart));
   updateCartLink();
+  updateProductPayState(cart);
   renderCartDrawer();
 }
 
@@ -148,6 +150,15 @@ function getCartProductId(item) {
 
 function getCartQuantityForProductId(productId, cart = loadCart()) {
   return cart.reduce((sum, item) => (getCartProductId(item) === productId ? sum + item.quantity : sum), 0);
+}
+
+function isCurrentProductInCart(cart = loadCart()) {
+  return Boolean(product?.id && getCartQuantityForProductId(product.id, cart) > 0);
+}
+
+function updateProductPayState(cart = loadCart()) {
+  if (!productPay) return;
+  productPay.disabled = !isCurrentProductInCart(cart);
 }
 
 function getStockForCartItem(item, cart = loadCart()) {
@@ -228,6 +239,7 @@ function renderCartDrawer() {
     .join("");
 
   updateCartLink();
+  updateProductPayState(cart);
   if (itemCount === 0 && cartDrawer?.classList.contains("open")) {
     checkoutLink.setAttribute("aria-disabled", "true");
   }
@@ -642,6 +654,11 @@ quantityMinus.addEventListener("click", () => setQuantity(selectedQuantity - 1))
 quantityPlus.addEventListener("click", () => setQuantity(selectedQuantity + 1));
 
 productAdd.addEventListener("click", addToCart);
+
+productPay?.addEventListener("click", () => {
+  if (productPay.disabled) return;
+  window.location.href = "checkout.html";
+});
 
 productCartLink.addEventListener("click", (event) => {
   event.preventDefault();
