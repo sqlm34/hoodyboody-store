@@ -13,6 +13,14 @@ import com.getcapacitor.annotation.CapacitorPlugin;
 @CapacitorPlugin(name = "HoodyBoodyNotifications")
 public class HoodyBoodyNotificationsPlugin extends Plugin {
     @PluginMethod
+    public void isFirebaseConfigured(PluginCall call) {
+        int googleAppId = getContext().getResources().getIdentifier("google_app_id", "string", getContext().getPackageName());
+        JSObject result = new JSObject();
+        result.put("configured", googleAppId != 0);
+        call.resolve(result);
+    }
+
+    @PluginMethod
     public void openNotificationSettings(PluginCall call) {
         String channelId = call.getString("channelId", "hoodyboody_live_chat_v2");
         Intent intent;

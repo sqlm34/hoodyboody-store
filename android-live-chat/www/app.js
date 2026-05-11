@@ -27,6 +27,8 @@ let loadedOnce = false;
 let lastConversationTimes = {};
 let notificationsReady = false;
 let pushListenersReady = false;
+let firebaseChecked = false;
+let firebaseConfigured = false;
 
 serverUrlInput.value = localStorage.getItem(SERVER_KEY) || "https://www.hoodyboody.com";
 adminTokenInput.value = localStorage.getItem(TOKEN_KEY) || "";
@@ -116,6 +118,12 @@ async function ensurePushNotifications() {
   if (!push) return false;
 
   try {
+    const firebaseReady = await isFirebaseConfigured();
+    if (!firebaseReady) {
+      setStatus("App works. Firebase push is not configured yet.");
+      return false;
+    }
+
     let permission = await push.checkPermissions();
     if (permission.receive !== "granted") permission = await push.requestPermissions();
     if (permission.receive !== "granted") {
@@ -157,6 +165,22 @@ async function ensurePushNotifications() {
   }
 }
 
+async function isFirebaseConfigured() {
+  if (firebaseChecked) return firebaseConfigured;
+  firebaseChecked = true;
+  const plugin = window.Capacitor?.Plugins?.HoodyBoodyNotifications;
+  if (!plugin?.isFirebaseConfigured) return false;
+
+  try {
+    const result = await plugin.isFirebaseConfigured();
+    firebaseConfigured = result.configured === true;
+    return firebaseConfigured;
+  } catch {
+    firebaseConfigured = false;
+    return false;
+  }
+}
+
 async function ensureNotifications() {
   const plugins = window.Capacitor?.Plugins;
   const localNotifications = plugins?.LocalNotifications;
@@ -183,7 +207,6 @@ async function ensureNotifications() {
       sound: "hoodyboody_chat.wav"
     });
     notificationsReady = true;
-    await ensurePushNotifications();
     return true;
   } catch {
     notificationsReady = false;
@@ -302,7 +325,6 @@ async function connect() {
   localStorage.setItem(TOKEN_KEY, getToken());
   setStatus("Connecting...");
   await ensureNotifications();
-  await ensurePushNotifications();
 
   await loadConversations();
 
