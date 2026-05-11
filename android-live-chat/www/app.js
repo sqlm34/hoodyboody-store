@@ -1,9 +1,11 @@
 const SERVER_KEY = "hoodyboody-chat-server";
 const TOKEN_KEY = "hoodyboody-chat-token";
+const NOTIFICATION_CHANNEL_ID = "hoodyboody_live_chat_v2";
 
 const serverUrlInput = document.querySelector("#serverUrl");
 const adminTokenInput = document.querySelector("#adminToken");
 const connectButton = document.querySelector("#connectButton");
+const notificationsButton = document.querySelector("#notificationsButton");
 const settingsToggle = document.querySelector("#settingsToggle");
 const settingsCard = document.querySelector("#settingsCard");
 const statusText = document.querySelector("#statusText");
@@ -21,6 +23,7 @@ let pollTimer = 0;
 let knownMessageIds = new Set();
 let loadedOnce = false;
 let lastConversationTimes = {};
+let notificationsReady = false;
 
 serverUrlInput.value = localStorage.getItem(SERVER_KEY) || "https://www.hoodyboody.com";
 adminTokenInput.value = localStorage.getItem(TOKEN_KEY) || "";
@@ -73,8 +76,8 @@ async function notify(title, body) {
   const localNotifications = plugins?.LocalNotifications;
   if (!localNotifications) return;
 
-  const permission = await localNotifications.requestPermissions();
-  if (permission.display !== "granted") return;
+  const ready = notificationsReady || (await ensureNotifications());
+  if (!ready) return;
 
   await localNotifications.schedule({
     notifications: [
@@ -82,10 +85,46 @@ async function notify(title, body) {
         id: Math.floor(Date.now() % 2147483647),
         title,
         body,
+        channelId: NOTIFICATION_CHANNEL_ID,
+        sound: "hoodyboody_chat.wav",
+        data: { source: "hoodyboody-live-chat" },
         schedule: { at: new Date(Date.now() + 250) }
       }
     ]
   });
+}
+
+async function ensureNotifications() {
+  const plugins = window.Capacitor?.Plugins;
+  const localNotifications = plugins?.LocalNotifications;
+  if (!localNotifications) return false;
+
+  try {
+    const current = await localNotifications.checkPermissions();
+    const permission = current.display === "granted" ? current : await localNotifications.requestPermissions();
+    if (permission.display !== "granted") {
+      setStatus("Notifications are off. Allow notifications in Android settings.");
+      notificationsReady = false;
+      return false;
+    }
+
+    await localNotifications.createChannel({
+      id: NOTIFICATION_CHANNEL_ID,
+      name: "Customer messages",
+      description: "Sound alerts for new HOODYBOODY customer chat messages.",
+      importance: 5,
+      visibility: 1,
+      lights: true,
+      lightColor: "#B08D57",
+      vibration: true,
+      sound: "hoodyboody_chat.wav"
+    });
+    notificationsReady = true;
+    return true;
+  } catch {
+    notificationsReady = false;
+    return false;
+  }
 }
 
 function renderConversations() {
@@ -154,7 +193,7 @@ async function loadConversations() {
     nextConversations.forEach((conversation) => {
       const lastTime = conversation.lastMessageAt || "";
       const wasKnown = lastConversationTimes[conversation.id];
-      if (Number(conversation.unreadAdmin || 0) > 0 && lastTime && wasKnown && wasKnown !== lastTime) {
+      if (Number(conversation.unreadAdmin || 0) > 0 && lastTime && wasKnown !== lastTime) {
         notify(`Message from ${conversation.customer?.name || "Customer"}`, conversation.lastMessageText || "New customer message");
       }
     });
@@ -187,6 +226,7 @@ async function connect() {
   localStorage.setItem(SERVER_KEY, serverUrl);
   localStorage.setItem(TOKEN_KEY, getToken());
   setStatus("Connecting...");
+  await ensureNotifications();
 
   await loadConversations();
 
@@ -262,5 +302,10 @@ replyForm.addEventListener("submit", async (event) => {
 
 settingsToggle.addEventListener("click", () => settingsCard.classList.toggle("collapsed"));
 connectButton.addEventListener("click", () => connect().catch((error) => setStatus(error.message)));
+notificationsButton.addEventListener("click", async () => {
+  const enabled = await ensureNotifications();
+  if (enabled) await notify("HOODYBOODY notifications", "Sound is enabled.");
+  setStatus(enabled ? "Notifications enabled with sound." : "Notifications are off. Allow them in Android settings.");
+});
 
 connect().catch((error) => setStatus(error.message));
