@@ -1,6 +1,7 @@
 const SERVER_KEY = "hoodyboody-chat-server";
 const TOKEN_KEY = "hoodyboody-chat-token";
 const NOTIFICATION_CHANNEL_ID = "hoodyboody_live_chat_v2";
+const NOTIFICATION_CHANNEL_KEY = "hoodyboody-chat-notification-channel";
 
 const serverUrlInput = document.querySelector("#serverUrl");
 const adminTokenInput = document.querySelector("#adminToken");
@@ -29,6 +30,8 @@ let notificationsReady = false;
 let pushListenersReady = false;
 let firebaseChecked = false;
 let firebaseConfigured = false;
+let notificationChannelId = localStorage.getItem(NOTIFICATION_CHANNEL_KEY) || NOTIFICATION_CHANNEL_ID;
+let currentPushToken = "";
 
 serverUrlInput.value = localStorage.getItem(SERVER_KEY) || "https://www.hoodyboody.com";
 adminTokenInput.value = localStorage.getItem(TOKEN_KEY) || "";
@@ -52,6 +55,16 @@ function getToken() {
 
 function setStatus(message) {
   statusText.textContent = message;
+}
+
+function getNotificationChannelId() {
+  return notificationChannelId || NOTIFICATION_CHANNEL_ID;
+}
+
+function setNotificationChannelId(channelId) {
+  const value = String(channelId || "").trim() || NOTIFICATION_CHANNEL_ID;
+  notificationChannelId = value;
+  localStorage.setItem(NOTIFICATION_CHANNEL_KEY, value);
 }
 
 function headers() {
@@ -90,7 +103,7 @@ async function notify(title, body) {
         id: Math.floor(Date.now() % 2147483647),
         title,
         body,
-        channelId: NOTIFICATION_CHANNEL_ID,
+        channelId: getNotificationChannelId(),
         sound: "hoodyboody_chat.wav",
         data: { source: "hoodyboody-live-chat" },
         schedule: { at: new Date(Date.now() + 250) }
@@ -101,12 +114,13 @@ async function notify(title, body) {
 
 async function registerPushToken(token) {
   if (!token) return;
+  currentPushToken = token;
   const data = await api("/api/admin/chat/push-token", {
     method: "POST",
     body: JSON.stringify({
       token,
       platform: "android",
-      channelId: NOTIFICATION_CHANNEL_ID
+      channelId: getNotificationChannelId()
     })
   });
   return data;
@@ -134,6 +148,7 @@ async function ensurePushNotifications() {
     if (!pushListenersReady) {
       push.addListener("registration", async (token) => {
         try {
+          currentPushToken = token.value;
           await registerPushToken(token.value);
           setStatus("Push notifications enabled.");
         } catch (error) {
@@ -195,8 +210,14 @@ async function ensureNotifications() {
       return false;
     }
 
+    const plugin = plugins?.HoodyBoodyNotifications;
+    if (plugin?.applySavedNotificationSound) {
+      const saved = await plugin.applySavedNotificationSound({ channelId: NOTIFICATION_CHANNEL_ID });
+      if (saved?.channelId) setNotificationChannelId(saved.channelId);
+    }
+
     await localNotifications.createChannel({
-      id: NOTIFICATION_CHANNEL_ID,
+      id: getNotificationChannelId(),
       name: "Customer messages",
       description: "Sound alerts for new HOODYBOODY customer chat messages.",
       importance: 5,
@@ -215,10 +236,28 @@ async function ensureNotifications() {
 }
 
 async function openSoundSettings() {
-  await ensureNotifications();
+  const enabled = await ensureNotifications();
+  if (!enabled) return;
+
   const plugin = window.Capacitor?.Plugins?.HoodyBoodyNotifications;
+  if (plugin?.chooseNotificationSound) {
+    const result = await plugin.chooseNotificationSound({ channelId: getNotificationChannelId() });
+    if (result?.channelId) setNotificationChannelId(result.channelId);
+
+    if (result?.selected) {
+      notificationsReady = true;
+      if (currentPushToken) registerPushToken(currentPushToken).catch(() => {});
+      const soundName = result.soundTitle ? `: ${result.soundTitle}` : "";
+      setStatus(`Notification sound selected${soundName}.`);
+      await notify("HOODYBOODY notifications", "Selected sound is active.");
+    } else {
+      setStatus("Sound selection canceled.");
+    }
+    return;
+  }
+
   if (plugin?.openNotificationSettings) {
-    await plugin.openNotificationSettings({ channelId: NOTIFICATION_CHANNEL_ID });
+    await plugin.openNotificationSettings({ channelId: getNotificationChannelId() });
     setStatus("Choose sound in Android notification settings.");
     return;
   }
