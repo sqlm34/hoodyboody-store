@@ -172,7 +172,7 @@ async function loadConversations({ silent = false } = {}) {
     conversations = nextConversations;
     showDashboard();
     renderConversations();
-    chatStatus.textContent = connected ? "Socket connected" : "Secure backup refresh active";
+    chatStatus.textContent = connected ? "Live connection active" : "Live refresh active";
     if (!activeConversation && conversations[0]) await openConversation(conversations[0].id, { silent: true });
   } catch (error) {
     if (!silent) showLocked(error.status === 401 ? "Login as owner or enter the Android app token." : error.message);
@@ -216,12 +216,12 @@ async function connectSocket() {
     });
     socket.on("connect", () => {
       connected = true;
-      chatStatus.textContent = "Socket connected";
+      chatStatus.textContent = "Live connection active";
       socket.emit("chat:admin:join", { conversationId: activeConversation?.id || "" });
     });
     socket.on("disconnect", () => {
       connected = false;
-      chatStatus.textContent = "Reconnecting...";
+      chatStatus.textContent = "Live refresh active";
       startPolling();
     });
     socket.on("chat:admin:ready", (payload) => {
@@ -251,6 +251,7 @@ async function connectSocket() {
     });
   } catch {
     connected = false;
+    chatStatus.textContent = "Live refresh active";
     startPolling();
   }
 }
@@ -260,7 +261,7 @@ function startPolling() {
   pollTimer = setInterval(() => {
     loadConversations({ silent: true });
     if (activeConversation) openConversation(activeConversation.id, { silent: true });
-  }, 5000);
+  }, 2500);
 }
 
 conversationList.addEventListener("click", (event) => {

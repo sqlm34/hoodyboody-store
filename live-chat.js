@@ -180,7 +180,7 @@
       } catch {
         return;
       }
-    }, 5000);
+    }, 2500);
   }
 
   async function connectSocket() {
@@ -208,7 +208,7 @@
       });
       state.socket.on("disconnect", () => {
         state.connected = false;
-        setStatus("Reconnecting...");
+        setStatus("Online", true);
         startPolling();
       });
       state.socket.on("chat:error", (payload) => setStatus(payload.message || "Chat error"));

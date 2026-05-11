@@ -203,7 +203,7 @@ async function connect() {
     });
     socket.on("disconnect", () => {
       connected = false;
-      setStatus("Socket disconnected. Backup refresh is active.");
+      setStatus("Live refresh connected. Waiting for messages.");
       startPolling();
     });
     socket.on("chat:conversation", async (payload) => {
@@ -218,7 +218,7 @@ async function connect() {
     });
     socket.on("chat:error", (payload) => setStatus(payload.message || "Chat error"));
   } catch {
-    setStatus("Socket unavailable. Backup refresh is active.");
+    setStatus("Live refresh connected. Waiting for messages.");
     startPolling();
   }
 }
@@ -232,7 +232,7 @@ function startPolling() {
     } catch (error) {
       setStatus(error.message);
     }
-  }, 5000);
+  }, 2500);
 }
 
 conversationList.addEventListener("click", (event) => {
