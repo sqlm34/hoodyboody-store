@@ -33,7 +33,9 @@ function escapeHtml(value) {
 }
 
 function getServerUrl() {
-  return serverUrlInput.value.trim().replace(/\/$/, "");
+  let value = serverUrlInput.value.trim();
+  if (value && !/^https?:\/\//i.test(value)) value = `https://${value}`;
+  return value.replace(/\/+$/, "");
 }
 
 function getToken() {
@@ -52,10 +54,15 @@ function headers() {
 }
 
 async function api(path, options = {}) {
-  const response = await fetch(`${getServerUrl()}${path}`, {
-    ...options,
-    headers: { ...headers(), ...(options.headers || {}) }
-  });
+  let response;
+  try {
+    response = await fetch(`${getServerUrl()}${path}`, {
+      ...options,
+      headers: { ...headers(), ...(options.headers || {}) }
+    });
+  } catch {
+    throw new Error("Cannot reach server. Check URL and internet connection.");
+  }
   const data = await response.json().catch(() => ({}));
   if (!response.ok) throw new Error(data.message || "Request error");
   return data;
@@ -175,7 +182,9 @@ function loadSocketClient() {
 }
 
 async function connect() {
-  localStorage.setItem(SERVER_KEY, getServerUrl());
+  const serverUrl = getServerUrl();
+  serverUrlInput.value = serverUrl;
+  localStorage.setItem(SERVER_KEY, serverUrl);
   localStorage.setItem(TOKEN_KEY, getToken());
   setStatus("Connecting...");
 

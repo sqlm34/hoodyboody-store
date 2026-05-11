@@ -700,6 +700,29 @@ function sendJson(res, status, payload, headers = {}) {
   res.end(JSON.stringify(payload));
 }
 
+function isChatApiPath(pathname = "") {
+  return pathname === "/api/chat/bootstrap" || pathname.startsWith("/api/chat/") || pathname.startsWith("/api/admin/chat/");
+}
+
+function chatCorsHeaders(req) {
+  const origin = req.headers.origin || "*";
+  return {
+    "Access-Control-Allow-Origin": origin,
+    "Access-Control-Allow-Methods": "GET, POST, PATCH, OPTIONS",
+    "Access-Control-Allow-Headers": "Content-Type, x-chat-admin-token",
+    "Access-Control-Allow-Credentials": "true",
+    "Access-Control-Max-Age": "86400",
+    Vary: "Origin"
+  };
+}
+
+function sendChatJson(req, res, status, payload, headers = {}) {
+  sendJson(res, status, payload, {
+    ...chatCorsHeaders(req),
+    ...headers
+  });
+}
+
 function parseCookies(req) {
   return Object.fromEntries(
     (req.headers.cookie || "")
@@ -1693,6 +1716,15 @@ async function handleApi(req, res) {
   const url = new URL(req.url, `http://${req.headers.host}`);
 
   try {
+    if (isChatApiPath(url.pathname) && method === "OPTIONS") {
+      res.writeHead(204, {
+        ...noIndexHeader,
+        ...chatCorsHeaders(req)
+      });
+      res.end();
+      return;
+    }
+
     if (url.pathname === "/api/register" && method === "POST") {
       const body = await readJson(req);
       const name = String(body.name || "").trim();
@@ -1782,7 +1814,7 @@ async function handleApi(req, res) {
         await writeDbAsync(db);
       }
 
-      sendJson(res, 200, {
+      sendChatJson(req, res, 200, {
         user: publicUser(user),
         conversation: publicChatConversation(conversation, db, { withMessages: true }),
         socketEnabled: true
@@ -1795,13 +1827,13 @@ async function handleApi(req, res) {
       const conversation = db.chatConversations.find((item) => item.id === conversationId);
 
       if (!conversation) {
-        sendJson(res, 404, { message: "Chat conversation not found." });
+        sendChatJson(req, res, 404, { message: "Chat conversation not found." });
         return;
       }
 
       markChatRead(conversation, "customer");
       await writeDbAsync(db);
-      sendJson(res, 200, { conversation: publicChatConversation(conversation, db, { withMessages: true }) });
+      sendChatJson(req, res, 200, { conversation: publicChatConversation(conversation, db, { withMessages: true }) });
       return;
     }
 
@@ -1812,13 +1844,13 @@ async function handleApi(req, res) {
       const message = addChatMessage(db, conversation, "customer", body.text || body.message, conversation.customer?.name || user?.name || "Customer");
 
       if (!message) {
-        sendJson(res, 400, { message: "Write a message before sending." });
+        sendChatJson(req, res, 400, { message: "Write a message before sending." });
         return;
       }
 
       await writeDbAsync(db);
       emitChatUpdate(db, conversation, message);
-      sendJson(res, 201, {
+      sendChatJson(req, res, 201, {
         conversation: publicChatConversation(conversation, db, { withMessages: true }),
         message: publicChatMessage(message)
       });
@@ -1827,7 +1859,7 @@ async function handleApi(req, res) {
 
     if (url.pathname === "/api/admin/chat/conversations" && method === "GET") {
       if (!hasChatAdminAccess(req, db)) {
-        sendJson(res, 401, { message: "Owner access is required for live chat." });
+        sendChatJson(req, res, 401, { message: "Owner access is required for live chat." });
         return;
       }
 
@@ -1835,13 +1867,13 @@ async function handleApi(req, res) {
         .slice()
         .sort((a, b) => new Date(b.lastMessageAt || b.updatedAt || b.createdAt) - new Date(a.lastMessageAt || a.updatedAt || a.createdAt))
         .map((conversation) => publicChatConversation(conversation, db));
-      sendJson(res, 200, { conversations, tokenAuth: Boolean(req.headers["x-chat-admin-token"]) });
+      sendChatJson(req, res, 200, { conversations, tokenAuth: Boolean(req.headers["x-chat-admin-token"]) });
       return;
     }
 
     if (url.pathname.startsWith("/api/admin/chat/conversations/")) {
       if (!hasChatAdminAccess(req, db)) {
-        sendJson(res, 401, { message: "Owner access is required for live chat." });
+        sendChatJson(req, res, 401, { message: "Owner access is required for live chat." });
         return;
       }
 
@@ -1851,14 +1883,14 @@ async function handleApi(req, res) {
       const conversation = db.chatConversations.find((item) => item.id === conversationId);
 
       if (!conversation) {
-        sendJson(res, 404, { message: "Chat conversation not found." });
+        sendChatJson(req, res, 404, { message: "Chat conversation not found." });
         return;
       }
 
       if (!action && method === "GET") {
         markChatRead(conversation, "admin");
         await writeDbAsync(db);
-        sendJson(res, 200, { conversation: publicChatConversation(conversation, db, { withMessages: true }) });
+        sendChatJson(req, res, 200, { conversation: publicChatConversation(conversation, db, { withMessages: true }) });
         return;
       }
 
@@ -1868,13 +1900,13 @@ async function handleApi(req, res) {
         const message = addChatMessage(db, conversation, "admin", body.text || body.message, user?.name || "HOODYBOODY");
 
         if (!message) {
-          sendJson(res, 400, { message: "Write a message before sending." });
+          sendChatJson(req, res, 400, { message: "Write a message before sending." });
           return;
         }
 
         await writeDbAsync(db);
         emitChatUpdate(db, conversation, message);
-        sendJson(res, 201, {
+        sendChatJson(req, res, 201, {
           conversation: publicChatConversation(conversation, db, { withMessages: true }),
           message: publicChatMessage(message)
         });
@@ -1884,7 +1916,7 @@ async function handleApi(req, res) {
       if (action === "read" && method === "PATCH") {
         markChatRead(conversation, "admin");
         await writeDbAsync(db);
-        sendJson(res, 200, { conversation: publicChatConversation(conversation, db, { withMessages: true }) });
+        sendChatJson(req, res, 200, { conversation: publicChatConversation(conversation, db, { withMessages: true }) });
         return;
       }
     }
