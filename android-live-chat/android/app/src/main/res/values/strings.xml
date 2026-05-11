@@ -4,4 +4,5 @@
     <string name="title_activity_main">HOODYBOODY Chat</string>
     <string name="package_name">com.hoodyboody.livechat</string>
     <string name="custom_url_scheme">com.hoodyboody.livechat</string>
+    <string name="default_notification_channel_id">hoodyboody_live_chat_v2</string>
 </resources>

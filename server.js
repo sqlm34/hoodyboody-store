@@ -17,6 +17,15 @@ const {
 } = require("./services/shippoService");
 const { sendOrderStatusEmail } = require("./services/emailService");
 const {
+  DEFAULT_CHANNEL_ID,
+  isPushConfigured,
+  publicPushToken,
+  removePushToken,
+  sendChatPushNotifications,
+  sendTestPush,
+  upsertPushToken
+} = require("./services/pushNotifications");
+const {
   buildSitemapUrls,
   ensureSeoDefaults,
   findRedirectForRequest,
@@ -327,7 +336,8 @@ const emptyDb = {
   mediaSeo: [],
   seoSitemap: null,
   chatConversations: [],
-  chatMessages: []
+  chatMessages: [],
+  chatPushTokens: []
 };
 const memoryDb = process.env.NITKA_DB_PATH === ":memory:" || (process.env.VERCEL && !hasRedisDb && !hasPostgresDb) ? JSON.parse(JSON.stringify(emptyDb)) : null;
 const dbPath = memoryDb ? "" : path.resolve(root, process.env.NITKA_DB_PATH || "data/db.json");
@@ -394,6 +404,7 @@ function ensureDbDefaults(db) {
   db.productImages ||= {};
   db.chatConversations ||= [];
   db.chatMessages ||= [];
+  db.chatPushTokens ||= [];
   if (ensureSeoDefaults(db)) changed = true;
   if (!Object.prototype.hasOwnProperty.call(db, "categories")) {
     db.categories = JSON.parse(JSON.stringify(defaultCategories));
@@ -527,6 +538,7 @@ function writeDb(db) {
     memoryDb.seoSitemap = db.seoSitemap;
     memoryDb.chatConversations = db.chatConversations;
     memoryDb.chatMessages = db.chatMessages;
+    memoryDb.chatPushTokens = db.chatPushTokens;
     return;
   }
 
@@ -1008,6 +1020,17 @@ function emitChatUpdate(db, conversation, message = null) {
 
   chatIo.to(`chat:${conversation.id}`).emit("chat:message", payload);
   chatIo.to("chat:admins").emit("chat:conversation", payload);
+}
+
+async function notifyChatAdmins(db, conversation, message) {
+  try {
+    const result = await sendChatPushNotifications(db, conversation, message, { logger: console });
+    if (result.changed) await writeDbAsync(db);
+    return result;
+  } catch (error) {
+    console.warn(`[push] Chat push failed: ${error.message || error}`);
+    return { sent: 0, failed: 1, changed: false };
+  }
 }
 
 function publicInventory(inventory) {
@@ -1850,9 +1873,77 @@ async function handleApi(req, res) {
 
       await writeDbAsync(db);
       emitChatUpdate(db, conversation, message);
+      await notifyChatAdmins(db, conversation, message);
       sendChatJson(req, res, 201, {
         conversation: publicChatConversation(conversation, db, { withMessages: true }),
         message: publicChatMessage(message)
+      });
+      return;
+    }
+
+    if (url.pathname === "/api/admin/chat/push-token" && method === "POST") {
+      if (!hasChatAdminAccess(req, db)) {
+        sendChatJson(req, res, 401, { message: "Owner access is required for live chat." });
+        return;
+      }
+
+      const body = await readJson(req);
+      const record = upsertPushToken(db, {
+        ...body,
+        channelId: body.channelId || DEFAULT_CHANNEL_ID
+      });
+      if (!record) {
+        sendChatJson(req, res, 400, { message: "Push token is required." });
+        return;
+      }
+
+      await writeDbAsync(db);
+      sendChatJson(req, res, 200, {
+        ok: true,
+        pushConfigured: isPushConfigured(),
+        token: publicPushToken(record)
+      });
+      return;
+    }
+
+    if (url.pathname === "/api/admin/chat/push-token" && method === "DELETE") {
+      if (!hasChatAdminAccess(req, db)) {
+        sendChatJson(req, res, 401, { message: "Owner access is required for live chat." });
+        return;
+      }
+
+      const body = await readJson(req);
+      const removed = removePushToken(db, String(body.token || "").trim());
+      if (removed) await writeDbAsync(db);
+      sendChatJson(req, res, 200, { ok: true, removed });
+      return;
+    }
+
+    if (url.pathname === "/api/admin/chat/push-status" && method === "GET") {
+      if (!hasChatAdminAccess(req, db)) {
+        sendChatJson(req, res, 401, { message: "Owner access is required for live chat." });
+        return;
+      }
+
+      sendChatJson(req, res, 200, {
+        configured: isPushConfigured(),
+        tokens: (db.chatPushTokens || []).map(publicPushToken)
+      });
+      return;
+    }
+
+    if (url.pathname === "/api/admin/chat/test-push" && method === "POST") {
+      if (!hasChatAdminAccess(req, db)) {
+        sendChatJson(req, res, 401, { message: "Owner access is required for live chat." });
+        return;
+      }
+
+      const result = await sendTestPush(db, { logger: console });
+      if (result.changed) await writeDbAsync(db);
+      sendChatJson(req, res, 200, {
+        ok: true,
+        pushConfigured: isPushConfigured(),
+        result
       });
       return;
     }
@@ -3094,6 +3185,7 @@ function attachChatSocket(httpServer) {
         socket.data.conversationId = conversation.id;
         socket.join(`chat:${conversation.id}`);
         emitChatUpdate(db, conversation, message);
+        if (senderType === "customer") await notifyChatAdmins(db, conversation, message);
         const response = {
           conversation: publicChatConversation(conversation, db, { withMessages: true }),
           message: publicChatMessage(message)

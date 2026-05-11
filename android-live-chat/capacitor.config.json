@@ -7,6 +7,9 @@
     "LocalNotifications": {
       "smallIcon": "ic_stat_icon_config_sample",
       "iconColor": "#1f6b5a"
+    },
+    "PushNotifications": {
+      "presentationOptions": ["alert", "sound"]
     }
   }
 }

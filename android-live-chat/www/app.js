@@ -6,6 +6,8 @@ const serverUrlInput = document.querySelector("#serverUrl");
 const adminTokenInput = document.querySelector("#adminToken");
 const connectButton = document.querySelector("#connectButton");
 const notificationsButton = document.querySelector("#notificationsButton");
+const testPushButton = document.querySelector("#testPushButton");
+const soundSettingsButton = document.querySelector("#soundSettingsButton");
 const settingsToggle = document.querySelector("#settingsToggle");
 const settingsCard = document.querySelector("#settingsCard");
 const statusText = document.querySelector("#statusText");
@@ -24,6 +26,7 @@ let knownMessageIds = new Set();
 let loadedOnce = false;
 let lastConversationTimes = {};
 let notificationsReady = false;
+let pushListenersReady = false;
 
 serverUrlInput.value = localStorage.getItem(SERVER_KEY) || "https://www.hoodyboody.com";
 adminTokenInput.value = localStorage.getItem(TOKEN_KEY) || "";
@@ -94,6 +97,66 @@ async function notify(title, body) {
   });
 }
 
+async function registerPushToken(token) {
+  if (!token) return;
+  const data = await api("/api/admin/chat/push-token", {
+    method: "POST",
+    body: JSON.stringify({
+      token,
+      platform: "android",
+      channelId: NOTIFICATION_CHANNEL_ID
+    })
+  });
+  return data;
+}
+
+async function ensurePushNotifications() {
+  const plugins = window.Capacitor?.Plugins;
+  const push = plugins?.PushNotifications;
+  if (!push) return false;
+
+  try {
+    let permission = await push.checkPermissions();
+    if (permission.receive !== "granted") permission = await push.requestPermissions();
+    if (permission.receive !== "granted") {
+      setStatus("Push notifications are off. Allow them in Android settings.");
+      return false;
+    }
+
+    if (!pushListenersReady) {
+      push.addListener("registration", async (token) => {
+        try {
+          await registerPushToken(token.value);
+          setStatus("Push notifications enabled.");
+        } catch (error) {
+          setStatus(error.message || "Push token was not saved.");
+        }
+      });
+      push.addListener("registrationError", () => {
+        setStatus("Push setup needs Firebase google-services.json.");
+      });
+      push.addListener("pushNotificationReceived", async (notification) => {
+        await loadConversations();
+        const title = notification.title || notification.data?.title || "HOODYBOODY live chat";
+        const body = notification.body || notification.data?.body || "New customer message";
+        await notify(title, body);
+      });
+      push.addListener("pushNotificationActionPerformed", async (notification) => {
+        const conversationId = notification.notification?.data?.conversationId || notification.notification?.data?.conversation_id || "";
+        await loadConversations();
+        if (conversationId) await openConversation(conversationId).catch(() => {});
+      });
+      pushListenersReady = true;
+    }
+
+    await push.register();
+    return true;
+  } catch (error) {
+    setStatus(error.message || "Push notifications are not ready.");
+    return false;
+  }
+}
+
 async function ensureNotifications() {
   const plugins = window.Capacitor?.Plugins;
   const localNotifications = plugins?.LocalNotifications;
@@ -120,11 +183,23 @@ async function ensureNotifications() {
       sound: "hoodyboody_chat.wav"
     });
     notificationsReady = true;
+    await ensurePushNotifications();
     return true;
   } catch {
     notificationsReady = false;
     return false;
   }
+}
+
+async function openSoundSettings() {
+  await ensureNotifications();
+  const plugin = window.Capacitor?.Plugins?.HoodyBoodyNotifications;
+  if (plugin?.openNotificationSettings) {
+    await plugin.openNotificationSettings({ channelId: NOTIFICATION_CHANNEL_ID });
+    setStatus("Choose sound in Android notification settings.");
+    return;
+  }
+  setStatus("Open Android app settings and choose sound for Customer messages.");
 }
 
 function renderConversations() {
@@ -227,6 +302,7 @@ async function connect() {
   localStorage.setItem(TOKEN_KEY, getToken());
   setStatus("Connecting...");
   await ensureNotifications();
+  await ensurePushNotifications();
 
   await loadConversations();
 
@@ -306,6 +382,21 @@ notificationsButton.addEventListener("click", async () => {
   const enabled = await ensureNotifications();
   if (enabled) await notify("HOODYBOODY notifications", "Sound is enabled.");
   setStatus(enabled ? "Notifications enabled with sound." : "Notifications are off. Allow them in Android settings.");
+});
+testPushButton.addEventListener("click", async () => {
+  try {
+    await ensurePushNotifications();
+    const data = await api("/api/admin/chat/test-push", {
+      method: "POST",
+      body: JSON.stringify({})
+    });
+    setStatus(data.pushConfigured ? "Test push sent." : "Firebase push is not configured on the server.");
+  } catch (error) {
+    setStatus(error.message || "Test push failed.");
+  }
+});
+soundSettingsButton.addEventListener("click", () => {
+  openSoundSettings().catch((error) => setStatus(error.message || "Could not open notification settings."));
 });
 
 connect().catch((error) => setStatus(error.message));
