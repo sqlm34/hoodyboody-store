@@ -9,3 +9,5 @@ data/db.json
 git-test/
 repo.bundle
 stripe-shippo-orders.patch
+
+.vercel
