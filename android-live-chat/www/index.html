@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <title>HOODYBOODY Chat</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <main class="app-shell">
+      <header class="app-header">
+        <div>
+          <p>Owner app</p>
+          <h1>HOODYBOODY Chat</h1>
+        </div>
+        <button class="icon-button" id="settingsToggle" type="button" aria-label="Settings">⚙</button>
+      </header>
+
+      <section class="settings-card" id="settingsCard">
+        <label>
+          Site URL
+          <input id="serverUrl" type="url" placeholder="https://www.hoodyboody.com" />
+        </label>
+        <label>
+          Admin token
+          <input id="adminToken" type="password" placeholder="CHAT_ADMIN_TOKEN" />
+        </label>
+        <button id="connectButton" type="button">Connect</button>
+        <p id="statusText">Enter token and connect.</p>
+      </section>
+
+      <section class="chat-layout">
+        <aside class="conversation-list" id="conversationList"></aside>
+        <section class="thread-card">
+          <div class="thread-head" id="threadHead">
+            <h2>Select chat</h2>
+            <p>New customer messages will appear here.</p>
+          </div>
+          <div class="thread-messages" id="threadMessages"></div>
+          <form class="reply-form" id="replyForm">
+            <textarea id="replyText" rows="2" placeholder="Reply..." required></textarea>
+            <button type="submit">Send</button>
+          </form>
+        </section>
+      </section>
+    </main>
+
+    <script src="app.js"></script>
+  </body>
+</html>

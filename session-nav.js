@@ -62,3 +62,16 @@ async function initSessionNav() {
 }
 
 initSessionNav();
+
+function loadLiveChatWidget() {
+  const path = window.location.pathname.toLowerCase();
+  if (path.includes("admin")) return;
+  if (document.querySelector('script[src$="live-chat.js"]')) return;
+
+  const script = document.createElement("script");
+  script.src = "live-chat.js";
+  script.defer = true;
+  document.body.appendChild(script);
+}
+
+loadLiveChatWidget();

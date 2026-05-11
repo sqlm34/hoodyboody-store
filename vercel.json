@@ -24,11 +24,11 @@
   "functions": {
     "server.js": {
       "maxDuration": 30,
-      "includeFiles": "{*.html,*.css,*.js,robots.txt,assets/**,controllers/**,models/**,routes/**,services/**,package.json}"
+      "includeFiles": "{*.html,*.css,*.js,robots.txt,assets/**,controllers/**,models/**,routes/**,services/**,dist/**,package.json}"
     },
     "api/index.js": {
       "maxDuration": 30,
-      "includeFiles": "{*.html,*.css,*.js,robots.txt,assets/**,controllers/**,models/**,routes/**,services/**,package.json}"
+      "includeFiles": "{*.html,*.css,*.js,robots.txt,assets/**,controllers/**,models/**,routes/**,services/**,dist/**,package.json}"
     }
   }
 }

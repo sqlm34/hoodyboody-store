@@ -4,6 +4,7 @@ const express = require("express");
 const fs = require("fs");
 const path = require("path");
 const crypto = require("crypto");
+const { Server: SocketServer } = require("socket.io");
 const { createOrderController } = require("./controllers/orderController");
 const { createAdminOrderRouter } = require("./routes/adminOrderRoutes");
 const { createSeoAdminRouter } = require("./routes/seoRoutes");
@@ -53,6 +54,7 @@ const root = __dirname;
 const port = Number(process.env.PORT) || 8000;
 const adminEmail = process.env.NITKA_ADMIN_EMAIL || localEnv.NITKA_ADMIN_EMAIL || "owner@nitka.local";
 const adminPassword = process.env.NITKA_ADMIN_PASSWORD || localEnv.NITKA_ADMIN_PASSWORD || "owner123";
+const chatAdminToken = process.env.CHAT_ADMIN_TOKEN || localEnv.CHAT_ADMIN_TOKEN || "";
 const stripeSecretKey = process.env.STRIPE_SECRET_KEY || localEnv.STRIPE_SECRET_KEY || "";
 const stripeWebhookSecret = process.env.STRIPE_WEBHOOK_SECRET || localEnv.STRIPE_WEBHOOK_SECRET || "";
 const stripeCurrency = String(process.env.STRIPE_CURRENCY || localEnv.STRIPE_CURRENCY || "usd").toLowerCase();
@@ -323,7 +325,9 @@ const emptyDb = {
   seoCodeSnippets: [],
   seoAuditLogs: [],
   mediaSeo: [],
-  seoSitemap: null
+  seoSitemap: null,
+  chatConversations: [],
+  chatMessages: []
 };
 const memoryDb = process.env.NITKA_DB_PATH === ":memory:" || (process.env.VERCEL && !hasRedisDb && !hasPostgresDb) ? JSON.parse(JSON.stringify(emptyDb)) : null;
 const dbPath = memoryDb ? "" : path.resolve(root, process.env.NITKA_DB_PATH || "data/db.json");
@@ -339,8 +343,10 @@ const types = {
   ".jpg": "image/jpeg",
   ".jpeg": "image/jpeg",
   ".webp": "image/webp",
-  ".svg": "image/svg+xml"
+  ".svg": "image/svg+xml",
+  ".apk": "application/vnd.android.package-archive"
 };
+const noIndexHeader = { "X-Robots-Tag": "noindex, nofollow, noarchive" };
 
 function ensureDb() {
   if (memoryDb) return;
@@ -386,6 +392,8 @@ function ensureDbDefaults(db) {
   db.pendingStripeOrders ||= [];
   db.products ||= [];
   db.productImages ||= {};
+  db.chatConversations ||= [];
+  db.chatMessages ||= [];
   if (ensureSeoDefaults(db)) changed = true;
   if (!Object.prototype.hasOwnProperty.call(db, "categories")) {
     db.categories = JSON.parse(JSON.stringify(defaultCategories));
@@ -517,6 +525,8 @@ function writeDb(db) {
     memoryDb.seoAuditLogs = db.seoAuditLogs;
     memoryDb.mediaSeo = db.mediaSeo;
     memoryDb.seoSitemap = db.seoSitemap;
+    memoryDb.chatConversations = db.chatConversations;
+    memoryDb.chatMessages = db.chatMessages;
     return;
   }
 
@@ -684,6 +694,7 @@ async function writePgDb(db) {
 function sendJson(res, status, payload, headers = {}) {
   res.writeHead(status, {
     "Content-Type": "application/json; charset=utf-8",
+    ...noIndexHeader,
     ...headers
   });
   res.end(JSON.stringify(payload));
@@ -842,6 +853,138 @@ function getReviewSummary(reviews) {
 
 function isAdmin(user) {
   return user?.role === "admin" || user?.role === "superadmin";
+}
+
+function hasChatAdminToken(value) {
+  if (!chatAdminToken) return false;
+  const received = Buffer.from(String(value || ""));
+  const expected = Buffer.from(chatAdminToken);
+  return received.length === expected.length && crypto.timingSafeEqual(received, expected);
+}
+
+function hasChatAdminAccess(req, db) {
+  const token = req.headers["x-chat-admin-token"];
+  return isAdmin(getSessionUser(req, db)) || hasChatAdminToken(Array.isArray(token) ? token[0] : token);
+}
+
+function normalizeChatText(value) {
+  return String(value || "").replace(/\s+/g, " ").trim().slice(0, 1200);
+}
+
+function normalizeChatCustomer(payload = {}, user = null) {
+  return {
+    name: String(payload.name || user?.name || "Customer").trim().slice(0, 80) || "Customer",
+    email: normalizeEmail(payload.email || user?.email || ""),
+    phone: String(payload.phone || user?.phone || "").trim().slice(0, 40)
+  };
+}
+
+function publicChatMessage(message) {
+  if (!message) return null;
+
+  return {
+    id: message.id,
+    conversationId: message.conversationId,
+    senderType: message.senderType,
+    senderName: message.senderName,
+    text: message.text,
+    createdAt: message.createdAt
+  };
+}
+
+function publicChatConversation(conversation, db, options = {}) {
+  if (!conversation) return null;
+
+  const messages = db.chatMessages.filter((message) => message.conversationId === conversation.id);
+  const lastMessage = messages[messages.length - 1] || null;
+
+  return {
+    id: conversation.id,
+    customer: conversation.customer || {},
+    status: conversation.status || "open",
+    unreadAdmin: Number(conversation.unreadAdmin || 0),
+    unreadCustomer: Number(conversation.unreadCustomer || 0),
+    lastMessageText: conversation.lastMessageText || lastMessage?.text || "",
+    lastMessageAt: conversation.lastMessageAt || lastMessage?.createdAt || conversation.createdAt,
+    createdAt: conversation.createdAt,
+    updatedAt: conversation.updatedAt,
+    messages: options.withMessages ? messages.map(publicChatMessage) : undefined
+  };
+}
+
+function ensureChatConversation(db, payload = {}, user = null) {
+  const requestedId = String(payload.conversationId || "").trim();
+  const existing = requestedId ? db.chatConversations.find((conversation) => conversation.id === requestedId) : null;
+  const customer = normalizeChatCustomer(payload.customer || payload, user);
+
+  if (existing) {
+    existing.customer = {
+      ...(existing.customer || {}),
+      ...Object.fromEntries(Object.entries(customer).filter(([, value]) => value))
+    };
+    existing.updatedAt = new Date().toISOString();
+    return existing;
+  }
+
+  const now = new Date().toISOString();
+  const conversation = {
+    id: crypto.randomUUID(),
+    customer,
+    status: "open",
+    unreadAdmin: 0,
+    unreadCustomer: 0,
+    createdAt: now,
+    updatedAt: now,
+    lastMessageAt: now,
+    lastMessageText: ""
+  };
+
+  db.chatConversations.push(conversation);
+  return conversation;
+}
+
+function addChatMessage(db, conversation, senderType, text, senderName = "") {
+  const cleanText = normalizeChatText(text);
+  if (!cleanText) return null;
+
+  const now = new Date().toISOString();
+  const message = {
+    id: crypto.randomUUID(),
+    conversationId: conversation.id,
+    senderType,
+    senderName: String(senderName || (senderType === "admin" ? "HOODYBOODY" : conversation.customer?.name || "Customer")).slice(0, 80),
+    text: cleanText,
+    createdAt: now
+  };
+
+  db.chatMessages.push(message);
+  conversation.lastMessageAt = now;
+  conversation.lastMessageText = cleanText;
+  conversation.updatedAt = now;
+  if (senderType === "admin") conversation.unreadCustomer = Number(conversation.unreadCustomer || 0) + 1;
+  if (senderType === "customer") conversation.unreadAdmin = Number(conversation.unreadAdmin || 0) + 1;
+  return message;
+}
+
+function markChatRead(conversation, readerType) {
+  if (!conversation) return;
+  if (readerType === "admin") conversation.unreadAdmin = 0;
+  if (readerType === "customer") conversation.unreadCustomer = 0;
+  conversation.updatedAt = new Date().toISOString();
+}
+
+let chatIo = null;
+
+function emitChatUpdate(db, conversation, message = null) {
+  if (!chatIo || !conversation) return;
+
+  const payload = {
+    conversation: publicChatConversation(conversation, db),
+    message: publicChatMessage(message)
+  };
+
+  chatIo.to(`chat:${conversation.id}`).emit("chat:message", payload);
+  chatIo.to("chat:admins").emit("chat:conversation", payload);
 }
 
 function publicInventory(inventory) {
@@ -1627,6 +1770,123 @@ async function handleApi(req, res) {
       const user = getSessionUser(req, db);
       sendJson(res, 200, { user: publicUser(user) });
       return;
+    }
+
+    if (url.pathname === "/api/chat/bootstrap" && method === "GET") {
+      const user = getSessionUser(req, db);
+      const conversationId = String(url.searchParams.get("conversationId") || "").trim();
+      const conversation = conversationId ? db.chatConversations.find((item) => item.id === conversationId) : null;
+
+      if (conversation) {
+        markChatRead(conversation, "customer");
+        await writeDbAsync(db);
+      }
+
+      sendJson(res, 200, {
+        user: publicUser(user),
+        conversation: publicChatConversation(conversation, db, { withMessages: true }),
+        socketEnabled: true
+      });
+      return;
+    }
+
+    if (url.pathname === "/api/chat/messages" && method === "GET") {
+      const conversationId = String(url.searchParams.get("conversationId") || "").trim();
+      const conversation = db.chatConversations.find((item) => item.id === conversationId);
+
+      if (!conversation) {
+        sendJson(res, 404, { message: "Chat conversation not found." });
+        return;
+      }
+
+      markChatRead(conversation, "customer");
+      await writeDbAsync(db);
+      sendJson(res, 200, { conversation: publicChatConversation(conversation, db, { withMessages: true }) });
+      return;
+    }
+
+    if (url.pathname === "/api/chat/messages" && method === "POST") {
+      const user = getSessionUser(req, db);
+      const body = await readJson(req);
+      const conversation = ensureChatConversation(db, body, user);
+      const message = addChatMessage(db, conversation, "customer", body.text || body.message, conversation.customer?.name || user?.name || "Customer");
+
+      if (!message) {
+        sendJson(res, 400, { message: "Write a message before sending." });
+        return;
+      }
+
+      await writeDbAsync(db);
+      emitChatUpdate(db, conversation, message);
+      sendJson(res, 201, {
+        conversation: publicChatConversation(conversation, db, { withMessages: true }),
+        message: publicChatMessage(message)
+      });
+      return;
+    }
+
+    if (url.pathname === "/api/admin/chat/conversations" && method === "GET") {
+      if (!hasChatAdminAccess(req, db)) {
+        sendJson(res, 401, { message: "Owner access is required for live chat." });
+        return;
+      }
+
+      const conversations = db.chatConversations
+        .slice()
+        .sort((a, b) => new Date(b.lastMessageAt || b.updatedAt || b.createdAt) - new Date(a.lastMessageAt || a.updatedAt || a.createdAt))
+        .map((conversation) => publicChatConversation(conversation, db));
+      sendJson(res, 200, { conversations, tokenAuth: Boolean(req.headers["x-chat-admin-token"]) });
+      return;
+    }
+
+    if (url.pathname.startsWith("/api/admin/chat/conversations/")) {
+      if (!hasChatAdminAccess(req, db)) {
+        sendJson(res, 401, { message: "Owner access is required for live chat." });
+        return;
+      }
+
+      const parts = url.pathname.split("/").filter(Boolean);
+      const conversationId = parts[4] || "";
+      const action = parts[5] || "";
+      const conversation = db.chatConversations.find((item) => item.id === conversationId);
+
+      if (!conversation) {
+        sendJson(res, 404, { message: "Chat conversation not found." });
+        return;
+      }
+
+      if (!action && method === "GET") {
+        markChatRead(conversation, "admin");
+        await writeDbAsync(db);
+        sendJson(res, 200, { conversation: publicChatConversation(conversation, db, { withMessages: true }) });
+        return;
+      }
+
+      if (action === "messages" && method === "POST") {
+        const user = getSessionUser(req, db);
+        const body = await readJson(req);
+        const message = addChatMessage(db, conversation, "admin", body.text || body.message, user?.name || "HOODYBOODY");
+
+        if (!message) {
+          sendJson(res, 400, { message: "Write a message before sending." });
+          return;
+        }
+
+        await writeDbAsync(db);
+        emitChatUpdate(db, conversation, message);
+        sendJson(res, 201, {
+          conversation: publicChatConversation(conversation, db, { withMessages: true }),
+          message: publicChatMessage(message)
+        });
+        return;
+      }
+
+      if (action === "read" && method === "PATCH") {
+        markChatRead(conversation, "admin");
+        await writeDbAsync(db);
+        sendJson(res, 200, { conversation: publicChatConversation(conversation, db, { withMessages: true }) });
+        return;
+      }
     }
 
     if (url.pathname === "/api/health" && method === "GET") {
@@ -2526,6 +2786,15 @@ async function handleApi(req, res) {
   }
 }
 
+function applyNoIndexToHtml(html) {
+  const noIndexMeta = '<meta name="robots" content="noindex, nofollow, noarchive" />';
+  if (/<meta\s+name=["']robots["'][^>]*>/i.test(html)) {
+    return html.replace(/<meta\s+name=["']robots["'][^>]*>/i, noIndexMeta);
+  }
+
+  return html.replace(/<head([^>]*)>/i, `<head$1>\n    ${noIndexMeta}`);
+}
+
 async function serveStatic(req, res, db = null) {
   const urlPath = decodeURIComponent(req.url.split("?")[0]);
   const requestedPath = urlPath === "/" ? "/index.html" : urlPath;
@@ -2533,7 +2802,7 @@ async function serveStatic(req, res, db = null) {
   const safeRoot = root.endsWith(path.sep) ? root : `${root}${path.sep}`;
 
   if (filePath !== root && !filePath.startsWith(safeRoot)) {
-    res.writeHead(403);
+    res.writeHead(403, noIndexHeader);
     res.end("Forbidden");
     return;
   }
@@ -2567,15 +2836,15 @@ async function serveStatic(req, res, db = null) {
     </main>
   </body>
 </html>`;
-            res.writeHead(200, { "Content-Type": "text/html; charset=utf-8" });
-            res.end(injectSeoHead(pageHtml, metadata));
+            res.writeHead(200, { "Content-Type": "text/html; charset=utf-8", ...noIndexHeader });
+            res.end(applyNoIndexToHtml(injectSeoHead(pageHtml, metadata)));
             return;
           }
         } catch {
           // Fall through to the regular 404 below.
         }
       }
-      res.writeHead(404, { "Content-Type": "text/plain; charset=utf-8" });
+      res.writeHead(404, { "Content-Type": "text/plain; charset=utf-8", ...noIndexHeader });
       res.end("File not found");
       return;
     }
@@ -2592,7 +2861,11 @@ async function serveStatic(req, res, db = null) {
       }
     }
 
-    res.writeHead(200, { "Content-Type": types[ext] || "application/octet-stream" });
+    if (ext === ".html") {
+      responseContent = Buffer.from(applyNoIndexToHtml(responseContent.toString("utf8")));
+    }
+
+    res.writeHead(200, { "Content-Type": types[ext] || "application/octet-stream", ...noIndexHeader });
     res.end(responseContent);
   });
 }
@@ -2616,7 +2889,7 @@ async function appHandler(req, res) {
 
   const pathname = new URL(req.url, getRequestOrigin(req)).pathname;
   if (pathname === "/robots.txt") {
-    res.writeHead(200, { "Content-Type": "text/plain; charset=utf-8" });
+    res.writeHead(200, { "Content-Type": "text/plain; charset=utf-8", ...noIndexHeader });
     res.end(generateRobotsTxt(db, getRequestOrigin(req)));
     return;
   }
@@ -2627,18 +2900,178 @@ async function appHandler(req, res) {
     if (pathname === "/sitemap-products.xml") urls = urls.filter((item) => item.loc.includes("product.html"));
     if (pathname === "/sitemap-categories.xml") urls = urls.filter((item) => item.loc.includes("category.html") || /\/(outerwear|tops|accessories)\.html$/.test(item.loc));
     if (pathname === "/sitemap-blog.xml") urls = [];
-    res.writeHead(200, { "Content-Type": "application/xml; charset=utf-8" });
+    res.writeHead(200, { "Content-Type": "application/xml; charset=utf-8", ...noIndexHeader });
     res.end(renderSitemapXml(urls));
     return;
   }
 
   if (pathname === "/sitemap-index.xml") {
-    res.writeHead(200, { "Content-Type": "application/xml; charset=utf-8" });
+    res.writeHead(200, { "Content-Type": "application/xml; charset=utf-8", ...noIndexHeader });
     res.end(renderSitemapIndex(getRequestOrigin(req)));
     return;
   }
 
   serveStatic(req, res, db);
+}
+
+function getSocketUser(socket, db) {
+  const cookieHeader = socket.handshake.headers.cookie || "";
+  const token = Object.fromEntries(
+    cookieHeader
+      .split(";")
+      .map((item) => item.trim())
+      .filter(Boolean)
+      .map((item) => {
+        const [key, ...value] = item.split("=");
+        return [key, decodeURIComponent(value.join("="))];
+      })
+  )[sessionCookie];
+
+  if (!token) return null;
+  const session = db.sessions.find((item) => item.token === token && item.expiresAt > Date.now());
+  if (!session) return null;
+  return db.users.find((user) => user.id === session.userId) || null;
+}
+
+function socketHasAdminAccess(socket, db) {
+  const user = getSocketUser(socket, db);
+  return { ok: isAdmin(user) || hasChatAdminToken(socket.handshake.auth?.adminToken), user };
+}
+
+function attachChatSocket(httpServer) {
+  chatIo = new SocketServer(httpServer, {
+    cors: {
+      origin: true,
+      credentials: true
+    }
+  });
+
+  chatIo.on("connection", (socket) => {
+    socket.emit("chat:connected", { ok: true });
+
+    socket.on("chat:customer:join", async (payload = {}, reply) => {
+      try {
+        const db = await readDbAsync();
+        const user = getSocketUser(socket, db);
+        const conversation = ensureChatConversation(db, payload, user);
+        markChatRead(conversation, "customer");
+        await writeDbAsync(db);
+
+        socket.data.conversationId = conversation.id;
+        socket.join(`chat:${conversation.id}`);
+        const response = { conversation: publicChatConversation(conversation, db, { withMessages: true }) };
+        socket.emit("chat:ready", response);
+        chatIo.to("chat:admins").emit("chat:conversation", { conversation: publicChatConversation(conversation, db) });
+        if (typeof reply === "function") reply(response);
+      } catch (error) {
+        socket.emit("chat:error", { message: error.message || "Chat connection failed." });
+      }
+    });
+
+    socket.on("chat:admin:join", async (payload = {}, reply) => {
+      try {
+        const db = await readDbAsync();
+        const admin = socketHasAdminAccess(socket, db);
+        if (!admin.ok) {
+          socket.emit("chat:error", { message: "Owner access is required for live chat." });
+          return;
+        }
+
+        socket.data.isChatAdmin = true;
+        socket.join("chat:admins");
+
+        const conversationId = String(payload.conversationId || "").trim();
+        const conversation = conversationId ? db.chatConversations.find((item) => item.id === conversationId) : null;
+        if (conversation) {
+          markChatRead(conversation, "admin");
+          await writeDbAsync(db);
+          socket.join(`chat:${conversation.id}`);
+        }
+
+        const conversations = db.chatConversations
+          .slice()
+          .sort((a, b) => new Date(b.lastMessageAt || b.updatedAt || b.createdAt) - new Date(a.lastMessageAt || a.updatedAt || a.createdAt))
+          .map((item) => publicChatConversation(item, db));
+        const response = {
+          conversations,
+          conversation: publicChatConversation(conversation, db, { withMessages: true })
+        };
+        socket.emit("chat:admin:ready", response);
+        if (typeof reply === "function") reply(response);
+      } catch (error) {
+        socket.emit("chat:error", { message: error.message || "Chat connection failed." });
+      }
+    });
+
+    socket.on("chat:admin:open", async (payload = {}, reply) => {
+      try {
+        const db = await readDbAsync();
+        const admin = socketHasAdminAccess(socket, db);
+        if (!admin.ok) {
+          socket.emit("chat:error", { message: "Owner access is required for live chat." });
+          return;
+        }
+
+        const conversation = db.chatConversations.find((item) => item.id === String(payload.conversationId || "").trim());
+        if (!conversation) {
+          socket.emit("chat:error", { message: "Chat conversation not found." });
+          return;
+        }
+
+        markChatRead(conversation, "admin");
+        await writeDbAsync(db);
+        socket.join(`chat:${conversation.id}`);
+        const response = { conversation: publicChatConversation(conversation, db, { withMessages: true }) };
+        socket.emit("chat:admin:conversation", response);
+        if (typeof reply === "function") reply(response);
+      } catch (error) {
+        socket.emit("chat:error", { message: error.message || "Chat connection failed." });
+      }
+    });
+
+    socket.on("chat:message:send", async (payload = {}, reply) => {
+      try {
+        const db = await readDbAsync();
+        const admin = socketHasAdminAccess(socket, db);
+        const senderType = admin.ok && payload.senderType === "admin" ? "admin" : "customer";
+        const user = senderType === "admin" ? admin.user : getSocketUser(socket, db);
+        const conversation =
+          senderType === "admin"
+            ? db.chatConversations.find((item) => item.id === String(payload.conversationId || socket.data.conversationId || "").trim())
+            : ensureChatConversation(db, { ...payload, conversationId: payload.conversationId || socket.data.conversationId }, user);
+
+        if (!conversation) {
+          socket.emit("chat:error", { message: "Chat conversation not found." });
+          return;
+        }
+
+        const message = addChatMessage(
+          db,
+          conversation,
+          senderType,
+          payload.text || payload.message,
+          senderType === "admin" ? user?.name || "HOODYBOODY" : conversation.customer?.name || user?.name || "Customer"
+        );
+
+        if (!message) {
+          socket.emit("chat:error", { message: "Write a message before sending." });
+          return;
+        }
+
+        await writeDbAsync(db);
+        socket.data.conversationId = conversation.id;
+        socket.join(`chat:${conversation.id}`);
+        emitChatUpdate(db, conversation, message);
+        const response = {
+          conversation: publicChatConversation(conversation, db, { withMessages: true }),
+          message: publicChatMessage(message)
+        };
+        if (typeof reply === "function") reply(response);
+      } catch (error) {
+        socket.emit("chat:error", { message: error.message || "Message was not sent." });
+      }
+    });
+  });
 }
 
 const orderController = createOrderController({
@@ -2668,9 +3101,14 @@ expressApp.get("/admin/categories", (req, res) => {
 expressApp.get("/admin/seo", (req, res) => {
   res.sendFile(path.join(root, "admin-seo.html"));
 });
+
+expressApp.get("/admin/chat", (req, res) => {
+  res.sendFile(path.join(root, "admin-chat.html"));
+});
 expressApp.use((req, res) => appHandler(req, res));
 
 const server = http.createServer(expressApp);
+attachChatSocket(server);
 
 if (require.main === module) {
   server.listen(port, () => {

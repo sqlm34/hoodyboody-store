@@ -4,3 +4,8 @@ node_modules/
 data/db.json
 
 .env*.local
+.codex-server*.log
+.codex-server*.err
+git-test/
+repo.bundle
+stripe-shippo-orders.patch

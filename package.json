@@ -11,6 +11,7 @@
     "@aws-sdk/rds-signer": "^3.1041.0",
     "express": "^5.2.1",
     "pg": "^8.20.0",
+    "socket.io": "^4.8.3",
     "stripe": "^22.1.0"
   }
 }

@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="robots" content="noindex, nofollow, noarchive" />
+    <title>Live chat | HOODYBOODY Owner</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css" />
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <header class="topbar checkout-topbar" aria-label="Owner navigation">
+      <a class="brand" href="index.html" aria-label="HOODYBOODY">
+        <span class="brand-mark">H</span>
+        <span>HOODYBOODY</span>
+      </a>
+      <nav class="nav-links" aria-label="Sections">
+        <a href="admin.html">Owner</a>
+        <a href="/admin/orders">Orders</a>
+        <a href="admin-products.html">Product cards</a>
+      </nav>
+      <div class="top-actions">
+        <a class="account-pill login-link" href="auth.html" hidden>Login</a>
+        <a class="account-pill cabinet-link" href="account.html" hidden>Cabinet</a>
+        <a class="account-pill admin-link" href="admin.html" hidden>Owner</a>
+        <button class="account-pill as-button logout-button" type="button" hidden>Logout</button>
+      </div>
+    </header>
+
+    <main class="checkout-page admin-page chat-admin-page">
+      <section class="checkout-hero admin-hero" aria-labelledby="chatTitle">
+        <p class="eyebrow">owner dashboard</p>
+        <h1 id="chatTitle">Live chat</h1>
+        <p>Online customer messages with Socket.IO updates and phone app support.</p>
+      </section>
+
+      <section class="admin-locked checkout-panel" id="chatLocked" hidden>
+        <h2>Access denied</h2>
+        <p id="chatLockedText">Login as owner or enter the Android app token.</p>
+        <a class="button primary" href="auth.html?next=/admin-chat.html">Login as owner</a>
+        <label class="chat-token-field">
+          Android token
+          <input id="chatAdminToken" type="password" autocomplete="off" placeholder="CHAT_ADMIN_TOKEN" />
+        </label>
+        <button class="button ghost dark" type="button" id="saveChatToken">Use token</button>
+      </section>
+
+      <section class="chat-admin-shell checkout-panel" id="chatDashboard" hidden>
+        <div class="chat-admin-toolbar">
+          <div>
+            <h2>Conversations</h2>
+            <p id="chatStatus">Connecting...</p>
+          </div>
+          <div class="admin-toolbar">
+            <button class="button ghost dark" type="button" id="enableChatNotifications">
+              <i class="fa-solid fa-bell" aria-hidden="true"></i>
+              <span>Notifications</span>
+            </button>
+            <button class="button ghost dark" type="button" id="refreshChat">
+              <i class="fa-solid fa-rotate-right" aria-hidden="true"></i>
+              <span>Refresh</span>
+            </button>
+          </div>
+        </div>
+
+        <div class="chat-admin-grid">
+          <aside class="chat-conversation-list" id="chatConversationList" aria-label="Chat conversations"></aside>
+          <section class="chat-thread" aria-label="Selected conversation">
+            <div class="chat-thread-head" id="chatThreadHead">
+              <h3>Select a conversation</h3>
+              <p>Customer details will appear here.</p>
+            </div>
+            <div class="chat-thread-messages" id="chatThreadMessages" aria-live="polite"></div>
+            <form class="chat-reply-form" id="chatReplyForm">
+              <textarea id="chatReplyText" rows="3" placeholder="Reply to customer..." required></textarea>
+              <button class="button primary" type="submit">
+                <i class="fa-solid fa-paper-plane" aria-hidden="true"></i>
+                <span>Send reply</span>
+              </button>
+            </form>
+          </section>
+        </div>
+      </section>
+    </main>
+
+    <script src="session-nav.js"></script>
+    <script src="admin-chat.js"></script>
+  </body>
+</html>
