@@ -126,7 +126,8 @@ async function registerPushToken(token) {
   return data;
 }
 
-async function ensurePushNotifications() {
+async function ensurePushNotifications(options = {}) {
+  const silent = options.silent === true;
   const plugins = window.Capacitor?.Plugins;
   const push = plugins?.PushNotifications;
   if (!push) return false;
@@ -134,14 +135,14 @@ async function ensurePushNotifications() {
   try {
     const firebaseReady = await isFirebaseConfigured();
     if (!firebaseReady) {
-      setStatus("App works. Firebase push is not configured yet.");
+      if (!silent) setStatus("App works. Firebase push is not configured yet.");
       return false;
     }
 
     let permission = await push.checkPermissions();
     if (permission.receive !== "granted") permission = await push.requestPermissions();
     if (permission.receive !== "granted") {
-      setStatus("Push notifications are off. Allow them in Android settings.");
+      if (!silent) setStatus("Push notifications are off. Allow them in Android settings.");
       return false;
     }
 
@@ -149,14 +150,16 @@ async function ensurePushNotifications() {
       push.addListener("registration", async (token) => {
         try {
           currentPushToken = token.value;
-          await registerPushToken(token.value);
-          setStatus("Push notifications enabled.");
+          const data = await registerPushToken(token.value);
+          if (!silent) {
+            setStatus(data?.pushConfigured ? "Background push notifications enabled." : "Phone registered. Server Firebase push is not configured yet.");
+          }
         } catch (error) {
-          setStatus(error.message || "Push token was not saved.");
+          if (!silent) setStatus(error.message || "Push token was not saved.");
         }
       });
       push.addListener("registrationError", () => {
-        setStatus("Push setup needs Firebase google-services.json.");
+        if (!silent) setStatus("Push setup needs Firebase google-services.json.");
       });
       push.addListener("pushNotificationReceived", async (notification) => {
         await loadConversations();
@@ -175,7 +178,7 @@ async function ensurePushNotifications() {
     await push.register();
     return true;
   } catch (error) {
-    setStatus(error.message || "Push notifications are not ready.");
+    if (!silent) setStatus(error.message || "Push notifications are not ready.");
     return false;
   }
 }
@@ -364,6 +367,7 @@ async function connect() {
   localStorage.setItem(TOKEN_KEY, getToken());
   setStatus("Connecting...");
   await ensureNotifications();
+  ensurePushNotifications({ silent: true }).catch(() => {});
 
   await loadConversations();
 
@@ -441,8 +445,13 @@ settingsToggle.addEventListener("click", () => settingsCard.classList.toggle("co
 connectButton.addEventListener("click", () => connect().catch((error) => setStatus(error.message)));
 notificationsButton.addEventListener("click", async () => {
   const enabled = await ensureNotifications();
-  if (enabled) await notify("HOODYBOODY notifications", "Sound is enabled.");
-  setStatus(enabled ? "Notifications enabled with sound." : "Notifications are off. Allow them in Android settings.");
+  const pushEnabled = enabled ? await ensurePushNotifications() : false;
+  if (enabled) await notify("HOODYBOODY notifications", pushEnabled ? "Background push setup was started." : "Sound is enabled.");
+  if (!enabled) {
+    setStatus("Notifications are off. Allow them in Android settings.");
+  } else if (!pushEnabled) {
+    setStatus("Local sound is enabled. Background push needs Firebase setup.");
+  }
 });
 testPushButton.addEventListener("click", async () => {
   try {

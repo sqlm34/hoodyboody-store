@@ -76,6 +76,29 @@ function isPushConfigured() {
   return Boolean(getFirebaseCredential());
 }
 
+function getPushConfigurationStatus() {
+  const hasServiceAccountJson = Boolean(getEnv("FIREBASE_SERVICE_ACCOUNT_JSON"));
+  const hasProjectId = Boolean(getEnv("FIREBASE_PROJECT_ID"));
+  const hasClientEmail = Boolean(getEnv("FIREBASE_CLIENT_EMAIL"));
+  const hasPrivateKey = Boolean(getEnv("FIREBASE_PRIVATE_KEY"));
+  const parsedCredential = buildCredentialFromEnv();
+  const missing = [];
+
+  if (!hasServiceAccountJson && !(hasProjectId && hasClientEmail && hasPrivateKey)) {
+    if (!hasServiceAccountJson) missing.push("FIREBASE_SERVICE_ACCOUNT_JSON");
+    if (!hasProjectId) missing.push("FIREBASE_PROJECT_ID");
+    if (!hasClientEmail) missing.push("FIREBASE_CLIENT_EMAIL");
+    if (!hasPrivateKey) missing.push("FIREBASE_PRIVATE_KEY");
+  }
+
+  return {
+    configured: Boolean(parsedCredential),
+    source: hasServiceAccountJson ? "FIREBASE_SERVICE_ACCOUNT_JSON" : hasProjectId || hasClientEmail || hasPrivateKey ? "split_env" : "missing",
+    missing,
+    error: parsedCredential ? "" : firebaseInitError || "Firebase credentials are not configured."
+  };
+}
+
 function publicPushToken(record = {}) {
   return {
     id: record.id,
@@ -290,6 +313,7 @@ async function sendTestPush(db, options = {}) {
 
 module.exports = {
   DEFAULT_CHANNEL_ID,
+  getPushConfigurationStatus,
   isPushConfigured,
   publicPushToken,
   removePushToken,

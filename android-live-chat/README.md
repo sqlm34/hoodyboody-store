@@ -4,7 +4,12 @@ Owner chat app for Android. It connects to the store chat and supports Firebase 
 
 ## Push notifications
 
-For closed-app/background push notifications, create a Firebase Android app with package:
+For closed-app/background push notifications, Firebase must be configured in two places:
+
+1. Android APK: `google-services.json` must be included before the APK is built.
+2. Vercel server: a Firebase service account must be added as production environment variables.
+
+Create a Firebase Android app with package:
 
 ```text
 com.hoodyboody.livechat
@@ -33,6 +38,12 @@ FIREBASE_PRIVATE_KEY
 The service account must be allowed to send Firebase Cloud Messaging HTTP v1 messages.
 
 The app creates a notification channel named `Customer messages`. Use the app button `Choose notification sound` to open Android notification settings and select any sound from the phone's sound library.
+
+Detailed setup steps are in:
+
+```text
+FIREBASE_SETUP.md
+```
 
 ## Build APK
 

@@ -18,6 +18,7 @@ const {
 const { sendOrderStatusEmail } = require("./services/emailService");
 const {
   DEFAULT_CHANNEL_ID,
+  getPushConfigurationStatus,
   isPushConfigured,
   publicPushToken,
   removePushToken,
@@ -1927,6 +1928,7 @@ async function handleApi(req, res) {
 
       sendChatJson(req, res, 200, {
         configured: isPushConfigured(),
+        configuration: getPushConfigurationStatus(),
         tokens: (db.chatPushTokens || []).map(publicPushToken)
       });
       return;
