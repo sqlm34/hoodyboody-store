@@ -52,6 +52,10 @@
             <p id="chatStatus">Connecting...</p>
           </div>
           <div class="admin-toolbar">
+            <button class="button ghost dark" type="button" id="toggleChatSettings">
+              <i class="fa-solid fa-sliders" aria-hidden="true"></i>
+              <span>Settings</span>
+            </button>
             <button class="button ghost dark" type="button" id="enableChatNotifications">
               <i class="fa-solid fa-bell" aria-hidden="true"></i>
               <span>Notifications</span>
@@ -63,6 +67,46 @@
           </div>
         </div>
 
+        <section class="chat-settings-panel" id="chatSettingsPanel" hidden>
+          <div class="chat-settings-grid">
+            <label>
+              Chat color
+              <input id="chatColor" type="color" value="#1f6b5a" />
+            </label>
+            <label>
+              Accent color
+              <input id="chatAccentColor" type="color" value="#263b73" />
+            </label>
+            <label>
+              Time color
+              <input id="chatTimeColor" type="color" value="#59616a" />
+            </label>
+            <label>
+              Push color
+              <input id="chatPushColor" type="color" value="#1f6b5a" />
+            </label>
+          </div>
+          <label>
+            Logo text
+            <input id="chatLogoText" type="text" maxlength="60" placeholder="HOODYBOODY" />
+          </label>
+          <label>
+            Welcome text
+            <input id="chatWelcomeText" type="text" maxlength="180" placeholder="Ask us about size, delivery or your order." />
+          </label>
+          <div class="chat-logo-row">
+            <label>
+              Logo image
+              <input id="chatLogoFile" type="file" accept="image/png,image/jpeg,image/webp,image/svg+xml" />
+            </label>
+            <img id="chatLogoPreview" alt="Chat logo preview" hidden />
+          </div>
+          <button class="button primary" type="button" id="saveChatSettings">
+            <i class="fa-solid fa-floppy-disk" aria-hidden="true"></i>
+            <span>Save settings</span>
+          </button>
+        </section>
+
         <div class="chat-admin-grid">
           <aside class="chat-conversation-list" id="chatConversationList" aria-label="Chat conversations"></aside>
           <section class="chat-thread" aria-label="Selected conversation">
@@ -72,7 +116,20 @@
             </div>
             <div class="chat-thread-messages" id="chatThreadMessages" aria-live="polite"></div>
             <form class="chat-reply-form" id="chatReplyForm">
-              <textarea id="chatReplyText" rows="3" placeholder="Reply to customer..." required></textarea>
+              <div class="live-chat-attachments" id="chatReplyAttachments" hidden></div>
+              <textarea id="chatReplyText" rows="3" placeholder="Reply to customer..."></textarea>
+              <div class="live-chat-tools" aria-label="Chat reply tools">
+                <button class="icon-button" id="chatAttachFile" type="button" aria-label="Attach file">
+                  <i class="fa-solid fa-paperclip" aria-hidden="true"></i>
+                </button>
+                <button class="icon-button" id="chatRecordAudio" type="button" aria-label="Record audio message">
+                  <i class="fa-solid fa-microphone" aria-hidden="true"></i>
+                </button>
+                <button class="icon-button" id="chatStartVideo" type="button" aria-label="Start video call">
+                  <i class="fa-solid fa-video" aria-hidden="true"></i>
+                </button>
+              </div>
+              <input id="chatFileInput" type="file" multiple hidden />
               <button class="button primary" type="submit">
                 <i class="fa-solid fa-paper-plane" aria-hidden="true"></i>
                 <span>Send reply</span>

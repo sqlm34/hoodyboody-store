@@ -1,12 +1,35 @@
 (function () {
   const STORAGE_KEY = "hoodyboody-live-chat";
+  const MAX_ATTACHMENT_BYTES = 5_000_000;
+
+  function loadStoredChat() {
+    const raw = localStorage.getItem(STORAGE_KEY) || "";
+    if (!raw) return { conversationId: "", clientToken: "" };
+
+    try {
+      const parsed = JSON.parse(raw);
+      return {
+        conversationId: String(parsed.conversationId || "").trim(),
+        clientToken: String(parsed.clientToken || "").trim()
+      };
+    } catch {
+      return { conversationId: raw.trim(), clientToken: "" };
+    }
+  }
+
+  const storedChat = loadStoredChat();
   const state = {
     socket: null,
     connected: false,
-    conversationId: localStorage.getItem(STORAGE_KEY) || "",
+    conversationId: storedChat.conversationId,
+    clientToken: storedChat.clientToken,
     messages: [],
+    attachments: [],
     pollTimer: 0,
-    user: null
+    user: null,
+    settings: {},
+    mediaRecorder: null,
+    recordedChunks: []
   };
 
   if (document.querySelector("[data-live-chat-root]")) return;
@@ -36,9 +59,10 @@
     </button>
     <aside class="live-chat-panel" id="liveChatPanel" aria-hidden="true">
       <div class="live-chat-head">
-        <div>
+        <div class="live-chat-brand">
+          <img class="live-chat-logo" data-chat-logo alt="" hidden />
           <p class="eyebrow">online support</p>
-          <h2>Live chat</h2>
+          <h2 data-chat-title>Live chat</h2>
         </div>
         <button class="icon-button live-chat-close" type="button" aria-label="Close chat">
           <i class="fa-solid fa-xmark" aria-hidden="true"></i>
@@ -61,7 +85,20 @@
       </div>
       <div class="live-chat-messages" data-chat-messages aria-live="polite"></div>
       <form class="live-chat-form" data-chat-form>
-        <textarea data-chat-text rows="2" placeholder="Write a message..." required></textarea>
+        <div class="live-chat-attachments" data-chat-attachments hidden></div>
+        <textarea data-chat-text rows="2" placeholder="Write a message..."></textarea>
+        <div class="live-chat-tools" aria-label="Chat tools">
+          <button class="icon-button" data-chat-file-button type="button" aria-label="Attach file">
+            <i class="fa-solid fa-paperclip" aria-hidden="true"></i>
+          </button>
+          <button class="icon-button" data-chat-audio-button type="button" aria-label="Record audio message">
+            <i class="fa-solid fa-microphone" aria-hidden="true"></i>
+          </button>
+          <button class="icon-button" data-chat-video-button type="button" aria-label="Start video call">
+            <i class="fa-solid fa-video" aria-hidden="true"></i>
+          </button>
+        </div>
+        <input data-chat-file type="file" multiple hidden />
         <button class="button primary" type="submit">
           <i class="fa-solid fa-paper-plane" aria-hidden="true"></i>
           <span>Send</span>
@@ -76,12 +113,19 @@
   const closeButton = root.querySelector(".live-chat-close");
   const panel = root.querySelector(".live-chat-panel");
   const status = root.querySelector("[data-chat-status]");
+  const logoImage = root.querySelector("[data-chat-logo]");
+  const titleText = root.querySelector("[data-chat-title]");
   const messagesBox = root.querySelector("[data-chat-messages]");
   const form = root.querySelector("[data-chat-form]");
   const textInput = root.querySelector("[data-chat-text]");
   const nameInput = root.querySelector("[data-chat-name]");
   const emailInput = root.querySelector("[data-chat-email]");
   const phoneInput = root.querySelector("[data-chat-phone]");
+  const attachmentsBox = root.querySelector("[data-chat-attachments]");
+  const fileInput = root.querySelector("[data-chat-file]");
+  const fileButton = root.querySelector("[data-chat-file-button]");
+  const audioButton = root.querySelector("[data-chat-audio-button]");
+  const videoButton = root.querySelector("[data-chat-video-button]");
 
   function setOpen(isOpen) {
     root.classList.toggle("open", isOpen);
@@ -103,17 +147,71 @@
     };
   }
 
+  function saveStoredChat() {
+    localStorage.setItem(
+      STORAGE_KEY,
+      JSON.stringify({
+        conversationId: state.conversationId,
+        clientToken: state.clientToken
+      })
+    );
+  }
+
+  function applySettings(settings = {}) {
+    state.settings = settings || {};
+    root.style.setProperty("--chat-color", settings.chatColor || "#1f6b5a");
+    root.style.setProperty("--chat-accent", settings.accentColor || "#263b73");
+    root.style.setProperty("--chat-time-color", settings.timeColor || "#59616a");
+    titleText.textContent = settings.logoText || "Live chat";
+    if (settings.logoImage) {
+      logoImage.src = settings.logoImage;
+      logoImage.hidden = false;
+    } else {
+      logoImage.hidden = true;
+    }
+  }
+
   function setConversation(conversation) {
     if (!conversation) return;
     state.conversationId = conversation.id;
-    localStorage.setItem(STORAGE_KEY, conversation.id);
+    if (conversation.clientToken) state.clientToken = conversation.clientToken;
+    saveStoredChat();
     state.messages = Array.isArray(conversation.messages) ? conversation.messages : state.messages;
     renderMessages();
   }
 
+  function renderAttachment(attachment = {}) {
+    const name = escapeHtml(attachment.name || "Attachment");
+    if (attachment.kind === "video-call") {
+      return `<a class="chat-attachment video-call" href="${escapeHtml(attachment.url)}" target="_blank" rel="noopener">
+        <i class="fa-solid fa-video" aria-hidden="true"></i>
+        <span>Join video call</span>
+      </a>`;
+    }
+
+    if (attachment.kind === "audio" || /^audio\//i.test(attachment.type || "")) {
+      return `<div class="chat-attachment audio-message">
+        <audio controls src="${escapeHtml(attachment.dataUrl || "")}"></audio>
+        <span>${name}</span>
+      </div>`;
+    }
+
+    if (/^image\//i.test(attachment.type || "")) {
+      return `<a class="chat-attachment image-file" href="${escapeHtml(attachment.dataUrl || "")}" download="${name}">
+        <img src="${escapeHtml(attachment.dataUrl || "")}" alt="${name}" />
+        <span>${name}</span>
+      </a>`;
+    }
+
+    return `<a class="chat-attachment file-message" href="${escapeHtml(attachment.dataUrl || attachment.url || "")}" download="${name}" target="_blank" rel="noopener">
+      <i class="fa-solid fa-file-arrow-down" aria-hidden="true"></i>
+      <span>${name}</span>
+    </a>`;
+  }
+
   function renderMessages() {
     if (!state.messages.length) {
-      messagesBox.innerHTML = `<div class="live-chat-empty">Ask us about size, delivery or your order.</div>`;
+      messagesBox.innerHTML = `<div class="live-chat-empty">${escapeHtml(state.settings.welcomeText || "Ask us about size, delivery or your order.")}</div>`;
       return;
     }
 
@@ -121,7 +219,8 @@
       .map(
         (message) => `
           <article class="live-chat-message ${message.senderType === "admin" ? "from-admin" : "from-customer"}">
-            <div>${escapeHtml(message.text)}</div>
+            ${message.text ? `<div>${escapeHtml(message.text)}</div>` : ""}
+            ${(message.attachments || []).map(renderAttachment).join("")}
             <small>${escapeHtml(message.senderName || "")} ${formatTime(message.createdAt)}</small>
           </article>
         `
@@ -139,7 +238,99 @@
     if (!message || message.senderType !== "admin") return;
     if (!("Notification" in window) || Notification.permission !== "granted") return;
     if (document.visibilityState === "visible" && root.classList.contains("open")) return;
-    new Notification("HOODYBOODY live chat", { body: message.text, tag: message.id });
+    new Notification("HOODYBOODY live chat", { body: message.text || "New attachment", tag: message.id });
+  }
+
+  function renderComposerAttachments() {
+    attachmentsBox.hidden = state.attachments.length === 0;
+    attachmentsBox.innerHTML = state.attachments
+      .map(
+        (attachment, index) => `
+          <span class="chat-attachment-chip">
+            <i class="fa-solid ${attachment.kind === "audio" ? "fa-microphone" : attachment.kind === "video-call" ? "fa-video" : "fa-paperclip"}" aria-hidden="true"></i>
+            <span>${escapeHtml(attachment.name || "Attachment")}</span>
+            <button type="button" data-remove-attachment="${index}" aria-label="Remove attachment">
+              <i class="fa-solid fa-xmark" aria-hidden="true"></i>
+            </button>
+          </span>
+        `
+      )
+      .join("");
+  }
+
+  function addAttachment(attachment) {
+    if (!attachment) return;
+    state.attachments = [...state.attachments, attachment].slice(0, 4);
+    renderComposerAttachments();
+  }
+
+  function readFileAsAttachment(file, kind = "file") {
+    return new Promise((resolve, reject) => {
+      if (!file) {
+        resolve(null);
+        return;
+      }
+      if (file.size > MAX_ATTACHMENT_BYTES) {
+        reject(new Error("File is too large. Maximum is 5 MB."));
+        return;
+      }
+
+      const reader = new FileReader();
+      reader.onload = () =>
+        resolve({
+          kind,
+          name: file.name || (kind === "audio" ? "Audio message.webm" : "Attachment"),
+          type: file.type || "application/octet-stream",
+          size: file.size,
+          dataUrl: String(reader.result || "")
+        });
+      reader.onerror = () => reject(new Error("File could not be attached."));
+      reader.readAsDataURL(file);
+    });
+  }
+
+  async function toggleAudioRecording() {
+    if (state.mediaRecorder?.state === "recording") {
+      state.mediaRecorder.stop();
+      audioButton.classList.remove("recording");
+      return;
+    }
+
+    if (!navigator.mediaDevices?.getUserMedia || !window.MediaRecorder) {
+      setStatus("Audio recording is not available in this browser.");
+      return;
+    }
+
+    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    state.recordedChunks = [];
+    state.mediaRecorder = new MediaRecorder(stream);
+    state.mediaRecorder.addEventListener("dataavailable", (event) => {
+      if (event.data?.size) state.recordedChunks.push(event.data);
+    });
+    state.mediaRecorder.addEventListener("stop", async () => {
+      stream.getTracks().forEach((track) => track.stop());
+      const blob = new Blob(state.recordedChunks, { type: state.mediaRecorder.mimeType || "audio/webm" });
+      const file = new File([blob], `audio-message-${Date.now()}.webm`, { type: blob.type });
+      addAttachment(await readFileAsAttachment(file, "audio"));
+      setStatus("Audio message attached.", true);
+    });
+    state.mediaRecorder.start();
+    audioButton.classList.add("recording");
+    setStatus("Recording audio... tap microphone again to stop.", true);
+  }
+
+  async function addVideoCallInvitation() {
+    const roomSeed = state.conversationId || window.crypto?.randomUUID?.() || String(Date.now());
+    const roomId = `hoodyboody-${roomSeed}`.replace(/[^\w-]/g, "").slice(0, 80);
+    addAttachment({
+      kind: "video-call",
+      name: "Video call",
+      type: "video/link",
+      roomId,
+      url: `https://meet.jit.si/${roomId}`,
+      size: 0
+    });
+    setStatus("Video call invitation attached.", true);
   }
 
   function loadSocketClient() {
@@ -157,9 +348,12 @@
 
   async function bootstrap() {
     const params = state.conversationId ? `?conversationId=${encodeURIComponent(state.conversationId)}` : "";
-    const response = await fetch(`/api/chat/bootstrap${params}`);
+    const response = await fetch(`/api/chat/bootstrap${params}`, {
+      headers: state.clientToken ? { "x-chat-client-token": state.clientToken } : {}
+    });
     const data = await response.json().catch(() => ({}));
     state.user = data.user || null;
+    applySettings(data.settings || {});
     if (state.user) {
       nameInput.value = state.user.name || "";
       emailInput.value = state.user.email || "";
@@ -173,7 +367,9 @@
     if (!state.conversationId) return;
     state.pollTimer = setInterval(async () => {
       try {
-        const response = await fetch(`/api/chat/messages?conversationId=${encodeURIComponent(state.conversationId)}`);
+        const response = await fetch(`/api/chat/messages?conversationId=${encodeURIComponent(state.conversationId)}`, {
+          headers: state.clientToken ? { "x-chat-client-token": state.clientToken } : {}
+        });
         if (!response.ok) return;
         const data = await response.json();
         setConversation(data.conversation);
@@ -192,6 +388,7 @@
         setStatus("Online", true);
         state.socket.emit("chat:customer:join", {
           conversationId: state.conversationId,
+          clientToken: state.clientToken,
           customer: getCustomer()
         });
       });
@@ -220,25 +417,34 @@
   }
 
   async function sendMessage(text) {
+    const attachments = state.attachments;
     const payload = {
       conversationId: state.conversationId,
+      clientToken: state.clientToken,
       customer: getCustomer(),
-      text
+      text,
+      attachments
     };
 
     if (state.connected && state.socket) {
-      state.socket.emit("chat:message:send", payload, (response) => setConversation(response?.conversation));
+      state.socket.emit("chat:message:send", payload, (response) => {
+        setConversation(response?.conversation);
+        state.attachments = [];
+        renderComposerAttachments();
+      });
       return;
     }
 
     const response = await fetch("/api/chat/messages", {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: { "Content-Type": "application/json", ...(state.clientToken ? { "x-chat-client-token": state.clientToken } : {}) },
       body: JSON.stringify(payload)
     });
     const data = await response.json().catch(() => ({}));
     if (!response.ok) throw new Error(data.message || "Message was not sent.");
     setConversation(data.conversation);
+    state.attachments = [];
+    renderComposerAttachments();
     startPolling();
   }
 
@@ -247,7 +453,7 @@
   form.addEventListener("submit", async (event) => {
     event.preventDefault();
     const text = textInput.value.trim();
-    if (!text) return;
+    if (!text && !state.attachments.length) return;
     textInput.value = "";
     try {
       await sendMessage(text);
@@ -255,6 +461,25 @@
       setStatus(error.message || "Message was not sent.");
     }
   });
+  attachmentsBox.addEventListener("click", (event) => {
+    const button = event.target.closest("[data-remove-attachment]");
+    if (!button) return;
+    state.attachments = state.attachments.filter((_, index) => index !== Number(button.dataset.removeAttachment));
+    renderComposerAttachments();
+  });
+  fileButton.addEventListener("click", () => fileInput.click());
+  fileInput.addEventListener("change", async () => {
+    try {
+      for (const file of Array.from(fileInput.files || [])) {
+        addAttachment(await readFileAsAttachment(file));
+      }
+      fileInput.value = "";
+    } catch (error) {
+      setStatus(error.message || "File could not be attached.");
+    }
+  });
+  audioButton.addEventListener("click", () => toggleAudioRecording().catch((error) => setStatus(error.message || "Audio could not be recorded.")));
+  videoButton.addEventListener("click", () => addVideoCallInvitation());
 
   renderMessages();
   bootstrap()

@@ -76,6 +76,16 @@ const redisDbKey = process.env.NITKA_REDIS_DB_KEY || localEnv.NITKA_REDIS_DB_KEY
 const hasRedisDb = Boolean(redisRestUrl && redisRestToken);
 const maxJsonBodyBytes = 6_500_000;
 const maxProductImageBytes = 2_500_000;
+const maxChatAttachmentBytes = 5_000_000;
+const defaultChatSettings = {
+  chatColor: "#1f6b5a",
+  accentColor: "#263b73",
+  timeColor: "#59616a",
+  pushColor: "#1f6b5a",
+  logoText: "HOODYBOODY",
+  logoImage: "",
+  welcomeText: "Ask us about size, delivery or your order."
+};
 const postgresUrl = process.env.DATABASE_URL || process.env.POSTGRES_URL || localEnv.DATABASE_URL || localEnv.POSTGRES_URL || "";
 const postgresPassword = process.env.PGPASSWORD || process.env.POSTGRES_PASSWORD || localEnv.PGPASSWORD || localEnv.POSTGRES_PASSWORD || "";
 const hasAwsIamPostgres = Boolean(
@@ -338,7 +348,8 @@ const emptyDb = {
   seoSitemap: null,
   chatConversations: [],
   chatMessages: [],
-  chatPushTokens: []
+  chatPushTokens: [],
+  chatSettings: JSON.parse(JSON.stringify(defaultChatSettings))
 };
 const memoryDb = process.env.NITKA_DB_PATH === ":memory:" || (process.env.VERCEL && !hasRedisDb && !hasPostgresDb) ? JSON.parse(JSON.stringify(emptyDb)) : null;
 const dbPath = memoryDb ? "" : path.resolve(root, process.env.NITKA_DB_PATH || "data/db.json");
@@ -406,6 +417,7 @@ function ensureDbDefaults(db) {
   db.chatConversations ||= [];
   db.chatMessages ||= [];
   db.chatPushTokens ||= [];
+  db.chatSettings = sanitizeChatSettings(db.chatSettings || {});
   if (ensureSeoDefaults(db)) changed = true;
   if (!Object.prototype.hasOwnProperty.call(db, "categories")) {
     db.categories = JSON.parse(JSON.stringify(defaultCategories));
@@ -722,7 +734,7 @@ function chatCorsHeaders(req) {
   return {
     "Access-Control-Allow-Origin": origin,
     "Access-Control-Allow-Methods": "GET, POST, PATCH, OPTIONS",
-    "Access-Control-Allow-Headers": "Content-Type, x-chat-admin-token",
+    "Access-Control-Allow-Headers": "Content-Type, x-chat-admin-token, x-chat-client-token",
     "Access-Control-Allow-Credentials": "true",
     "Access-Control-Max-Age": "86400",
     Vary: "Origin"
@@ -915,6 +927,131 @@ function normalizeChatCustomer(payload = {}, user = null) {
   };
 }
 
+function sanitizeHexColor(value, fallback) {
+  const color = String(value || "").trim();
+  return /^#[0-9a-f]{6}$/i.test(color) ? color : fallback;
+}
+
+function sanitizeChatSettings(input = {}, current = defaultChatSettings) {
+  return {
+    chatColor: sanitizeHexColor(input.chatColor, current.chatColor || defaultChatSettings.chatColor),
+    accentColor: sanitizeHexColor(input.accentColor, current.accentColor || defaultChatSettings.accentColor),
+    timeColor: sanitizeHexColor(input.timeColor, current.timeColor || defaultChatSettings.timeColor),
+    pushColor: sanitizeHexColor(input.pushColor, current.pushColor || defaultChatSettings.pushColor),
+    logoText: String(input.logoText || current.logoText || defaultChatSettings.logoText).trim().slice(0, 60) || defaultChatSettings.logoText,
+    logoImage: sanitizeChatLogo(input.logoImage || current.logoImage || ""),
+    welcomeText: String(input.welcomeText || current.welcomeText || defaultChatSettings.welcomeText).trim().slice(0, 180) || defaultChatSettings.welcomeText
+  };
+}
+
+function sanitizeChatLogo(value) {
+  const logo = String(value || "").trim();
+  if (!logo) return "";
+  if (/^https?:\/\/[\w.-]/i.test(logo)) return logo.slice(0, 900);
+  if (/^data:image\/(png|jpeg|jpg|webp|svg\+xml);base64,/i.test(logo) && Buffer.byteLength(logo, "utf8") <= maxChatAttachmentBytes) return logo;
+  return "";
+}
+
+function publicChatSettings(settings = {}) {
+  return sanitizeChatSettings(settings);
+}
+
+function createChatClientToken() {
+  return crypto.randomBytes(32).toString("base64url");
+}
+
+function hashChatClientToken(token) {
+  return crypto.createHash("sha256").update(String(token || "")).digest("hex");
+}
+
+function readChatClientToken(req, payload = {}, url = null) {
+  const headerToken = req?.headers?.["x-chat-client-token"];
+  return String(payload.clientToken || (Array.isArray(headerToken) ? headerToken[0] : headerToken) || url?.searchParams?.get("clientToken") || "").trim();
+}
+
+function canAccessCustomerChat(conversation, user, clientToken) {
+  if (!conversation) return false;
+  if (user?.id && conversation.userId && conversation.userId === user.id) return true;
+  if (!clientToken || !conversation.clientTokenHash) return false;
+  return conversation.clientTokenHash === hashChatClientToken(clientToken);
+}
+
+function findCustomerChatConversation(db, conversationId, user, clientToken) {
+  const requestedId = String(conversationId || "").trim();
+  let conversation = requestedId ? db.chatConversations.find((item) => item.id === requestedId) : null;
+  if (conversation && canAccessCustomerChat(conversation, user, clientToken)) return conversation;
+  if (requestedId) return null;
+
+  if (user?.id) {
+    return db.chatConversations
+      .slice()
+      .filter((item) => item.userId === user.id)
+      .sort((a, b) => new Date(b.lastMessageAt || b.updatedAt || b.createdAt) - new Date(a.lastMessageAt || a.updatedAt || a.createdAt))[0] || null;
+  }
+
+  return null;
+}
+
+function ensureCustomerChatConversation(db, payload = {}, user = null) {
+  const customer = normalizeChatCustomer(payload.customer || payload, user);
+  let clientToken = String(payload.clientToken || "").trim();
+  let conversation = findCustomerChatConversation(db, payload.conversationId, user, clientToken);
+
+  if (conversation) {
+    conversation.customer = {
+      ...(conversation.customer || {}),
+      ...Object.fromEntries(Object.entries(customer).filter(([, value]) => value))
+    };
+    if (user?.id && !conversation.userId) conversation.userId = user.id;
+    conversation.updatedAt = new Date().toISOString();
+    return { conversation, clientToken };
+  }
+
+  clientToken = createChatClientToken();
+  const now = new Date().toISOString();
+  conversation = {
+    id: crypto.randomUUID(),
+    userId: user?.id || "",
+    clientTokenHash: hashChatClientToken(clientToken),
+    customer,
+    status: "open",
+    unreadAdmin: 0,
+    unreadCustomer: 0,
+    createdAt: now,
+    updatedAt: now,
+    lastMessageAt: now,
+    lastMessageText: ""
+  };
+
+  db.chatConversations.push(conversation);
+  return { conversation, clientToken };
+}
+
+function normalizeChatAttachments(value = []) {
+  const input = Array.isArray(value) ? value : value ? [value] : [];
+  return input
+    .map((attachment) => {
+      const kind = ["file", "audio", "video-call"].includes(attachment.kind) ? attachment.kind : "file";
+      const name = String(attachment.name || (kind === "audio" ? "Audio message" : kind === "video-call" ? "Video call" : "Attachment")).trim().slice(0, 120);
+      const type = String(attachment.type || "").trim().slice(0, 120);
+      const url = String(attachment.url || "").trim().slice(0, 1200);
+      const dataUrl = String(attachment.dataUrl || "").trim();
+      const size = Math.max(0, Math.min(Number(attachment.size || 0) || 0, maxChatAttachmentBytes));
+      const roomId = String(attachment.roomId || "").trim().replace(/[^\w-]/g, "").slice(0, 120);
+
+      if (kind === "video-call") {
+        if (!url) return null;
+        return { id: crypto.randomUUID(), kind, name, type: "video/link", url, roomId, size: 0 };
+      }
+
+      if (!/^data:[\w.+-]+\/[\w.+-]+;base64,/i.test(dataUrl)) return null;
+      if (Buffer.byteLength(dataUrl, "utf8") > maxChatAttachmentBytes) return null;
+      return { id: crypto.randomUUID(), kind, name, type, dataUrl, size };
+    })
+    .filter(Boolean)
+    .slice(0, 4);
+}
+
 function publicChatMessage(message) {
   if (!message) return null;
 
@@ -924,6 +1061,7 @@ function publicChatMessage(message) {
     senderType: message.senderType,
     senderName: message.senderName,
     text: message.text,
+    attachments: Array.isArray(message.attachments) ? message.attachments : [],
     createdAt: message.createdAt
   };
 }
@@ -944,6 +1082,7 @@ function publicChatConversation(conversation, db, options = {}) {
     lastMessageAt: conversation.lastMessageAt || lastMessage?.createdAt || conversation.createdAt,
     createdAt: conversation.createdAt,
     updatedAt: conversation.updatedAt,
+    clientToken: options.clientToken || undefined,
     messages: options.withMessages ? messages.map(publicChatMessage) : undefined
   };
 }
@@ -979,23 +1118,32 @@ function ensureChatConversation(db, payload = {}, user = null) {
   return conversation;
 }
 
-function addChatMessage(db, conversation, senderType, text, senderName = "") {
+function addChatMessage(db, conversation, senderType, text, senderName = "", attachments = []) {
   const cleanText = normalizeChatText(text);
-  if (!cleanText) return null;
+  const cleanAttachments = normalizeChatAttachments(attachments);
+  if (!cleanText && !cleanAttachments.length) return null;
 
   const now = new Date().toISOString();
+  const fallbackText = cleanAttachments.length
+    ? cleanAttachments.some((attachment) => attachment.kind === "video-call")
+      ? "Video call invitation"
+      : cleanAttachments.some((attachment) => attachment.kind === "audio")
+        ? "Audio message"
+        : "File attachment"
+    : "";
   const message = {
     id: crypto.randomUUID(),
     conversationId: conversation.id,
     senderType,
     senderName: String(senderName || (senderType === "admin" ? "HOODYBOODY" : conversation.customer?.name || "Customer")).slice(0, 80),
     text: cleanText,
+    attachments: cleanAttachments,
     createdAt: now
   };
 
   db.chatMessages.push(message);
   conversation.lastMessageAt = now;
-  conversation.lastMessageText = cleanText;
+  conversation.lastMessageText = cleanText || fallbackText;
   conversation.updatedAt = now;
   if (senderType === "admin") conversation.unreadCustomer = Number(conversation.unreadCustomer || 0) + 1;
   if (senderType === "customer") conversation.unreadAdmin = Number(conversation.unreadAdmin || 0) + 1;
@@ -1025,7 +1173,7 @@ function emitChatUpdate(db, conversation, message = null) {
 
 async function notifyChatAdmins(db, conversation, message) {
   try {
-    const result = await sendChatPushNotifications(db, conversation, message, { logger: console });
+    const result = await sendChatPushNotifications(db, conversation, message, { logger: console, color: db.chatSettings?.pushColor });
     if (result.changed) await writeDbAsync(db);
     return result;
   } catch (error) {
@@ -1831,7 +1979,8 @@ async function handleApi(req, res) {
     if (url.pathname === "/api/chat/bootstrap" && method === "GET") {
       const user = getSessionUser(req, db);
       const conversationId = String(url.searchParams.get("conversationId") || "").trim();
-      const conversation = conversationId ? db.chatConversations.find((item) => item.id === conversationId) : null;
+      const clientToken = readChatClientToken(req, {}, url);
+      const conversation = findCustomerChatConversation(db, conversationId, user, clientToken);
 
       if (conversation) {
         markChatRead(conversation, "customer");
@@ -1840,15 +1989,23 @@ async function handleApi(req, res) {
 
       sendChatJson(req, res, 200, {
         user: publicUser(user),
-        conversation: publicChatConversation(conversation, db, { withMessages: true }),
+        conversation: publicChatConversation(conversation, db, { withMessages: true, clientToken }),
+        settings: publicChatSettings(db.chatSettings),
         socketEnabled: true
       });
       return;
     }
 
+    if (url.pathname === "/api/chat/settings" && method === "GET") {
+      sendChatJson(req, res, 200, { settings: publicChatSettings(db.chatSettings) });
+      return;
+    }
+
     if (url.pathname === "/api/chat/messages" && method === "GET") {
       const conversationId = String(url.searchParams.get("conversationId") || "").trim();
-      const conversation = db.chatConversations.find((item) => item.id === conversationId);
+      const clientToken = readChatClientToken(req, {}, url);
+      const user = getSessionUser(req, db);
+      const conversation = findCustomerChatConversation(db, conversationId, user, clientToken);
 
       if (!conversation) {
         sendChatJson(req, res, 404, { message: "Chat conversation not found." });
@@ -1857,15 +2014,16 @@ async function handleApi(req, res) {
 
       markChatRead(conversation, "customer");
       await writeDbAsync(db);
-      sendChatJson(req, res, 200, { conversation: publicChatConversation(conversation, db, { withMessages: true }) });
+      sendChatJson(req, res, 200, { conversation: publicChatConversation(conversation, db, { withMessages: true, clientToken }) });
       return;
     }
 
     if (url.pathname === "/api/chat/messages" && method === "POST") {
       const user = getSessionUser(req, db);
-      const body = await readJson(req);
-      const conversation = ensureChatConversation(db, body, user);
-      const message = addChatMessage(db, conversation, "customer", body.text || body.message, conversation.customer?.name || user?.name || "Customer");
+      const body = await readJson(req, maxJsonBodyBytes);
+      const resolved = ensureCustomerChatConversation(db, { ...body, clientToken: readChatClientToken(req, body, url) }, user);
+      const conversation = resolved.conversation;
+      const message = addChatMessage(db, conversation, "customer", body.text || body.message, conversation.customer?.name || user?.name || "Customer", body.attachments);
 
       if (!message) {
         sendChatJson(req, res, 400, { message: "Write a message before sending." });
@@ -1876,7 +2034,7 @@ async function handleApi(req, res) {
       emitChatUpdate(db, conversation, message);
       await notifyChatAdmins(db, conversation, message);
       sendChatJson(req, res, 201, {
-        conversation: publicChatConversation(conversation, db, { withMessages: true }),
+        conversation: publicChatConversation(conversation, db, { withMessages: true, clientToken: resolved.clientToken }),
         message: publicChatMessage(message)
       });
       return;
@@ -1950,6 +2108,29 @@ async function handleApi(req, res) {
       return;
     }
 
+    if (url.pathname === "/api/admin/chat/settings" && method === "GET") {
+      if (!hasChatAdminAccess(req, db)) {
+        sendChatJson(req, res, 401, { message: "Owner access is required for live chat." });
+        return;
+      }
+
+      sendChatJson(req, res, 200, { settings: publicChatSettings(db.chatSettings) });
+      return;
+    }
+
+    if (url.pathname === "/api/admin/chat/settings" && method === "PATCH") {
+      if (!hasChatAdminAccess(req, db)) {
+        sendChatJson(req, res, 401, { message: "Owner access is required for live chat." });
+        return;
+      }
+
+      const body = await readJson(req, maxJsonBodyBytes);
+      db.chatSettings = sanitizeChatSettings(body, db.chatSettings || defaultChatSettings);
+      await writeDbAsync(db);
+      sendChatJson(req, res, 200, { settings: publicChatSettings(db.chatSettings) });
+      return;
+    }
+
     if (url.pathname === "/api/admin/chat/conversations" && method === "GET") {
       if (!hasChatAdminAccess(req, db)) {
         sendChatJson(req, res, 401, { message: "Owner access is required for live chat." });
@@ -1989,8 +2170,8 @@ async function handleApi(req, res) {
 
       if (action === "messages" && method === "POST") {
         const user = getSessionUser(req, db);
-        const body = await readJson(req);
-        const message = addChatMessage(db, conversation, "admin", body.text || body.message, user?.name || "HOODYBOODY");
+        const body = await readJson(req, maxJsonBodyBytes);
+        const message = addChatMessage(db, conversation, "admin", body.text || body.message, user?.name || "HOODYBOODY", body.attachments);
 
         if (!message) {
           sendChatJson(req, res, 400, { message: "Write a message before sending." });
@@ -3078,13 +3259,19 @@ function attachChatSocket(httpServer) {
       try {
         const db = await readDbAsync();
         const user = getSocketUser(socket, db);
-        const conversation = ensureChatConversation(db, payload, user);
+        const resolved = ensureCustomerChatConversation(
+          db,
+          { ...payload, clientToken: payload.clientToken || socket.data.clientToken || "" },
+          user
+        );
+        const conversation = resolved.conversation;
         markChatRead(conversation, "customer");
         await writeDbAsync(db);
 
         socket.data.conversationId = conversation.id;
+        socket.data.clientToken = resolved.clientToken || payload.clientToken || socket.data.clientToken || "";
         socket.join(`chat:${conversation.id}`);
-        const response = { conversation: publicChatConversation(conversation, db, { withMessages: true }) };
+        const response = { conversation: publicChatConversation(conversation, db, { withMessages: true, clientToken: socket.data.clientToken }) };
         socket.emit("chat:ready", response);
         chatIo.to("chat:admins").emit("chat:conversation", { conversation: publicChatConversation(conversation, db) });
         if (typeof reply === "function") reply(response);
@@ -3160,10 +3347,22 @@ function attachChatSocket(httpServer) {
         const admin = socketHasAdminAccess(socket, db);
         const senderType = admin.ok && payload.senderType === "admin" ? "admin" : "customer";
         const user = senderType === "admin" ? admin.user : getSocketUser(socket, db);
+        const resolvedCustomerConversation =
+          senderType === "customer"
+            ? ensureCustomerChatConversation(
+                db,
+                {
+                  ...payload,
+                  conversationId: payload.conversationId || socket.data.conversationId,
+                  clientToken: payload.clientToken || socket.data.clientToken || ""
+                },
+                user
+              )
+            : null;
         const conversation =
           senderType === "admin"
             ? db.chatConversations.find((item) => item.id === String(payload.conversationId || socket.data.conversationId || "").trim())
-            : ensureChatConversation(db, { ...payload, conversationId: payload.conversationId || socket.data.conversationId }, user);
+            : resolvedCustomerConversation.conversation;
 
         if (!conversation) {
           socket.emit("chat:error", { message: "Chat conversation not found." });
@@ -3175,7 +3374,8 @@ function attachChatSocket(httpServer) {
           conversation,
           senderType,
           payload.text || payload.message,
-          senderType === "admin" ? user?.name || "HOODYBOODY" : conversation.customer?.name || user?.name || "Customer"
+          senderType === "admin" ? user?.name || "HOODYBOODY" : conversation.customer?.name || user?.name || "Customer",
+          payload.attachments
         );
 
         if (!message) {
@@ -3185,11 +3385,12 @@ function attachChatSocket(httpServer) {
 
         await writeDbAsync(db);
         socket.data.conversationId = conversation.id;
+        if (senderType === "customer") socket.data.clientToken = resolvedCustomerConversation.clientToken || payload.clientToken || socket.data.clientToken || "";
         socket.join(`chat:${conversation.id}`);
         emitChatUpdate(db, conversation, message);
         if (senderType === "customer") await notifyChatAdmins(db, conversation, message);
         const response = {
-          conversation: publicChatConversation(conversation, db, { withMessages: true }),
+          conversation: publicChatConversation(conversation, db, { withMessages: true, clientToken: senderType === "customer" ? socket.data.clientToken : undefined }),
           message: publicChatMessage(message)
         };
         if (typeof reply === "function") reply(response);

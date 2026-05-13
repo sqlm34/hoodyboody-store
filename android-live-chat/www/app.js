@@ -288,6 +288,20 @@ function renderConversations() {
     .join("");
 }
 
+function renderAttachment(attachment = {}) {
+  const name = escapeHtml(attachment.name || "Attachment");
+  if (attachment.kind === "video-call") {
+    return `<a class="attachment" href="${escapeHtml(attachment.url || "")}" target="_blank" rel="noopener">Join video call</a>`;
+  }
+  if (attachment.kind === "audio" || /^audio\//i.test(attachment.type || "")) {
+    return `<audio class="attachment audio" controls src="${escapeHtml(attachment.dataUrl || "")}"></audio>`;
+  }
+  if (/^image\//i.test(attachment.type || "")) {
+    return `<a class="attachment" href="${escapeHtml(attachment.dataUrl || "")}" target="_blank" rel="noopener"><img src="${escapeHtml(attachment.dataUrl || "")}" alt="${name}" /></a>`;
+  }
+  return `<a class="attachment" href="${escapeHtml(attachment.dataUrl || attachment.url || "")}" target="_blank" rel="noopener">${name}</a>`;
+}
+
 function renderThread() {
   if (!activeConversation) {
     threadHead.innerHTML = `<h2>Select chat</h2><p>New customer messages will appear here.</p>`;
@@ -306,7 +320,8 @@ function renderThread() {
         .map(
           (message) => `
             <article class="message ${message.senderType === "admin" ? "admin" : "customer"}">
-              <div>${escapeHtml(message.text)}</div>
+              ${message.text ? `<div>${escapeHtml(message.text)}</div>` : ""}
+              ${(message.attachments || []).map(renderAttachment).join("")}
               <small>${escapeHtml(message.senderName || "")}</small>
             </article>
           `

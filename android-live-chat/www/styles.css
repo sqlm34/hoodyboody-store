@@ -187,6 +187,23 @@ button[type="submit"] {
   background: rgba(38, 59, 115, 0.1);
 }
 
+.attachment {
+  display: grid;
+  gap: 6px;
+  margin-top: 8px;
+  color: var(--pine);
+  overflow-wrap: anywhere;
+}
+
+.attachment img {
+  width: min(220px, 100%);
+  border-radius: 8px;
+}
+
+.attachment.audio {
+  width: min(260px, 100%);
+}
+
 .reply-form {
   display: grid;
   gap: 10px;

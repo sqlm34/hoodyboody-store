@@ -143,10 +143,12 @@ function removePushToken(db, token) {
   return before !== db.chatPushTokens.length;
 }
 
-function buildChatPushMessage({ token, conversation, message, channelId = DEFAULT_CHANNEL_ID, title, body }) {
+function buildChatPushMessage({ token, conversation, message, channelId = DEFAULT_CHANNEL_ID, title, body, color }) {
   const customerName = String(conversation?.customer?.name || "Customer").trim() || "Customer";
-  const safeBody = String(body || message?.text || "New customer message").slice(0, 240);
+  const fallbackBody = message?.attachments?.length ? "New attachment from customer" : "New customer message";
+  const safeBody = String(body || message?.text || fallbackBody).slice(0, 240);
   const safeTitle = String(title || `Message from ${customerName}`).slice(0, 80);
+  const safeColor = /^#[0-9a-f]{6}$/i.test(String(color || "")) ? String(color) : undefined;
 
   return {
     token,
@@ -167,6 +169,7 @@ function buildChatPushMessage({ token, conversation, message, channelId = DEFAUL
       collapseKey: `chat-${conversation?.id || "new"}`,
       notification: {
         channelId,
+        ...(safeColor ? { color: safeColor } : {}),
         sound: "hoodyboody_chat",
         tag: `chat-${conversation?.id || "new"}`
       }
@@ -276,7 +279,8 @@ async function sendChatPushNotifications(db, conversation, message, options = {}
           message,
           channelId: record.channelId || DEFAULT_CHANNEL_ID,
           title: options.title,
-          body: options.body
+          body: options.body,
+          color: options.color
         })
       );
       sent += 1;

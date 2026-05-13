@@ -13,6 +13,22 @@ const replyForm = document.querySelector("#chatReplyForm");
 const replyText = document.querySelector("#chatReplyText");
 const refreshChat = document.querySelector("#refreshChat");
 const enableChatNotifications = document.querySelector("#enableChatNotifications");
+const toggleChatSettings = document.querySelector("#toggleChatSettings");
+const chatSettingsPanel = document.querySelector("#chatSettingsPanel");
+const saveChatSettings = document.querySelector("#saveChatSettings");
+const chatColor = document.querySelector("#chatColor");
+const chatAccentColor = document.querySelector("#chatAccentColor");
+const chatTimeColor = document.querySelector("#chatTimeColor");
+const chatPushColor = document.querySelector("#chatPushColor");
+const chatLogoText = document.querySelector("#chatLogoText");
+const chatWelcomeText = document.querySelector("#chatWelcomeText");
+const chatLogoFile = document.querySelector("#chatLogoFile");
+const chatLogoPreview = document.querySelector("#chatLogoPreview");
+const replyAttachments = document.querySelector("#chatReplyAttachments");
+const attachFileButton = document.querySelector("#chatAttachFile");
+const recordAudioButton = document.querySelector("#chatRecordAudio");
+const startVideoButton = document.querySelector("#chatStartVideo");
+const fileInput = document.querySelector("#chatFileInput");
 
 let conversations = [];
 let activeConversation = null;
@@ -21,6 +37,11 @@ let connected = false;
 let pollTimer = 0;
 let loadedConversationsOnce = false;
 let lastConversationTimes = {};
+let replyDraftAttachments = [];
+let chatSettings = {};
+let mediaRecorder = null;
+let recordedChunks = [];
+const MAX_ATTACHMENT_BYTES = 5_000_000;
 
 function escapeHtml(value) {
   return String(value || "").replace(/[&<>"']/g, (char) => {
@@ -68,6 +89,123 @@ function formatDate(value) {
   }).format(new Date(value));
 }
 
+function renderAttachment(attachment = {}) {
+  const name = escapeHtml(attachment.name || "Attachment");
+  if (attachment.kind === "video-call") {
+    return `<a class="chat-attachment video-call" href="${escapeHtml(attachment.url)}" target="_blank" rel="noopener">
+      <i class="fa-solid fa-video" aria-hidden="true"></i>
+      <span>Join video call</span>
+    </a>`;
+  }
+
+  if (attachment.kind === "audio" || /^audio\//i.test(attachment.type || "")) {
+    return `<div class="chat-attachment audio-message">
+      <audio controls src="${escapeHtml(attachment.dataUrl || "")}"></audio>
+      <span>${name}</span>
+    </div>`;
+  }
+
+  if (/^image\//i.test(attachment.type || "")) {
+    return `<a class="chat-attachment image-file" href="${escapeHtml(attachment.dataUrl || "")}" download="${name}">
+      <img src="${escapeHtml(attachment.dataUrl || "")}" alt="${name}" />
+      <span>${name}</span>
+    </a>`;
+  }
+
+  return `<a class="chat-attachment file-message" href="${escapeHtml(attachment.dataUrl || attachment.url || "")}" download="${name}" target="_blank" rel="noopener">
+    <i class="fa-solid fa-file-arrow-down" aria-hidden="true"></i>
+    <span>${name}</span>
+  </a>`;
+}
+
+function renderDraftAttachments() {
+  replyAttachments.hidden = replyDraftAttachments.length === 0;
+  replyAttachments.innerHTML = replyDraftAttachments
+    .map(
+      (attachment, index) => `
+        <span class="chat-attachment-chip">
+          <i class="fa-solid ${attachment.kind === "audio" ? "fa-microphone" : attachment.kind === "video-call" ? "fa-video" : "fa-paperclip"}" aria-hidden="true"></i>
+          <span>${escapeHtml(attachment.name || "Attachment")}</span>
+          <button type="button" data-remove-attachment="${index}" aria-label="Remove attachment">
+            <i class="fa-solid fa-xmark" aria-hidden="true"></i>
+          </button>
+        </span>
+      `
+    )
+    .join("");
+}
+
+function addDraftAttachment(attachment) {
+  if (!attachment) return;
+  replyDraftAttachments = [...replyDraftAttachments, attachment].slice(0, 4);
+  renderDraftAttachments();
+}
+
+function readFileAsAttachment(file, kind = "file") {
+  return new Promise((resolve, reject) => {
+    if (!file) {
+      resolve(null);
+      return;
+    }
+    if (file.size > MAX_ATTACHMENT_BYTES) {
+      reject(new Error("File is too large. Maximum is 5 MB."));
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = () =>
+      resolve({
+        kind,
+        name: file.name || (kind === "audio" ? "Audio message.webm" : "Attachment"),
+        type: file.type || "application/octet-stream",
+        size: file.size,
+        dataUrl: String(reader.result || "")
+      });
+    reader.onerror = () => reject(new Error("File could not be attached."));
+    reader.readAsDataURL(file);
+  });
+}
+
+function applySettings(settings = {}) {
+  chatSettings = settings || {};
+  chatColor.value = chatSettings.chatColor || "#1f6b5a";
+  chatAccentColor.value = chatSettings.accentColor || "#263b73";
+  chatTimeColor.value = chatSettings.timeColor || "#59616a";
+  chatPushColor.value = chatSettings.pushColor || "#1f6b5a";
+  chatLogoText.value = chatSettings.logoText || "HOODYBOODY";
+  chatWelcomeText.value = chatSettings.welcomeText || "";
+  document.documentElement.style.setProperty("--chat-color", chatColor.value);
+  document.documentElement.style.setProperty("--chat-accent", chatAccentColor.value);
+  document.documentElement.style.setProperty("--chat-time-color", chatTimeColor.value);
+  if (chatSettings.logoImage) {
+    chatLogoPreview.src = chatSettings.logoImage;
+    chatLogoPreview.hidden = false;
+  } else {
+    chatLogoPreview.hidden = true;
+  }
+}
+
+async function loadChatSettings() {
+  const data = await api("/api/admin/chat/settings");
+  applySettings(data.settings || {});
+}
+
+async function saveSettings() {
+  const data = await api("/api/admin/chat/settings", {
+    method: "PATCH",
+    body: JSON.stringify({
+      chatColor: chatColor.value,
+      accentColor: chatAccentColor.value,
+      timeColor: chatTimeColor.value,
+      pushColor: chatPushColor.value,
+      logoText: chatLogoText.value,
+      welcomeText: chatWelcomeText.value,
+      logoImage: chatSettings.logoImage || ""
+    })
+  });
+  applySettings(data.settings || {});
+  chatStatus.textContent = "Chat settings saved.";
+}
+
 function showLocked(message) {
   chatDashboard.hidden = true;
   chatLocked.hidden = false;
@@ -90,10 +228,18 @@ function renderConversations() {
       const customer = conversation.customer || {};
       const active = activeConversation?.id === conversation.id;
       const unread = Number(conversation.unreadAdmin || 0);
+      const name = customer.name || "Customer";
+      const initials = name
+        .split(/\s+/)
+        .map((part) => part[0])
+        .join("")
+        .slice(0, 2)
+        .toUpperCase();
       return `
         <button class="chat-conversation-card ${active ? "active" : ""}" type="button" data-id="${escapeHtml(conversation.id)}">
+          <span class="chat-avatar">${escapeHtml(initials || "C")}</span>
           <span>
-            <strong>${escapeHtml(customer.name || "Customer")}</strong>
+            <strong>${escapeHtml(name)}</strong>
             <small>${escapeHtml(customer.email || customer.phone || "No contact yet")}</small>
           </span>
           ${unread ? `<b>${unread}</b>` : ""}
@@ -125,7 +271,8 @@ function renderThread() {
         .map(
           (message) => `
             <article class="chat-thread-message ${message.senderType === "admin" ? "from-admin" : "from-customer"}">
-              <div>${escapeHtml(message.text)}</div>
+              ${message.text ? `<div>${escapeHtml(message.text)}</div>` : ""}
+              ${(message.attachments || []).map(renderAttachment).join("")}
               <small>${escapeHtml(message.senderName || "")} ${formatDate(message.createdAt)}</small>
             </article>
           `
@@ -140,7 +287,7 @@ function notifyAdmin(message, conversation) {
   if (!message || message.senderType !== "customer") return;
   if (!("Notification" in window) || Notification.permission !== "granted") return;
   const customerName = conversation?.customer?.name || "Customer";
-  new Notification(`New message from ${customerName}`, { body: message.text, tag: message.id });
+  new Notification(`New message from ${customerName}`, { body: message.text || "New attachment", tag: message.id });
 }
 
 async function loadConversations({ silent = false } = {}) {
@@ -273,18 +420,21 @@ conversationList.addEventListener("click", (event) => {
 replyForm.addEventListener("submit", async (event) => {
   event.preventDefault();
   const text = replyText.value.trim();
-  if (!activeConversation || !text) return;
+  if (!activeConversation || (!text && !replyDraftAttachments.length)) return;
+  const attachments = replyDraftAttachments;
   replyText.value = "";
 
   if (connected && socket) {
     socket.emit(
       "chat:message:send",
-      { conversationId: activeConversation.id, senderType: "admin", text },
+      { conversationId: activeConversation.id, senderType: "admin", text, attachments },
       (payload) => {
         if (payload?.conversation) {
           activeConversation = payload.conversation;
           renderThread();
         }
+        replyDraftAttachments = [];
+        renderDraftAttachments();
       }
     );
     return;
@@ -292,9 +442,11 @@ replyForm.addEventListener("submit", async (event) => {
 
   const data = await api(`/api/admin/chat/conversations/${encodeURIComponent(activeConversation.id)}/messages`, {
     method: "POST",
-    body: JSON.stringify({ text })
+    body: JSON.stringify({ text, attachments })
   });
   activeConversation = data.conversation;
+  replyDraftAttachments = [];
+  renderDraftAttachments();
   renderThread();
   await loadConversations({ silent: true });
 });
@@ -303,13 +455,90 @@ refreshChat.addEventListener("click", () => loadConversations());
 enableChatNotifications.addEventListener("click", () => {
   if ("Notification" in window) Notification.requestPermission();
 });
+toggleChatSettings.addEventListener("click", () => {
+  chatSettingsPanel.hidden = !chatSettingsPanel.hidden;
+});
+saveChatSettings.addEventListener("click", () => saveSettings().catch((error) => (chatStatus.textContent = error.message || "Settings were not saved.")));
+chatLogoFile.addEventListener("change", async () => {
+  const file = chatLogoFile.files?.[0];
+  if (!file) return;
+  try {
+    const attachment = await readFileAsAttachment(file);
+    chatSettings.logoImage = attachment.dataUrl;
+    chatLogoPreview.src = attachment.dataUrl;
+    chatLogoPreview.hidden = false;
+  } catch (error) {
+    chatStatus.textContent = error.message || "Logo was not loaded.";
+  }
+});
+replyAttachments.addEventListener("click", (event) => {
+  const button = event.target.closest("[data-remove-attachment]");
+  if (!button) return;
+  replyDraftAttachments = replyDraftAttachments.filter((_, index) => index !== Number(button.dataset.removeAttachment));
+  renderDraftAttachments();
+});
+attachFileButton.addEventListener("click", () => fileInput.click());
+fileInput.addEventListener("change", async () => {
+  try {
+    for (const file of Array.from(fileInput.files || [])) {
+      addDraftAttachment(await readFileAsAttachment(file));
+    }
+    fileInput.value = "";
+  } catch (error) {
+    chatStatus.textContent = error.message || "File could not be attached.";
+  }
+});
+recordAudioButton.addEventListener("click", async () => {
+  try {
+    if (mediaRecorder?.state === "recording") {
+      mediaRecorder.stop();
+      recordAudioButton.classList.remove("recording");
+      return;
+    }
+    if (!navigator.mediaDevices?.getUserMedia || !window.MediaRecorder) {
+      chatStatus.textContent = "Audio recording is not available in this browser.";
+      return;
+    }
+    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    recordedChunks = [];
+    mediaRecorder = new MediaRecorder(stream);
+    mediaRecorder.addEventListener("dataavailable", (event) => {
+      if (event.data?.size) recordedChunks.push(event.data);
+    });
+    mediaRecorder.addEventListener("stop", async () => {
+      stream.getTracks().forEach((track) => track.stop());
+      const blob = new Blob(recordedChunks, { type: mediaRecorder.mimeType || "audio/webm" });
+      const file = new File([blob], `audio-message-${Date.now()}.webm`, { type: blob.type });
+      addDraftAttachment(await readFileAsAttachment(file, "audio"));
+      chatStatus.textContent = "Audio message attached.";
+    });
+    mediaRecorder.start();
+    recordAudioButton.classList.add("recording");
+    chatStatus.textContent = "Recording audio... tap microphone again to stop.";
+  } catch (error) {
+    chatStatus.textContent = error.message || "Audio could not be recorded.";
+  }
+});
+startVideoButton.addEventListener("click", () => {
+  if (!activeConversation) return;
+  const roomId = `hoodyboody-${activeConversation.id}`.replace(/[^\w-]/g, "").slice(0, 80);
+  addDraftAttachment({
+    kind: "video-call",
+    name: "Video call",
+    type: "video/link",
+    roomId,
+    url: `https://meet.jit.si/${roomId}`,
+    size: 0
+  });
+  chatStatus.textContent = "Video call invitation attached.";
+});
 saveChatToken.addEventListener("click", () => {
   localStorage.setItem(TOKEN_KEY, chatAdminToken.value.trim());
   window.location.reload();
 });
 
 chatAdminToken.value = getToken();
-loadConversations().finally(() => {
+Promise.allSettled([loadChatSettings(), loadConversations()]).finally(() => {
   connectSocket();
   startPolling();
 });
