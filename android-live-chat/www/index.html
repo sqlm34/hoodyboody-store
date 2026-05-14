@@ -41,8 +41,13 @@
           </div>
           <div class="thread-messages" id="threadMessages"></div>
           <form class="reply-form" id="replyForm">
-            <textarea id="replyText" rows="2" placeholder="Reply..." required></textarea>
-            <button type="submit">Send</button>
+            <div class="reply-attachments" id="replyAttachments" hidden></div>
+            <textarea id="replyText" rows="2" placeholder="Reply..."></textarea>
+            <div class="reply-tools">
+              <button class="attach-button" id="attachFileButton" type="button">Attach file</button>
+              <input id="fileInput" type="file" multiple hidden />
+              <button type="submit">Send</button>
+            </div>
           </form>
         </section>
       </section>

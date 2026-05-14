@@ -123,6 +123,16 @@ function addDraftAttachment(attachment) {
   renderDraftAttachments();
 }
 
+function submitReplyOnEnter(event) {
+  if (event.key !== "Enter" || event.shiftKey || event.ctrlKey || event.altKey || event.metaKey || event.isComposing) return;
+  event.preventDefault();
+  if (typeof replyForm.requestSubmit === "function") {
+    replyForm.requestSubmit();
+    return;
+  }
+  replyForm.dispatchEvent(new Event("submit", { bubbles: true, cancelable: true }));
+}
+
 function readFileAsAttachment(file) {
   return new Promise((resolve, reject) => {
     if (!file) {
@@ -432,6 +442,7 @@ replyForm.addEventListener("submit", async (event) => {
   renderThread();
   await loadConversations({ silent: true });
 });
+replyText.addEventListener("keydown", submitReplyOnEnter);
 
 refreshChat.addEventListener("click", () => loadConversations());
 enableChatNotifications.addEventListener("click", () => {

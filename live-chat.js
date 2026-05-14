@@ -86,8 +86,9 @@
         <div class="live-chat-attachments" data-chat-attachments hidden></div>
         <textarea data-chat-text rows="2" placeholder="Write a message..."></textarea>
         <div class="live-chat-tools" aria-label="Chat tools">
-          <button class="icon-button" data-chat-file-button type="button" aria-label="Attach file">
+          <button class="icon-button live-chat-file-button" data-chat-file-button type="button" aria-label="Attach file">
             <i class="fa-solid fa-paperclip" aria-hidden="true"></i>
+            <span>Attach file</span>
           </button>
         </div>
         <input data-chat-file type="file" multiple hidden />
@@ -240,6 +241,16 @@
     renderComposerAttachments();
   }
 
+  function submitOnEnter(event) {
+    if (event.key !== "Enter" || event.shiftKey || event.ctrlKey || event.altKey || event.metaKey || event.isComposing) return;
+    event.preventDefault();
+    if (typeof form.requestSubmit === "function") {
+      form.requestSubmit();
+      return;
+    }
+    form.dispatchEvent(new Event("submit", { bubbles: true, cancelable: true }));
+  }
+
   function readFileAsAttachment(file) {
     return new Promise((resolve, reject) => {
       if (!file) {
@@ -382,6 +393,7 @@
 
   openButton.addEventListener("click", () => setOpen(!root.classList.contains("open")));
   closeButton.addEventListener("click", () => setOpen(false));
+  textInput.addEventListener("keydown", submitOnEnter);
   form.addEventListener("submit", async (event) => {
     event.preventDefault();
     const text = textInput.value.trim();

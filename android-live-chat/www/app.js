@@ -17,6 +17,9 @@ const threadHead = document.querySelector("#threadHead");
 const threadMessages = document.querySelector("#threadMessages");
 const replyForm = document.querySelector("#replyForm");
 const replyText = document.querySelector("#replyText");
+const replyAttachments = document.querySelector("#replyAttachments");
+const attachFileButton = document.querySelector("#attachFileButton");
+const fileInput = document.querySelector("#fileInput");
 
 let socket = null;
 let connected = false;
@@ -32,6 +35,8 @@ let firebaseChecked = false;
 let firebaseConfigured = false;
 let notificationChannelId = localStorage.getItem(NOTIFICATION_CHANNEL_KEY) || NOTIFICATION_CHANNEL_ID;
 let currentPushToken = "";
+let replyDraftAttachments = [];
+const MAX_ATTACHMENT_BYTES = 5_000_000;
 
 serverUrlInput.value = localStorage.getItem(SERVER_KEY) || "https://www.hoodyboody.com";
 adminTokenInput.value = localStorage.getItem(TOKEN_KEY) || "";
@@ -296,6 +301,60 @@ function renderAttachment(attachment = {}) {
   return `<a class="attachment" href="${escapeHtml(attachment.dataUrl || attachment.url || "")}" target="_blank" rel="noopener">${name}</a>`;
 }
 
+function renderDraftAttachments() {
+  replyAttachments.hidden = replyDraftAttachments.length === 0;
+  replyAttachments.innerHTML = replyDraftAttachments
+    .map(
+      (attachment, index) => `
+        <span class="attachment-chip">
+          <span>${escapeHtml(attachment.name || "Attachment")}</span>
+          <button type="button" data-remove-attachment="${index}" aria-label="Remove attachment">x</button>
+        </span>
+      `
+    )
+    .join("");
+}
+
+function addDraftAttachment(attachment) {
+  if (!attachment) return;
+  replyDraftAttachments = [...replyDraftAttachments, attachment].slice(0, 4);
+  renderDraftAttachments();
+}
+
+function readFileAsAttachment(file) {
+  return new Promise((resolve, reject) => {
+    if (!file) {
+      resolve(null);
+      return;
+    }
+    if (file.size > MAX_ATTACHMENT_BYTES) {
+      reject(new Error("File is too large. Maximum is 5 MB."));
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = () =>
+      resolve({
+        kind: "file",
+        name: file.name || "Attachment",
+        type: file.type || "application/octet-stream",
+        size: file.size,
+        dataUrl: String(reader.result || "")
+      });
+    reader.onerror = () => reject(new Error("File could not be attached."));
+    reader.readAsDataURL(file);
+  });
+}
+
+function submitReplyOnEnter(event) {
+  if (event.key !== "Enter" || event.shiftKey || event.ctrlKey || event.altKey || event.metaKey || event.isComposing) return;
+  event.preventDefault();
+  if (typeof replyForm.requestSubmit === "function") {
+    replyForm.requestSubmit();
+    return;
+  }
+  replyForm.dispatchEvent(new Event("submit", { bubbles: true, cancelable: true }));
+}
+
 function renderThread() {
   if (!activeConversation) {
     threadHead.innerHTML = `<h2>Select chat</h2><p>New customer messages will appear here.</p>`;
@@ -434,20 +493,48 @@ replyForm.addEventListener("submit", async (event) => {
   event.preventDefault();
   if (!activeConversation) return;
   const text = replyText.value.trim();
-  if (!text) return;
+  if (!text && !replyDraftAttachments.length) return;
+  const attachments = replyDraftAttachments;
   replyText.value = "";
 
   if (connected && socket) {
-    socket.emit("chat:message:send", { senderType: "admin", conversationId: activeConversation.id, text });
+    socket.emit("chat:message:send", { senderType: "admin", conversationId: activeConversation.id, text, attachments }, (payload) => {
+      if (payload?.conversation) {
+        activeConversation = payload.conversation;
+        renderThread();
+      }
+      replyDraftAttachments = [];
+      renderDraftAttachments();
+    });
     return;
   }
 
   const data = await api(`/api/admin/chat/conversations/${encodeURIComponent(activeConversation.id)}/messages`, {
     method: "POST",
-    body: JSON.stringify({ text })
+    body: JSON.stringify({ text, attachments })
   });
   activeConversation = data.conversation;
+  replyDraftAttachments = [];
+  renderDraftAttachments();
   renderThread();
+});
+replyText.addEventListener("keydown", submitReplyOnEnter);
+replyAttachments.addEventListener("click", (event) => {
+  const button = event.target.closest("[data-remove-attachment]");
+  if (!button) return;
+  replyDraftAttachments = replyDraftAttachments.filter((_, index) => index !== Number(button.dataset.removeAttachment));
+  renderDraftAttachments();
+});
+attachFileButton.addEventListener("click", () => fileInput.click());
+fileInput.addEventListener("change", async () => {
+  try {
+    for (const file of Array.from(fileInput.files || [])) {
+      addDraftAttachment(await readFileAsAttachment(file));
+    }
+    fileInput.value = "";
+  } catch (error) {
+    setStatus(error.message || "File could not be attached.");
+  }
 });
 
 settingsToggle.addEventListener("click", () => settingsCard.classList.toggle("collapsed"));
