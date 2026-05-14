@@ -214,7 +214,6 @@
   background: var(--white);
 }
 
-.live-chat-tools .icon-button.recording,
 .live-chat-tools .icon-button:hover {
   color: var(--white);
   background: var(--chat-color, var(--pine));
@@ -273,18 +272,13 @@
   object-fit: cover;
 }
 
-.chat-attachment.file-message,
-.chat-attachment.video-call {
+.chat-attachment.file-message {
   grid-template-columns: auto minmax(0, 1fr);
   align-items: center;
   border: 1px solid var(--line);
   border-radius: 8px;
   padding: 10px;
   background: rgba(255, 255, 255, 0.7);
-}
-
-.chat-attachment.audio-message audio {
-  width: min(260px, 100%);
 }
 
 .live-chat-empty,

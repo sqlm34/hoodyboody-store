@@ -1031,22 +1031,14 @@ function normalizeChatAttachments(value = []) {
   const input = Array.isArray(value) ? value : value ? [value] : [];
   return input
     .map((attachment) => {
-      const kind = ["file", "audio", "video-call"].includes(attachment.kind) ? attachment.kind : "file";
-      const name = String(attachment.name || (kind === "audio" ? "Audio message" : kind === "video-call" ? "Video call" : "Attachment")).trim().slice(0, 120);
+      const name = String(attachment.name || "Attachment").trim().slice(0, 120);
       const type = String(attachment.type || "").trim().slice(0, 120);
-      const url = String(attachment.url || "").trim().slice(0, 1200);
       const dataUrl = String(attachment.dataUrl || "").trim();
       const size = Math.max(0, Math.min(Number(attachment.size || 0) || 0, maxChatAttachmentBytes));
-      const roomId = String(attachment.roomId || "").trim().replace(/[^\w-]/g, "").slice(0, 120);
-
-      if (kind === "video-call") {
-        if (!url) return null;
-        return { id: crypto.randomUUID(), kind, name, type: "video/link", url, roomId, size: 0 };
-      }
 
       if (!/^data:[\w.+-]+\/[\w.+-]+;base64,/i.test(dataUrl)) return null;
       if (Buffer.byteLength(dataUrl, "utf8") > maxChatAttachmentBytes) return null;
-      return { id: crypto.randomUUID(), kind, name, type, dataUrl, size };
+      return { id: crypto.randomUUID(), kind: "file", name, type, dataUrl, size };
     })
     .filter(Boolean)
     .slice(0, 4);
@@ -1125,11 +1117,7 @@ function addChatMessage(db, conversation, senderType, text, senderName = "", att
 
   const now = new Date().toISOString();
   const fallbackText = cleanAttachments.length
-    ? cleanAttachments.some((attachment) => attachment.kind === "video-call")
-      ? "Video call invitation"
-      : cleanAttachments.some((attachment) => attachment.kind === "audio")
-        ? "Audio message"
-        : "File attachment"
+    ? "File attachment"
     : "";
   const message = {
     id: crypto.randomUUID(),

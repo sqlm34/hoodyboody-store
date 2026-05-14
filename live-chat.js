@@ -27,9 +27,7 @@
     attachments: [],
     pollTimer: 0,
     user: null,
-    settings: {},
-    mediaRecorder: null,
-    recordedChunks: []
+    settings: {}
   };
 
   if (document.querySelector("[data-live-chat-root]")) return;
@@ -91,12 +89,6 @@
           <button class="icon-button" data-chat-file-button type="button" aria-label="Attach file">
             <i class="fa-solid fa-paperclip" aria-hidden="true"></i>
           </button>
-          <button class="icon-button" data-chat-audio-button type="button" aria-label="Record audio message">
-            <i class="fa-solid fa-microphone" aria-hidden="true"></i>
-          </button>
-          <button class="icon-button" data-chat-video-button type="button" aria-label="Start video call">
-            <i class="fa-solid fa-video" aria-hidden="true"></i>
-          </button>
         </div>
         <input data-chat-file type="file" multiple hidden />
         <button class="button primary" type="submit">
@@ -124,8 +116,6 @@
   const attachmentsBox = root.querySelector("[data-chat-attachments]");
   const fileInput = root.querySelector("[data-chat-file]");
   const fileButton = root.querySelector("[data-chat-file-button]");
-  const audioButton = root.querySelector("[data-chat-audio-button]");
-  const videoButton = root.querySelector("[data-chat-video-button]");
 
   function setOpen(isOpen) {
     root.classList.toggle("open", isOpen);
@@ -182,20 +172,6 @@
 
   function renderAttachment(attachment = {}) {
     const name = escapeHtml(attachment.name || "Attachment");
-    if (attachment.kind === "video-call") {
-      return `<a class="chat-attachment video-call" href="${escapeHtml(attachment.url)}" target="_blank" rel="noopener">
-        <i class="fa-solid fa-video" aria-hidden="true"></i>
-        <span>Join video call</span>
-      </a>`;
-    }
-
-    if (attachment.kind === "audio" || /^audio\//i.test(attachment.type || "")) {
-      return `<div class="chat-attachment audio-message">
-        <audio controls src="${escapeHtml(attachment.dataUrl || "")}"></audio>
-        <span>${name}</span>
-      </div>`;
-    }
-
     if (/^image\//i.test(attachment.type || "")) {
       return `<a class="chat-attachment image-file" href="${escapeHtml(attachment.dataUrl || "")}" download="${name}">
         <img src="${escapeHtml(attachment.dataUrl || "")}" alt="${name}" />
@@ -247,7 +223,7 @@
       .map(
         (attachment, index) => `
           <span class="chat-attachment-chip">
-            <i class="fa-solid ${attachment.kind === "audio" ? "fa-microphone" : attachment.kind === "video-call" ? "fa-video" : "fa-paperclip"}" aria-hidden="true"></i>
+            <i class="fa-solid fa-paperclip" aria-hidden="true"></i>
             <span>${escapeHtml(attachment.name || "Attachment")}</span>
             <button type="button" data-remove-attachment="${index}" aria-label="Remove attachment">
               <i class="fa-solid fa-xmark" aria-hidden="true"></i>
@@ -264,7 +240,7 @@
     renderComposerAttachments();
   }
 
-  function readFileAsAttachment(file, kind = "file") {
+  function readFileAsAttachment(file) {
     return new Promise((resolve, reject) => {
       if (!file) {
         resolve(null);
@@ -278,8 +254,8 @@
       const reader = new FileReader();
       reader.onload = () =>
         resolve({
-          kind,
-          name: file.name || (kind === "audio" ? "Audio message.webm" : "Attachment"),
+          kind: "file",
+          name: file.name || "Attachment",
           type: file.type || "application/octet-stream",
           size: file.size,
           dataUrl: String(reader.result || "")
@@ -287,50 +263,6 @@
       reader.onerror = () => reject(new Error("File could not be attached."));
       reader.readAsDataURL(file);
     });
-  }
-
-  async function toggleAudioRecording() {
-    if (state.mediaRecorder?.state === "recording") {
-      state.mediaRecorder.stop();
-      audioButton.classList.remove("recording");
-      return;
-    }
-
-    if (!navigator.mediaDevices?.getUserMedia || !window.MediaRecorder) {
-      setStatus("Audio recording is not available in this browser.");
-      return;
-    }
-
-    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-    state.recordedChunks = [];
-    state.mediaRecorder = new MediaRecorder(stream);
-    state.mediaRecorder.addEventListener("dataavailable", (event) => {
-      if (event.data?.size) state.recordedChunks.push(event.data);
-    });
-    state.mediaRecorder.addEventListener("stop", async () => {
-      stream.getTracks().forEach((track) => track.stop());
-      const blob = new Blob(state.recordedChunks, { type: state.mediaRecorder.mimeType || "audio/webm" });
-      const file = new File([blob], `audio-message-${Date.now()}.webm`, { type: blob.type });
-      addAttachment(await readFileAsAttachment(file, "audio"));
-      setStatus("Audio message attached.", true);
-    });
-    state.mediaRecorder.start();
-    audioButton.classList.add("recording");
-    setStatus("Recording audio... tap microphone again to stop.", true);
-  }
-
-  async function addVideoCallInvitation() {
-    const roomSeed = state.conversationId || window.crypto?.randomUUID?.() || String(Date.now());
-    const roomId = `hoodyboody-${roomSeed}`.replace(/[^\w-]/g, "").slice(0, 80);
-    addAttachment({
-      kind: "video-call",
-      name: "Video call",
-      type: "video/link",
-      roomId,
-      url: `https://meet.jit.si/${roomId}`,
-      size: 0
-    });
-    setStatus("Video call invitation attached.", true);
   }
 
   function loadSocketClient() {
@@ -478,8 +410,6 @@
       setStatus(error.message || "File could not be attached.");
     }
   });
-  audioButton.addEventListener("click", () => toggleAudioRecording().catch((error) => setStatus(error.message || "Audio could not be recorded.")));
-  videoButton.addEventListener("click", () => addVideoCallInvitation());
 
   renderMessages();
   bootstrap()

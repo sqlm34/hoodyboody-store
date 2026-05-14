@@ -145,7 +145,7 @@ function removePushToken(db, token) {
 
 function buildChatPushMessage({ token, conversation, message, channelId = DEFAULT_CHANNEL_ID, title, body, color }) {
   const customerName = String(conversation?.customer?.name || "Customer").trim() || "Customer";
-  const fallbackBody = message?.attachments?.length ? "New attachment from customer" : "New customer message";
+  const fallbackBody = message?.attachments?.length ? "New file from customer" : "New customer message";
   const safeBody = String(body || message?.text || fallbackBody).slice(0, 240);
   const safeTitle = String(title || `Message from ${customerName}`).slice(0, 80);
   const safeColor = /^#[0-9a-f]{6}$/i.test(String(color || "")) ? String(color) : undefined;

@@ -200,10 +200,6 @@ button[type="submit"] {
   border-radius: 8px;
 }
 
-.attachment.audio {
-  width: min(260px, 100%);
-}
-
 .reply-form {
   display: grid;
   gap: 10px;

@@ -290,12 +290,6 @@ function renderConversations() {
 
 function renderAttachment(attachment = {}) {
   const name = escapeHtml(attachment.name || "Attachment");
-  if (attachment.kind === "video-call") {
-    return `<a class="attachment" href="${escapeHtml(attachment.url || "")}" target="_blank" rel="noopener">Join video call</a>`;
-  }
-  if (attachment.kind === "audio" || /^audio\//i.test(attachment.type || "")) {
-    return `<audio class="attachment audio" controls src="${escapeHtml(attachment.dataUrl || "")}"></audio>`;
-  }
   if (/^image\//i.test(attachment.type || "")) {
     return `<a class="attachment" href="${escapeHtml(attachment.dataUrl || "")}" target="_blank" rel="noopener"><img src="${escapeHtml(attachment.dataUrl || "")}" alt="${name}" /></a>`;
   }
