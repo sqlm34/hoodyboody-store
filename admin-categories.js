@@ -86,9 +86,7 @@ function getBlankCategory() {
     image: DEFAULT_CATEGORY_IMAGE,
     focus: "center",
     background: DEFAULT_CATEGORY_BACKGROUND,
-    sortOrder: nextOrder,
-    seoTitle: "",
-    seoDescription: ""
+    sortOrder: nextOrder
   };
 }
 
@@ -158,14 +156,6 @@ function renderCategoryForm(category, mode = "edit") {
           <label>
             Section background
             <input name="background" value="${escapeHtml(background)}" required />
-          </label>
-          <label>
-            SEO title
-            <input name="seoTitle" value="${escapeHtml(category.seoTitle || "")}" placeholder="${escapeHtml(category.title || "Category")} | HOODYBOODY" />
-          </label>
-          <label>
-            SEO description
-            <textarea name="seoDescription" rows="2" placeholder="Search engine description">${escapeHtml(category.seoDescription || "")}</textarea>
           </label>
         </div>
         <div class="admin-editor-actions">

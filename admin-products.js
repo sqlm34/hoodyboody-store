@@ -157,8 +157,6 @@ function getBlankProduct() {
     colors: [{ name: "Black", value: "#202326" }],
     longDescription: "Detailed product description.",
     gallery: [{ label: "General view", focus: "50% 50%", image: DEFAULT_IMAGE_URL }],
-    seoTitle: "",
-    seoDescription: "",
     isDigital: false,
     shipping: {
       weight_value: 18,
@@ -521,14 +519,6 @@ function renderProductForm(product, mode = "edit") {
             Product page description
             <textarea name="longDescription" rows="3" required>${escapeHtml(product.longDescription || "")}</textarea>
           </label>
-          <label>
-            SEO title
-            <input name="seoTitle" value="${escapeHtml(product.seoTitle || "")}" placeholder="${escapeHtml(product.title)} | HOODYBOODY" />
-          </label>
-          <label>
-            SEO description
-            <textarea name="seoDescription" rows="2" placeholder="Search engine description">${escapeHtml(product.seoDescription || "")}</textarea>
-          </label>
         </div>
         <div class="admin-editor-actions">
           <button class="button ghost dark" type="button" data-close-editor>Back to cards</button>
@@ -608,14 +598,6 @@ function renderLegacyProductsEditor() {
               <label class="full-span">
                 Product page description
                 <textarea name="longDescription" rows="3" required>${escapeHtml(product.longDescription || "")}</textarea>
-              </label>
-              <label>
-                SEO title
-                <input name="seoTitle" value="${escapeHtml(product.seoTitle || "")}" placeholder="${escapeHtml(product.title)} | HOODYBOODY" />
-              </label>
-              <label>
-                SEO description
-                <textarea name="seoDescription" rows="2" placeholder="Search engine description">${escapeHtml(product.seoDescription || "")}</textarea>
               </label>
             </div>
             <button class="button primary" type="submit">Save product</button>
@@ -795,7 +777,7 @@ adminProductsList.addEventListener("submit", (event) => {
       selectedProductId = response.product?.id || data.productId || selectedProductId;
       editorMode = "edit";
       renderProductsEditor();
-      setProductsStatus(isCreate ? "Product card created successfully." : "Product card saved successfully. SEO tags updated automatically.");
+      setProductsStatus(isCreate ? "Product card created successfully." : "Product card saved successfully.");
     })
     .catch((error) => {
       setProductsStatus(error.message, true);

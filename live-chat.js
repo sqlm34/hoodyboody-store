@@ -369,7 +369,7 @@
       attachments
     };
 
-    if (state.connected && state.socket) {
+    if (state.connected && state.socket && !attachments.length) {
       state.socket.emit("chat:message:send", payload, (response) => {
         setConversation(response?.conversation);
         state.attachments = [];

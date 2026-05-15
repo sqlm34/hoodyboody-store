@@ -420,13 +420,13 @@ function setMeta(name, content, property = false) {
   tag.setAttribute("content", content);
 }
 
-function updateSeo() {
-  const seoTitle = product.seoTitle || `${product.title} | HOODYBOODY`;
-  const seoDescription = product.seoDescription || product.longDescription || product.description;
-  document.title = seoTitle;
-  setMeta("description", seoDescription);
-  setMeta("og:title", seoTitle, true);
-  setMeta("og:description", seoDescription, true);
+function updatePageMeta() {
+  const pageTitle = `${product.title} | HOODYBOODY`;
+  const pageDescription = product.longDescription || product.description;
+  document.title = pageTitle;
+  setMeta("description", pageDescription);
+  setMeta("og:title", pageTitle, true);
+  setMeta("og:description", pageDescription, true);
   setMeta("og:type", "product", true);
   setMeta("og:url", window.location.href, true);
   if (product.image) setMeta("og:image", new URL(product.image, window.location.href).href, true);
@@ -607,7 +607,7 @@ function renderProduct() {
     return;
   }
 
-  updateSeo();
+  updatePageMeta();
   selectedSize = product.sizes[0];
   selectedColor = product.colors[0];
   productBadge.textContent = product.badge;

@@ -48,9 +48,7 @@ let CATEGORY_META = Object.fromEntries(
       copy: category.description,
       image: category.image,
       focus: category.focus,
-      background: category.background,
-      seoTitle: category.seoTitle,
-      seoDescription: category.seoDescription
+      background: category.background
     }
   ])
 );
@@ -143,8 +141,6 @@ function applyCategories(nextCategories) {
           image: String(category.image || "").trim(),
           focus: String(category.focus || "center").trim(),
           background: String(category.background || "").trim(),
-          seoTitle: String(category.seoTitle || "").trim(),
-          seoDescription: String(category.seoDescription || "").trim(),
           sortOrder: Number(category.sortOrder) || 100
         }))
         .filter((category) => category.id && category.title)
@@ -162,9 +158,7 @@ function applyCategories(nextCategories) {
         copy: category.description,
         image: category.image,
         focus: category.focus,
-        background: category.background,
-        seoTitle: category.seoTitle,
-        seoDescription: category.seoDescription
+        background: category.background
       }
     ])
   );
@@ -484,10 +478,10 @@ function updateCatalogViewHead(visibleCount) {
     categoryCatalogTitle.textContent = `${meta.title} products`;
   }
   if (isCategoryPage) {
-    document.title = meta.seoTitle || `${meta.title} | HOODYBOODY`;
+    document.title = `${meta.title} | HOODYBOODY`;
     const descriptionTag = document.querySelector('meta[name="description"]') || document.head.appendChild(document.createElement("meta"));
     descriptionTag.setAttribute("name", "description");
-    descriptionTag.setAttribute("content", meta.seoDescription || meta.copy || `${meta.title} products from HOODYBOODY.`);
+    descriptionTag.setAttribute("content", meta.copy || `${meta.title} products from HOODYBOODY.`);
   }
 }
 

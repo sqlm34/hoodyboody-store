@@ -7,7 +7,6 @@ const crypto = require("crypto");
 const { Server: SocketServer } = require("socket.io");
 const { createOrderController } = require("./controllers/orderController");
 const { createAdminOrderRouter } = require("./routes/adminOrderRoutes");
-const { createSeoAdminRouter } = require("./routes/seoRoutes");
 const { createStripeWebhookRouter } = require("./routes/stripeWebhookRoutes");
 const {
   createShippoService,
@@ -26,16 +25,6 @@ const {
   sendTestPush,
   upsertPushToken
 } = require("./services/pushNotifications");
-const {
-  buildSitemapUrls,
-  ensureSeoDefaults,
-  findRedirectForRequest,
-  generateRobotsTxt,
-  injectSeoHead,
-  renderSitemapIndex,
-  renderSitemapXml,
-  resolveSeoMetadata
-} = require("./services/seoService");
 let PgPool = null;
 let StsClient = null;
 let AssumeRoleWithWebIdentityCommand = null;
@@ -74,9 +63,9 @@ const redisRestToken =
   process.env.UPSTASH_REDIS_REST_TOKEN || process.env.KV_REST_API_TOKEN || localEnv.UPSTASH_REDIS_REST_TOKEN || localEnv.KV_REST_API_TOKEN || "";
 const redisDbKey = process.env.NITKA_REDIS_DB_KEY || localEnv.NITKA_REDIS_DB_KEY || "nitka:db";
 const hasRedisDb = Boolean(redisRestUrl && redisRestToken);
-const maxJsonBodyBytes = 6_500_000;
+const maxJsonBodyBytes = 8_500_000;
 const maxProductImageBytes = 2_500_000;
-const maxChatAttachmentBytes = 5_000_000;
+const maxChatAttachmentBytes = 8_500_000;
 const defaultChatSettings = {
   chatColor: "#1f6b5a",
   accentColor: "#263b73",
@@ -298,9 +287,7 @@ const defaultCategories = [
     image: "assets/embroidered-collection.png",
     focus: "38% 45%",
     background: "linear-gradient(135deg, #e9f0ea 0%, #f6eee1 100%)",
-    sortOrder: 10,
-    seoTitle: "Jackets | HOODYBOODY",
-    seoDescription: "Shop embroidered jackets, bombers and outerwear from HOODYBOODY."
+    sortOrder: 10
   },
   {
     id: "tops",
@@ -310,9 +297,7 @@ const defaultCategories = [
     image: "assets/embroidered-collection.png",
     focus: "56% 35%",
     background: "linear-gradient(135deg, #edf1f7 0%, #f7f0eb 100%)",
-    sortOrder: 20,
-    seoTitle: "Tops | HOODYBOODY",
-    seoDescription: "Shop embroidered hoodies, shirts and tops from HOODYBOODY."
+    sortOrder: 20
   },
   {
     id: "accessories",
@@ -322,9 +307,7 @@ const defaultCategories = [
     image: "assets/embroidered-collection.png",
     focus: "44% 68%",
     background: "linear-gradient(135deg, #f4efe7 0%, #e8f2ef 100%)",
-    sortOrder: 30,
-    seoTitle: "Accessories | HOODYBOODY",
-    seoDescription: "Shop embroidered accessories and small goods from HOODYBOODY."
+    sortOrder: 30
   }
 ];
 const emptyDb = {
@@ -338,14 +321,6 @@ const emptyDb = {
   products: [],
   productImages: {},
   categories: [],
-  seoGlobalSettings: null,
-  seoEntries: [],
-  seoTemplates: [],
-  seoRedirects: [],
-  seoCodeSnippets: [],
-  seoAuditLogs: [],
-  mediaSeo: [],
-  seoSitemap: null,
   chatConversations: [],
   chatMessages: [],
   chatPushTokens: [],
@@ -418,7 +393,21 @@ function ensureDbDefaults(db) {
   db.chatMessages ||= [];
   db.chatPushTokens ||= [];
   db.chatSettings = sanitizeChatSettings(db.chatSettings || {});
-  if (ensureSeoDefaults(db)) changed = true;
+  [
+    "seoGlobalSettings",
+    "seoEntries",
+    "seoTemplates",
+    "seoRedirects",
+    "seoCodeSnippets",
+    "seoAuditLogs",
+    "mediaSeo",
+    "seoSitemap"
+  ].forEach((key) => {
+    if (Object.prototype.hasOwnProperty.call(db, key)) {
+      delete db[key];
+      changed = true;
+    }
+  });
   if (!Object.prototype.hasOwnProperty.call(db, "categories")) {
     db.categories = JSON.parse(JSON.stringify(defaultCategories));
     changed = true;
@@ -433,6 +422,16 @@ function ensureDbDefaults(db) {
     .filter((category) => category.category)
     .map(({ category }, index) => ({ ...category, sortOrder: Number.isFinite(Number(category.sortOrder)) ? Number(category.sortOrder) : (index + 1) * 10 }));
   if (categoriesBefore !== JSON.stringify(db.categories)) changed = true;
+  db.categories.forEach((category) => {
+    if (Object.prototype.hasOwnProperty.call(category, "seoTitle")) {
+      delete category.seoTitle;
+      changed = true;
+    }
+    if (Object.prototype.hasOwnProperty.call(category, "seoDescription")) {
+      delete category.seoDescription;
+      changed = true;
+    }
+  });
 
   if (!db.products.length) {
     db.products = JSON.parse(JSON.stringify(defaultProducts));
@@ -456,6 +455,14 @@ function ensureDbDefaults(db) {
   }
 
   db.products.forEach((product) => {
+    if (Object.prototype.hasOwnProperty.call(product, "seoTitle")) {
+      delete product.seoTitle;
+      changed = true;
+    }
+    if (Object.prototype.hasOwnProperty.call(product, "seoDescription")) {
+      delete product.seoDescription;
+      changed = true;
+    }
     const before = JSON.stringify(product.shipping || {});
     const beforeDigital = product.isDigital;
     ensureProductShippingDefaults(product);
@@ -541,14 +548,6 @@ function writeDb(db) {
     memoryDb.products = db.products;
     memoryDb.productImages = db.productImages;
     memoryDb.categories = db.categories;
-    memoryDb.seoGlobalSettings = db.seoGlobalSettings;
-    memoryDb.seoEntries = db.seoEntries;
-    memoryDb.seoTemplates = db.seoTemplates;
-    memoryDb.seoRedirects = db.seoRedirects;
-    memoryDb.seoCodeSnippets = db.seoCodeSnippets;
-    memoryDb.seoAuditLogs = db.seoAuditLogs;
-    memoryDb.mediaSeo = db.mediaSeo;
-    memoryDb.seoSitemap = db.seoSitemap;
     memoryDb.chatConversations = db.chatConversations;
     memoryDb.chatMessages = db.chatMessages;
     memoryDb.chatPushTokens = db.chatPushTokens;
@@ -1209,8 +1208,6 @@ function sanitizeCategory(body = {}, currentCategory = {}) {
     .trim()
     .slice(0, 220);
   const sortOrder = Math.round(Number(body.sortOrder ?? currentCategory.sortOrder ?? 100));
-  const seoTitle = String(body.seoTitle || currentCategory.seoTitle || `${title} | HOODYBOODY`).trim().slice(0, 160);
-  const seoDescription = String(body.seoDescription || currentCategory.seoDescription || description).trim().slice(0, 260);
 
   if (!id || !title || !description) {
     return { category: null, message: "Fill category title and description." };
@@ -1225,9 +1222,7 @@ function sanitizeCategory(body = {}, currentCategory = {}) {
       image,
       focus,
       background,
-      sortOrder: Number.isFinite(sortOrder) ? sortOrder : 100,
-      seoTitle,
-      seoDescription
+      sortOrder: Number.isFinite(sortOrder) ? sortOrder : 100
     }
   };
 }
@@ -1260,8 +1255,6 @@ function publicProduct(product) {
     colors: Array.isArray(normalizedProduct.colors) ? normalizedProduct.colors : [],
     longDescription: normalizedProduct.longDescription || normalizedProduct.description,
     gallery: Array.isArray(normalizedProduct.gallery) ? normalizedProduct.gallery : [],
-    seoTitle: normalizedProduct.seoTitle || "",
-    seoDescription: normalizedProduct.seoDescription || "",
     isDigital: normalizedProduct.isDigital === true,
     shipping: normalizedProduct.shipping
   };
@@ -1333,8 +1326,6 @@ function sanitizeProductPatch(body, currentProduct) {
     badge: String(body.badge || "").trim().slice(0, 40),
     description: String(body.description || "").trim().slice(0, 260),
     longDescription: String(body.longDescription || "").trim().slice(0, 1200),
-    seoTitle: String(body.seoTitle || "").trim().slice(0, 160),
-    seoDescription: String(body.seoDescription || "").trim().slice(0, 260),
     image: String(body.image || "").trim().slice(0, 500),
     focus: String(body.focus || "center").trim().slice(0, 40),
     price,
@@ -2668,8 +2659,6 @@ async function handleApi(req, res) {
         badge: "new",
         description: "Short product description.",
         longDescription: "Detailed product description.",
-        seoTitle: "",
-        seoDescription: "",
         image: "assets/embroidered-collection.png",
         imageName: "",
         focus: "50% 50%",
@@ -3089,7 +3078,7 @@ function applyNoIndexToHtml(html) {
   return html.replace(/<head([^>]*)>/i, `<head$1>\n    ${noIndexMeta}`);
 }
 
-async function serveStatic(req, res, db = null) {
+async function serveStatic(req, res) {
   const urlPath = decodeURIComponent(req.url.split("?")[0]);
   const requestedPath = urlPath === "/" ? "/index.html" : urlPath;
   const filePath = path.resolve(root, `.${requestedPath}`);
@@ -3103,41 +3092,6 @@ async function serveStatic(req, res, db = null) {
 
   fs.readFile(filePath, async (error, content) => {
     if (error) {
-      if (db && req.method === "GET" && !path.extname(requestedPath)) {
-        try {
-          const metadata = resolveSeoMetadata(db, req, getRequestOrigin(req));
-          if (metadata.entry?.route_path) {
-            const pageHtml = `
-<!DOCTYPE html>
-<html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <link rel="stylesheet" href="/styles.css" />
-  </head>
-  <body>
-    <header class="topbar checkout-topbar" aria-label="Page navigation">
-      <a class="brand" href="/index.html" aria-label="HOODYBOODY"><span>HOODYBOODY</span></a>
-    </header>
-    <main class="checkout-page">
-      <section class="checkout-hero">
-        <p class="eyebrow">${escapeHtmlAttribute(metadata.context.entity_type || "page")}</p>
-        <h1>${escapeHtmlAttribute(metadata.h1 || metadata.title)}</h1>
-        <p>${escapeHtmlAttribute(metadata.description || "")}</p>
-      </section>
-      ${metadata.entry.seo_content_top ? `<section class="checkout-panel">${escapeHtmlAttribute(metadata.entry.seo_content_top)}</section>` : ""}
-      ${metadata.entry.seo_content_bottom ? `<section class="checkout-panel">${escapeHtmlAttribute(metadata.entry.seo_content_bottom)}</section>` : ""}
-    </main>
-  </body>
-</html>`;
-            res.writeHead(200, { "Content-Type": "text/html; charset=utf-8", ...noIndexHeader });
-            res.end(applyNoIndexToHtml(injectSeoHead(pageHtml, metadata)));
-            return;
-          }
-        } catch {
-          // Fall through to the regular 404 below.
-        }
-      }
       res.writeHead(404, { "Content-Type": "text/plain; charset=utf-8", ...noIndexHeader });
       res.end("File not found");
       return;
@@ -3145,15 +3099,6 @@ async function serveStatic(req, res, db = null) {
 
     const ext = path.extname(filePath).toLowerCase();
     let responseContent = content;
-
-    if (ext === ".html" && !requestedPath.startsWith("/admin") && !requestedPath.includes("admin-")) {
-      try {
-        const metadata = resolveSeoMetadata(db || (await readDbAsync()), req, getRequestOrigin(req));
-        responseContent = Buffer.from(injectSeoHead(content.toString("utf8"), metadata));
-      } catch {
-        responseContent = content;
-      }
-    }
 
     if (ext === ".html") {
       responseContent = Buffer.from(applyNoIndexToHtml(responseContent.toString("utf8")));
@@ -3170,42 +3115,16 @@ async function appHandler(req, res) {
     return;
   }
 
-  const db = await readDbAsync();
-  const redirectResult = findRedirectForRequest(db, req.url);
-  if (redirectResult && req.method === "GET") {
-    redirectResult.redirect.hit_count = Number(redirectResult.redirect.hit_count || 0) + 1;
-    redirectResult.redirect.last_hit_at = new Date().toISOString();
-    await writeDbAsync(db);
-    res.writeHead(redirectResult.redirect.status_code || 301, { Location: redirectResult.targetUrl });
-    res.end();
-    return;
-  }
-
   const pathname = new URL(req.url, getRequestOrigin(req)).pathname;
   if (pathname === "/robots.txt") {
+    const robotsPath = path.join(root, "robots.txt");
+    const robots = fs.existsSync(robotsPath) ? fs.readFileSync(robotsPath, "utf8") : "User-agent: *\nDisallow: /";
     res.writeHead(200, { "Content-Type": "text/plain; charset=utf-8", ...noIndexHeader });
-    res.end(generateRobotsTxt(db, getRequestOrigin(req)));
+    res.end(robots);
     return;
   }
 
-  if (pathname === "/sitemap.xml" || pathname === "/sitemap-pages.xml" || pathname === "/sitemap-products.xml" || pathname === "/sitemap-categories.xml" || pathname === "/sitemap-blog.xml") {
-    let urls = buildSitemapUrls(db, getRequestOrigin(req));
-    if (pathname === "/sitemap-pages.xml") urls = urls.filter((item) => !item.loc.includes("product.html") && !item.loc.includes("category.html") && !/\/(outerwear|tops|accessories)\.html$/.test(item.loc));
-    if (pathname === "/sitemap-products.xml") urls = urls.filter((item) => item.loc.includes("product.html"));
-    if (pathname === "/sitemap-categories.xml") urls = urls.filter((item) => item.loc.includes("category.html") || /\/(outerwear|tops|accessories)\.html$/.test(item.loc));
-    if (pathname === "/sitemap-blog.xml") urls = [];
-    res.writeHead(200, { "Content-Type": "application/xml; charset=utf-8", ...noIndexHeader });
-    res.end(renderSitemapXml(urls));
-    return;
-  }
-
-  if (pathname === "/sitemap-index.xml") {
-    res.writeHead(200, { "Content-Type": "application/xml; charset=utf-8", ...noIndexHeader });
-    res.end(renderSitemapIndex(getRequestOrigin(req)));
-    return;
-  }
-
-  serveStatic(req, res, db);
+  serveStatic(req, res);
 }
 
 function getSocketUser(socket, db) {
@@ -3234,6 +3153,7 @@ function socketHasAdminAccess(socket, db) {
 
 function attachChatSocket(httpServer) {
   chatIo = new SocketServer(httpServer, {
+    maxHttpBufferSize: maxJsonBodyBytes,
     cors: {
       origin: true,
       credentials: true
@@ -3404,17 +3324,12 @@ const expressApp = express();
 
 expressApp.use("/api", createStripeWebhookRouter({ express, orderController }));
 expressApp.use("/api", createAdminOrderRouter({ express, orderController }));
-expressApp.use("/api/admin/seo", createSeoAdminRouter({ express, readDbAsync, writeDbAsync, getSessionUser, adminEmail, getRequestOrigin }));
 expressApp.get("/admin/orders", (req, res) => {
   res.sendFile(path.join(root, "admin-orders.html"));
 });
 
 expressApp.get("/admin/categories", (req, res) => {
   res.sendFile(path.join(root, "admin-categories.html"));
-});
-
-expressApp.get("/admin/seo", (req, res) => {
-  res.sendFile(path.join(root, "admin-seo.html"));
 });
 
 expressApp.get("/admin/chat", (req, res) => {

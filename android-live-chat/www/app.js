@@ -497,7 +497,7 @@ replyForm.addEventListener("submit", async (event) => {
   const attachments = replyDraftAttachments;
   replyText.value = "";
 
-  if (connected && socket) {
+  if (connected && socket && !attachments.length) {
     socket.emit("chat:message:send", { senderType: "admin", conversationId: activeConversation.id, text, attachments }, (payload) => {
       if (payload?.conversation) {
         activeConversation = payload.conversation;
