@@ -1,0 +1,64 @@
+{
+  "pages": [
+    {
+      "slug": "embroidered-hoodies",
+      "title": "Embroidered Hoodies",
+      "h1": "Embroidered hoodies",
+      "seoTitle": "Embroidered Hoodies | Custom Hoodie Embroidery | HOODYBOODY",
+      "metaDescription": "Premium embroidered hoodies with clean stitching, custom motifs, logo upload and boutique embroidery finish.",
+      "intro": "Dense cotton hoodies with clean embroidery for personal wear, gifts, teams and business apparel.",
+      "keywords": ["hoodie", "hoodies"],
+      "category": "tops"
+    },
+    {
+      "slug": "embroidered-tshirts",
+      "title": "Embroidered T-shirts",
+      "h1": "Embroidered T-shirts",
+      "seoTitle": "Embroidered T-shirts | Custom T-shirt Embroidery | HOODYBOODY",
+      "metaDescription": "Custom embroidered T-shirts with logo upload, minimalist motifs and premium stitch details.",
+      "intro": "Soft embroidered T-shirts for minimal everyday wear, custom designs and small batch apparel.",
+      "keywords": ["shirt", "t-shirt", "tee"],
+      "category": "tops"
+    },
+    {
+      "slug": "embroidered-sweatshirts",
+      "title": "Embroidered Sweatshirts",
+      "h1": "Embroidered sweatshirts",
+      "seoTitle": "Embroidered Sweatshirts | Custom Sweatshirt Embroidery | HOODYBOODY",
+      "metaDescription": "Premium custom embroidered sweatshirts for personal pieces, business apparel and uploaded designs.",
+      "intro": "A scalable product page for embroidered sweatshirts, custom motifs and bulk embroidery requests.",
+      "keywords": ["sweatshirt", "crewneck"],
+      "category": "tops"
+    },
+    {
+      "slug": "embroidered-hats",
+      "title": "Embroidered Hats and Caps",
+      "h1": "Embroidered hats and caps",
+      "seoTitle": "Embroidered Hats and Caps | Custom Hat Embroidery | HOODYBOODY",
+      "metaDescription": "Custom embroidered hats and caps with logo upload, clean stitching and boutique brand finish.",
+      "intro": "Embroidered caps and hats for gifts, teams, small businesses and refined everyday accessories.",
+      "keywords": ["cap", "caps", "hat", "hats"],
+      "category": "accessories"
+    },
+    {
+      "slug": "embroidered-tote-bags",
+      "title": "Embroidered Tote Bags",
+      "h1": "Embroidered tote bags",
+      "seoTitle": "Embroidered Tote Bags | Custom Shopper Bag Embroidery | HOODYBOODY",
+      "metaDescription": "Custom embroidered tote bags and shopper bags with logo upload and premium stitch details.",
+      "intro": "Canvas tote bags and shopper bags with refined embroidery for gifts, events and everyday use.",
+      "keywords": ["tote", "shopper", "bag", "bags"],
+      "category": "accessories"
+    },
+    {
+      "slug": "embroidered-jackets",
+      "title": "Embroidered Jackets",
+      "h1": "Embroidered jackets",
+      "seoTitle": "Embroidered Jackets | Custom Jacket Embroidery | HOODYBOODY",
+      "metaDescription": "Premium embroidered jackets with custom motifs, logo embroidery and detailed stitch work.",
+      "intro": "Layered linen, denim and outerwear pieces with embroidery that feels crafted and wearable.",
+      "keywords": ["jacket", "outerwear", "denim"],
+      "category": "outerwear"
+    }
+  ]
+}

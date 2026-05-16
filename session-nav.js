@@ -18,27 +18,12 @@ async function logout() {
 }
 
 const PRODUCT_NAV_ITEMS = [
-  { label: "Jackets", href: "jackets.html" },
-  { label: "Tops", href: "embroidered-tops.html" },
-  { label: "Hoodies", href: "embroidered-hoodies.html" },
-  { label: "T-shirts", href: "embroidered-t-shirts.html" },
-  { label: "Caps", href: "embroidered-caps.html" },
-  { label: "Accessories", href: "embroidered-accessories.html" }
-];
-
-const LOCATION_NAV_ITEMS = [
-  { label: "All locations", href: "locations.html" },
-  {
-    label: "Indiana",
-    href: "indiana.html",
-    children: [
-      { label: "Indianapolis", href: "indianapolis.html" },
-      { label: "Fort Wayne", href: "fort-wayne.html" },
-      { label: "Evansville", href: "evansville.html" },
-      { label: "South Bend", href: "south-bend.html" },
-      { label: "Bloomington", href: "bloomington.html" }
-    ]
-  }
+  { label: "Hoodies", href: "/embroidered-hoodies/" },
+  { label: "T-shirts", href: "/embroidered-tshirts/" },
+  { label: "Sweatshirts", href: "/embroidered-sweatshirts/" },
+  { label: "Hats", href: "/embroidered-hats/" },
+  { label: "Tote bags", href: "/embroidered-tote-bags/" },
+  { label: "Jackets", href: "/embroidered-jackets/" }
 ];
 
 function renderNavItem(item) {
@@ -80,11 +65,11 @@ function enhanceSiteNavigation() {
 
   header.dataset.siteMenuReady = "true";
   nav.innerHTML = `
-    <a href="index.html#catalog">Categories</a>
+    <a href="/#catalog">Categories</a>
     ${renderNavGroup("Products", PRODUCT_NAV_ITEMS)}
-    ${renderNavGroup("Locations", LOCATION_NAV_ITEMS)}
-    <a href="index.html#custom">Embroidery</a>
-    <a href="checkout.html">Checkout</a>
+    <a href="/locations/">Locations</a>
+    <a href="/#custom">Embroidery</a>
+    <a href="/checkout.html">Checkout</a>
   `;
 
   const toggle = document.createElement("button");
@@ -139,6 +124,49 @@ function enhanceSiteNavigation() {
   });
 }
 
+function enhanceSiteFooter() {
+  const path = window.location.pathname.toLowerCase();
+  if (path.includes("admin") || document.querySelector(".site-footer")) return;
+
+  const main = document.querySelector("main");
+  if (!main) return;
+
+  main.insertAdjacentHTML(
+    "afterend",
+    `
+      <footer class="site-footer" data-footer-ready="true">
+        <div class="site-footer-inner">
+          <div class="site-footer-brand">
+            <a class="brand footer-brand" href="/" aria-label="HOODYBOODY"><span>HOODYBOODY</span></a>
+            <p>Premium embroidery for clean wardrobe pieces, custom logo apparel and small batch orders.</p>
+          </div>
+          <nav class="footer-links" aria-label="Product pages">
+            <strong>Products</strong>
+            <a href="/embroidered-hoodies/">Embroidered hoodies</a>
+            <a href="/embroidered-tshirts/">Embroidered T-shirts</a>
+            <a href="/embroidered-hats/">Embroidered hats</a>
+            <a href="/embroidered-tote-bags/">Embroidered tote bags</a>
+          </nav>
+          <nav class="footer-links" aria-label="Service areas">
+            <strong>Service areas</strong>
+            <a href="/locations/indiana/indianapolis/">Indianapolis</a>
+            <a href="/locations/indiana/fort-wayne/">Fort Wayne</a>
+            <a href="/locations/indiana/bloomington/">Bloomington</a>
+            <a href="/locations/indiana/south-bend/">South Bend</a>
+            <a href="/locations/illinois/chicago/">Chicago</a>
+          </nav>
+          <nav class="footer-links" aria-label="Custom embroidery">
+            <strong>Custom</strong>
+            <a href="/#custom">Upload logo or design</a>
+            <a href="/#custom">Business embroidery</a>
+            <a href="/checkout.html">Checkout</a>
+          </nav>
+        </div>
+      </footer>
+    `
+  );
+}
+
 function decorateHeaderAction(element, iconClass, label) {
   if (!element || element.dataset.decorated === "true") return;
 
@@ -185,6 +213,7 @@ async function initSessionNav() {
 
 initSessionNav();
 enhanceSiteNavigation();
+enhanceSiteFooter();
 
 function loadLiveChatWidget() {
   const path = window.location.pathname.toLowerCase();

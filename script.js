@@ -336,6 +336,7 @@ const cartDeliveryNotice = document.querySelector("#cartDeliveryNotice");
 const checkoutLink = document.querySelector(".checkout-link");
 const scrim = document.querySelector(".scrim");
 const customFiles = document.querySelector("#customFiles");
+const uploadBox = document.querySelector(".upload-box");
 const filePreview = document.querySelector("#filePreview");
 let catalogHeightFrame = 0;
 
@@ -838,12 +839,12 @@ function renderFilePreview() {
     .join("");
 }
 
-customFiles?.addEventListener("change", () => {
+function setCustomUploads(files) {
   state.uploads.forEach((upload) => {
     if (upload.previewUrl) URL.revokeObjectURL(upload.previewUrl);
   });
 
-  state.uploads = Array.from(customFiles.files).map((file) => {
+  state.uploads = Array.from(files || []).map((file) => {
     const extension = file.name.includes(".") ? file.name.split(".").pop().slice(0, 4).toUpperCase() : "FILE";
 
     return {
@@ -855,22 +856,48 @@ customFiles?.addEventListener("change", () => {
   });
 
   renderFilePreview();
+}
+
+customFiles?.addEventListener("change", () => {
+  setCustomUploads(customFiles.files);
+});
+
+["dragenter", "dragover"].forEach((eventName) => {
+  uploadBox?.addEventListener(eventName, (event) => {
+    event.preventDefault();
+    uploadBox.classList.add("drag-over");
+  });
+});
+
+["dragleave", "drop"].forEach((eventName) => {
+  uploadBox?.addEventListener(eventName, (event) => {
+    event.preventDefault();
+    uploadBox.classList.remove("drag-over");
+  });
+});
+
+uploadBox?.addEventListener("drop", (event) => {
+  setCustomUploads(event.dataTransfer?.files || []);
 });
 
 document.querySelector("#customAdd")?.addEventListener("click", () => {
   const base = document.querySelector("#baseSelect").value;
   const motif = document.querySelector("#motifInput").value.trim() || "signature motif";
+  const quantity = Math.max(1, Math.floor(Number(document.querySelector("#customQuantity")?.value) || 1));
+  const notes = document.querySelector("#customNotes")?.value.trim();
   const fileSummary = state.uploads.length
     ? `, files: ${state.uploads.map((upload) => upload.name).join(", ")}`
     : "";
+  const notesSummary = notes ? `, notes: ${notes}` : "";
 
   addToCart({
     id: `custom-${Date.now()}`,
     title: `Custom: ${motif}`,
-    description: `${base}, palette: ${state.threadColor}${fileSummary}`,
+    description: `${base}, palette: ${state.threadColor}, quantity request: ${quantity}${fileSummary}${notesSummary}`,
     price: 3500,
     sizes: ["custom"],
-    type: "custom"
+    type: "custom",
+    quantity
   });
 });
 

@@ -1417,6 +1417,519 @@ function absoluteUrl(req, value) {
   return `${getRequestOrigin(req).replace(/\/$/, "")}/${text.replace(/^\//, "")}`;
 }
 
+function readContentJson(fileName, fallback) {
+  try {
+    const contentPath = path.join(root, "content", fileName);
+    return JSON.parse(fs.readFileSync(contentPath, "utf8"));
+  } catch {
+    return fallback;
+  }
+}
+
+function getLocationContent() {
+  return readContentJson("locations.json", { states: [] });
+}
+
+function getProductPageContent() {
+  return readContentJson("product-pages.json", { pages: [] });
+}
+
+function stripTrailingSlash(value) {
+  const text = String(value || "/").replace(/\/+$/, "");
+  return text || "/";
+}
+
+function normalizeCleanHref(value) {
+  const text = String(value || "").trim();
+  if (!text) return "/";
+  if (/^https?:\/\//i.test(text)) return text;
+  return text.startsWith("/") ? text : `/${text}`;
+}
+
+function getCityUrl(stateSlug, citySlug) {
+  return `/locations/${stateSlug}/${citySlug}/`;
+}
+
+function getStateUrl(stateSlug) {
+  return `/locations/${stateSlug}/`;
+}
+
+function findLocationState(locationData, stateSlug) {
+  return (locationData.states || []).find((state) => state.slug === stateSlug) || null;
+}
+
+function findLocationCity(state, citySlug) {
+  return (state?.cities || []).find((city) => city.slug === citySlug) || null;
+}
+
+function getFeaturedCities(locationData) {
+  return (locationData.states || [])
+    .flatMap((state) => (state.cities || []).slice(0, 5).map((city) => ({ ...city, stateSlug: state.slug, stateName: state.stateName })))
+    .slice(0, 8);
+}
+
+function jsonLdScript(data) {
+  return `<script type="application/ld+json">${JSON.stringify(data).replace(/</g, "\\u003c")}</script>`;
+}
+
+function renderSiteTopbar() {
+  return `
+    <header class="topbar checkout-topbar" aria-label="Site navigation">
+      <a class="brand" href="/" aria-label="HOODYBOODY">
+        <span class="brand-mark">HB</span>
+        <span>HOODYBOODY</span>
+      </a>
+      <nav class="nav-links" aria-label="Site sections"></nav>
+      <div class="top-actions">
+        <a class="account-pill login-link" href="/auth.html" hidden>Login</a>
+        <a class="account-pill cabinet-link" href="/account.html" hidden>Cabinet</a>
+        <a class="account-pill admin-link" href="/admin.html" hidden>Owner</a>
+        <button class="account-pill as-button logout-button" type="button" hidden>Logout</button>
+      </div>
+    </header>
+  `;
+}
+
+function renderSeoFooter(locationData) {
+  const cities = getFeaturedCities(locationData);
+  return `
+    <footer class="site-footer" data-footer-ready="true">
+      <div class="site-footer-inner">
+        <div class="site-footer-brand">
+          <a class="brand footer-brand" href="/" aria-label="HOODYBOODY"><span>HOODYBOODY</span></a>
+          <p>Premium custom embroidery for clean wardrobe pieces, logo apparel and small batch orders.</p>
+        </div>
+        <nav class="footer-links" aria-label="Product pages">
+          <strong>Products</strong>
+          <a href="/embroidered-hoodies/">Embroidered hoodies</a>
+          <a href="/embroidered-tshirts/">Embroidered T-shirts</a>
+          <a href="/embroidered-hats/">Embroidered hats</a>
+          <a href="/embroidered-tote-bags/">Embroidered tote bags</a>
+        </nav>
+        <nav class="footer-links" aria-label="Service areas">
+          <strong>Service areas</strong>
+          ${cities.map((city) => `<a href="${getCityUrl(city.stateSlug, city.slug)}">${escapeHtmlAttribute(city.cityName)}</a>`).join("")}
+          <a href="/locations/">All service areas</a>
+        </nav>
+        <nav class="footer-links" aria-label="Custom embroidery">
+          <strong>Custom embroidery</strong>
+          <a href="/#custom">Upload logo or design</a>
+          <a href="/#custom">Business embroidery</a>
+          <a href="/checkout.html">Checkout</a>
+        </nav>
+      </div>
+    </footer>
+  `;
+}
+
+function renderBreadcrumbsHtml(items) {
+  if (!items.length) return "";
+  return `
+    <nav class="breadcrumbs" aria-label="Breadcrumb">
+      <ol>
+        ${items
+          .map((item, index) => {
+            const isLast = index === items.length - 1;
+            return `<li>${isLast ? `<span aria-current="page">${escapeHtmlAttribute(item.name)}</span>` : `<a href="${escapeHtmlAttribute(item.url)}">${escapeHtmlAttribute(item.name)}</a>`}</li>`;
+          })
+          .join("")}
+      </ol>
+    </nav>
+  `;
+}
+
+function renderPageShell(req, options) {
+  const locationData = getLocationContent();
+  const title = options.title || "HOODYBOODY";
+  const description = options.description || "Premium custom embroidery by HOODYBOODY.";
+  const canonicalPath = normalizeCleanHref(options.canonicalPath || "/");
+  const canonicalUrl = absoluteUrl(req, canonicalPath);
+  const breadcrumbs = options.breadcrumbs || [{ name: "Home", url: "/" }];
+  const structuredData = [
+    {
+      "@context": "https://schema.org",
+      "@type": "Organization",
+      name: "HOODYBOODY",
+      url: absoluteUrl(req, "/"),
+      logo: absoluteUrl(req, "/assets/embroidered-collection.png")
+    },
+    {
+      "@context": "https://schema.org",
+      "@type": "BreadcrumbList",
+      itemListElement: breadcrumbs.map((item, index) => ({
+        "@type": "ListItem",
+        position: index + 1,
+        name: item.name,
+        item: absoluteUrl(req, item.url)
+      }))
+    },
+    ...(options.structuredData || [])
+  ];
+
+  return applyNoIndexToHtml(`<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="robots" content="noindex, nofollow, noarchive" />
+    <title>${escapeHtmlAttribute(title)}</title>
+    <meta name="description" content="${escapeHtmlAttribute(description)}" />
+    <link rel="canonical" href="${escapeHtmlAttribute(canonicalUrl)}" />
+    <meta property="og:title" content="${escapeHtmlAttribute(title)}" />
+    <meta property="og:description" content="${escapeHtmlAttribute(description)}" />
+    <meta property="og:type" content="website" />
+    <meta property="og:url" content="${escapeHtmlAttribute(canonicalUrl)}" />
+    <meta property="og:site_name" content="HOODYBOODY" />
+    <meta property="og:image" content="${escapeHtmlAttribute(absoluteUrl(req, "/assets/embroidered-collection.png"))}" />
+    <meta property="og:image:alt" content="HOODYBOODY embroidered clothing" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="${escapeHtmlAttribute(title)}" />
+    <meta name="twitter:description" content="${escapeHtmlAttribute(description)}" />
+    <meta name="twitter:image" content="${escapeHtmlAttribute(absoluteUrl(req, "/assets/embroidered-collection.png"))}" />
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css" />
+    <link rel="stylesheet" href="/styles.css" />
+    ${structuredData.map(jsonLdScript).join("\n    ")}
+  </head>
+  <body>
+    ${renderSiteTopbar()}
+    <main class="${escapeHtmlAttribute(options.mainClass || "seo-page")}">
+      ${renderBreadcrumbsHtml(breadcrumbs)}
+      ${options.body || ""}
+    </main>
+    ${renderSeoFooter(locationData)}
+    <script src="/session-nav.js"></script>
+  </body>
+</html>`);
+}
+
+function productMatchesLanding(product, page) {
+  const keywords = Array.isArray(page.keywords) ? page.keywords.map((item) => String(item).toLowerCase()) : [];
+  const haystack = [product.id, product.title, product.type, product.badge, product.description, product.longDescription]
+    .join(" ")
+    .toLowerCase();
+  return (page.category && product.type === page.category) || keywords.some((keyword) => haystack.includes(keyword));
+}
+
+function renderProductCards(products, fromPath) {
+  if (!products.length) {
+    return `<div class="catalog-empty"><h3>Products are being prepared</h3><p>This page is ready for the catalog. Add matching products in the owner dashboard and they will appear here.</p></div>`;
+  }
+
+  return products
+    .map(
+      (product) => `
+        <a class="location-product-card" href="/product.html?id=${encodeURIComponent(product.id)}&from=${encodeURIComponent(fromPath)}">
+          <span class="location-product-photo" style="--product-image: url('${escapeHtmlAttribute(product.image || "assets/embroidered-collection.png")}'); --focus: ${escapeHtmlAttribute(product.focus || "center")}"></span>
+          <strong>${escapeHtmlAttribute(product.title)}</strong>
+          <p>${escapeHtmlAttribute(product.description)}</p>
+          <span class="price">${new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format((Number(product.price) || 0) / 100)}</span>
+        </a>
+      `
+    )
+    .join("");
+}
+
+function renderCategoryLinkGrid(req) {
+  const pages = getProductPageContent().pages || [];
+  return pages
+    .slice(0, 5)
+    .map((page) => `<a class="seo-link-card" href="/${escapeHtmlAttribute(page.slug)}/"><strong>${escapeHtmlAttribute(page.title)}</strong><span>${escapeHtmlAttribute(page.intro)}</span></a>`)
+    .join("");
+}
+
+async function renderProductLandingPage(req, page) {
+  const db = await readDbAsync();
+  const productsForPage = publicProducts(db).filter((product) => productMatchesLanding(product, page)).slice(0, 8);
+  const locationData = getLocationContent();
+  const featuredCities = getFeaturedCities(locationData).slice(0, 5);
+  const canonicalPath = `/${page.slug}/`;
+  const breadcrumbs = [
+    { name: "Home", url: "/" },
+    { name: "Products", url: "/#catalog" },
+    { name: page.title, url: canonicalPath }
+  ];
+
+  return renderPageShell(req, {
+    title: page.seoTitle || `${page.title} | HOODYBOODY`,
+    description: page.metaDescription,
+    canonicalPath,
+    mainClass: "seo-page product-landing-page",
+    breadcrumbs,
+    structuredData: [
+      {
+        "@context": "https://schema.org",
+        "@type": "CollectionPage",
+        name: page.title,
+        description: page.metaDescription,
+        url: absoluteUrl(req, canonicalPath)
+      }
+    ],
+    body: `
+      <section class="seo-hero">
+        <div class="seo-hero-copy">
+          <p class="eyebrow">product page</p>
+          <h1>${escapeHtmlAttribute(page.h1 || page.title)}</h1>
+          <p>${escapeHtmlAttribute(page.intro)}</p>
+          <div class="location-actions">
+            <a class="button primary" href="/#custom">Start custom embroidery</a>
+            <a class="button ghost dark" href="/locations/">Service areas</a>
+          </div>
+        </div>
+        <div class="seo-hero-media" aria-hidden="true"></div>
+      </section>
+      <section class="location-section">
+        <div class="section-head"><div><p class="eyebrow">catalog</p><h2>Product cards</h2></div></div>
+        <div class="location-grid">${renderProductCards(productsForPage, canonicalPath)}</div>
+      </section>
+      <section class="location-section">
+        <div class="section-head"><div><p class="eyebrow">custom work</p><h2>Logo and design embroidery</h2></div></div>
+        <div class="seo-split">
+          <p>Upload a logo, artwork or reference image, choose the base product and add notes about quantity, thread color and placement. HOODYBOODY reviews the request before confirming the final quote.</p>
+          <a class="button primary" href="/#custom">Upload design</a>
+        </div>
+      </section>
+      <section class="location-section">
+        <div class="section-head"><div><p class="eyebrow">available in</p><h2>Service areas</h2></div></div>
+        <div class="location-chip-row">${featuredCities.map((city) => `<a class="location-chip" href="${getCityUrl(city.stateSlug, city.slug)}">${escapeHtmlAttribute(city.cityName)}</a>`).join("")}</div>
+      </section>
+    `
+  });
+}
+
+function renderFaqItems(faq) {
+  return (faq || [])
+    .map((item) => `<details class="faq-item"><summary>${escapeHtmlAttribute(item.question)}</summary><p>${escapeHtmlAttribute(item.answer)}</p></details>`)
+    .join("");
+}
+
+async function renderLocationsIndexPage(req) {
+  const locationData = getLocationContent();
+  const breadcrumbs = [
+    { name: "Home", url: "/" },
+    { name: "Locations", url: "/locations/" }
+  ];
+
+  return renderPageShell(req, {
+    title: "Embroidery Service Areas | HOODYBOODY",
+    description: "Browse HOODYBOODY custom embroidery service areas by state and city.",
+    canonicalPath: "/locations/",
+    mainClass: "seo-page location-page",
+    breadcrumbs,
+    structuredData: [
+      {
+        "@context": "https://schema.org",
+        "@type": "CollectionPage",
+        name: "HOODYBOODY service areas",
+        url: absoluteUrl(req, "/locations/")
+      }
+    ],
+    body: `
+      <section class="seo-hero">
+        <div class="seo-hero-copy">
+          <p class="eyebrow">locations</p>
+          <h1>Custom embroidery service areas</h1>
+          <p>HOODYBOODY keeps the main site simple while service-area pages scale quietly in the background.</p>
+          <div class="location-actions"><a class="button primary" href="/#custom">Start custom order</a><a class="button ghost dark" href="/#catalog">Shop categories</a></div>
+        </div>
+        <div class="seo-hero-media" aria-hidden="true"></div>
+      </section>
+      <section class="location-section">
+        <div class="section-head"><div><p class="eyebrow">states</p><h2>Choose a state</h2></div></div>
+        <div class="seo-link-grid">
+          ${(locationData.states || []).map((state) => `<a class="seo-link-card" href="${getStateUrl(state.slug)}"><strong>${escapeHtmlAttribute(state.stateName)}</strong><span>${escapeHtmlAttribute(state.intro)}</span></a>`).join("")}
+        </div>
+      </section>
+    `
+  });
+}
+
+async function renderLocationStatePage(req, state) {
+  const canonicalPath = getStateUrl(state.slug);
+  const breadcrumbs = [
+    { name: "Home", url: "/" },
+    { name: "Locations", url: "/locations/" },
+    { name: state.stateName, url: canonicalPath }
+  ];
+
+  return renderPageShell(req, {
+    title: state.seoTitle,
+    description: state.metaDescription,
+    canonicalPath,
+    mainClass: "seo-page location-page",
+    breadcrumbs,
+    structuredData: [
+      {
+        "@context": "https://schema.org",
+        "@type": "CollectionPage",
+        name: state.seoTitle,
+        description: state.metaDescription,
+        url: absoluteUrl(req, canonicalPath)
+      }
+    ],
+    body: `
+      <section class="seo-hero">
+        <div class="seo-hero-copy">
+          <p class="eyebrow">${escapeHtmlAttribute(state.stateName)}</p>
+          <h1>${escapeHtmlAttribute(state.seoTitle.replace(" | HOODYBOODY", ""))}</h1>
+          <p>${escapeHtmlAttribute(state.intro)}</p>
+          <div class="location-actions"><a class="button primary" href="/#custom">Upload design</a><a class="button ghost dark" href="/#catalog">Shop categories</a></div>
+        </div>
+        <div class="seo-hero-media" aria-hidden="true"></div>
+      </section>
+      <section class="location-section location-city-buttons-section">
+        <div class="section-head"><div><p class="eyebrow">cities</p><h2>Choose your city</h2></div></div>
+        <div class="location-chip-row">${(state.cities || []).map((city) => `<a class="location-chip" href="${getCityUrl(state.slug, city.slug)}">${escapeHtmlAttribute(city.cityName)}</a>`).join("")}</div>
+      </section>
+      <section class="location-section">
+        <div class="section-head"><div><p class="eyebrow">categories</p><h2>Embroidery products</h2></div></div>
+        <div class="seo-link-grid">${renderCategoryLinkGrid(req)}</div>
+      </section>
+    `
+  });
+}
+
+async function renderLocationCityPage(req, state, city) {
+  const canonicalPath = getCityUrl(state.slug, city.slug);
+  const nearby = (city.nearbyCities || []).map((slug) => findLocationCity(state, slug)).filter(Boolean);
+  const faq = Array.isArray(city.faq) ? city.faq : [];
+  const breadcrumbs = [
+    { name: "Home", url: "/" },
+    { name: "Locations", url: "/locations/" },
+    { name: state.stateName, url: getStateUrl(state.slug) },
+    { name: city.cityName, url: canonicalPath }
+  ];
+
+  return renderPageShell(req, {
+    title: city.seoTitle,
+    description: city.metaDescription,
+    canonicalPath,
+    mainClass: "seo-page location-page",
+    breadcrumbs,
+    structuredData: [
+      {
+        "@context": "https://schema.org",
+        "@type": "LocalBusiness",
+        name: `HOODYBOODY custom embroidery for ${city.cityName}`,
+        areaServed: `${city.cityName}, ${state.stateCode}`,
+        url: absoluteUrl(req, canonicalPath),
+        image: absoluteUrl(req, "/assets/embroidered-collection.png"),
+        description: city.metaDescription
+      },
+      faq.length
+        ? {
+            "@context": "https://schema.org",
+            "@type": "FAQPage",
+            mainEntity: faq.map((item) => ({
+              "@type": "Question",
+              name: item.question,
+              acceptedAnswer: { "@type": "Answer", text: item.answer }
+            }))
+          }
+        : null
+    ].filter(Boolean),
+    body: `
+      <section class="seo-hero">
+        <div class="seo-hero-copy">
+          <p class="eyebrow">${escapeHtmlAttribute(city.cityName)}, ${escapeHtmlAttribute(state.stateCode)}</p>
+          <h1>${escapeHtmlAttribute(city.seoTitle.replace(" | HOODYBOODY", ""))}</h1>
+          <p>${escapeHtmlAttribute(city.intro)}</p>
+          <div class="location-actions"><a class="button primary" href="/#custom">Upload logo or design</a><a class="button ghost dark" href="/#catalog">Shop categories</a></div>
+        </div>
+        <div class="seo-hero-media" aria-hidden="true"></div>
+      </section>
+      <section class="location-section">
+        <div class="section-head"><div><p class="eyebrow">services</p><h2>Embroidery services</h2></div></div>
+        <div class="seo-link-grid">
+          <a class="seo-link-card" href="/#custom"><strong>Logo embroidery</strong><span>Upload a logo or artwork file for a quote.</span></a>
+          <a class="seo-link-card" href="/embroidered-hoodies/"><strong>Custom apparel</strong><span>Hoodies, T-shirts, sweatshirts, hats and totes.</span></a>
+          <a class="seo-link-card" href="/#custom"><strong>Business and bulk orders</strong><span>Simple quote flow for teams, events and staff apparel.</span></a>
+        </div>
+      </section>
+      <section class="location-section">
+        <div class="section-head"><div><p class="eyebrow">categories</p><h2>Shop by product type</h2></div></div>
+        <div class="seo-link-grid">${renderCategoryLinkGrid(req)}</div>
+      </section>
+      <section class="location-section">
+        <div class="seo-split">
+          <div>
+            <p class="eyebrow">local embroidery</p>
+            <h2>Made for ${escapeHtmlAttribute(city.cityName)} orders</h2>
+            <p>${escapeHtmlAttribute(city.localText)}</p>
+          </div>
+          <a class="button primary" href="/#custom">Request a quote</a>
+        </div>
+      </section>
+      <section class="location-section">
+        <div class="section-head"><div><p class="eyebrow">FAQ</p><h2>Questions</h2></div></div>
+        <div class="faq-list">${renderFaqItems(faq)}</div>
+      </section>
+      <section class="location-section">
+        <div class="section-head"><div><p class="eyebrow">nearby</p><h2>Nearby cities</h2></div></div>
+        <div class="location-chip-row">${nearby.map((item) => `<a class="location-chip" href="${getCityUrl(state.slug, item.slug)}">${escapeHtmlAttribute(item.cityName)}</a>`).join("")}</div>
+      </section>
+    `
+  });
+}
+
+async function tryRenderSeoRoute(req, res, pathname) {
+  const cleanPath = stripTrailingSlash(pathname);
+  const productPages = getProductPageContent().pages || [];
+  const productPage = productPages.find((page) => cleanPath === `/${page.slug}`);
+  if (productPage) {
+    const html = await renderProductLandingPage(req, productPage);
+    res.writeHead(200, { "Content-Type": "text/html; charset=utf-8", ...noIndexHeader });
+    res.end(html);
+    return true;
+  }
+
+  const locationData = getLocationContent();
+  if (cleanPath === "/locations") {
+    const html = await renderLocationsIndexPage(req);
+    res.writeHead(200, { "Content-Type": "text/html; charset=utf-8", ...noIndexHeader });
+    res.end(html);
+    return true;
+  }
+
+  const locationMatch = cleanPath.match(/^\/locations\/([^/]+)(?:\/([^/]+))?$/);
+  if (locationMatch) {
+    const state = findLocationState(locationData, locationMatch[1]);
+    if (state && !locationMatch[2]) {
+      const html = await renderLocationStatePage(req, state);
+      res.writeHead(200, { "Content-Type": "text/html; charset=utf-8", ...noIndexHeader });
+      res.end(html);
+      return true;
+    }
+
+    const city = findLocationCity(state, locationMatch[2]);
+    if (state && city) {
+      const html = await renderLocationCityPage(req, state, city);
+      res.writeHead(200, { "Content-Type": "text/html; charset=utf-8", ...noIndexHeader });
+      res.end(html);
+      return true;
+    }
+  }
+
+  return false;
+}
+
+function renderSitemapXml(req) {
+  const productPages = getProductPageContent().pages || [];
+  const locationData = getLocationContent();
+  const urls = [
+    "/",
+    "/locations/",
+    ...productPages.map((page) => `/${page.slug}/`),
+    ...(locationData.states || []).flatMap((state) => [
+      getStateUrl(state.slug),
+      ...(state.cities || []).map((city) => getCityUrl(state.slug, city.slug))
+    ])
+  ];
+
+  return `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n${urls
+    .map((url) => `  <url><loc>${escapeHtmlAttribute(absoluteUrl(req, url))}</loc><changefreq>weekly</changefreq><priority>${url === "/" ? "1.0" : "0.7"}</priority></url>`)
+    .join("\n")}\n</urlset>`;
+}
+
 function createStripeCheckoutSession(params) {
   const payload = params.toString();
 
@@ -3121,6 +3634,16 @@ async function appHandler(req, res) {
     const robots = fs.existsSync(robotsPath) ? fs.readFileSync(robotsPath, "utf8") : "User-agent: *\nDisallow: /";
     res.writeHead(200, { "Content-Type": "text/plain; charset=utf-8", ...noIndexHeader });
     res.end(robots);
+    return;
+  }
+
+  if (pathname === "/sitemap.xml") {
+    res.writeHead(200, { "Content-Type": "application/xml; charset=utf-8", ...noIndexHeader });
+    res.end(renderSitemapXml(req));
+    return;
+  }
+
+  if (await tryRenderSeoRoute(req, res, pathname)) {
     return;
   }
 

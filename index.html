@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="robots" content="noindex, nofollow, noarchive" />
     <title>HOODYBOODY | Embroidery clothes</title>
+    <meta name="description" content="Premium embroidered hoodies, T-shirts, hats, tote bags and custom logo embroidery by HOODYBOODY." />
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/intl-tel-input@28.0.4/dist/css/intlTelInput.css" />
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css" />
     <link rel="stylesheet" href="styles.css" />
@@ -64,6 +65,22 @@
         <div class="catalog-sections" id="catalogSections" aria-label="Product type sections"></div>
       </section>
 
+      <section class="home-link-band" aria-labelledby="featured-products-title">
+        <div class="home-link-inner">
+          <div>
+            <p class="eyebrow">featured categories</p>
+            <h2 id="featured-products-title">Embroidery pieces by product type</h2>
+            <p class="section-copy">A clean product architecture for shopping now and scaling future collections without making the navigation heavy.</p>
+          </div>
+          <div class="home-link-grid">
+            <a class="seo-link-card" href="/embroidered-hoodies/"><strong>Embroidered hoodies</strong><span>Dense cotton, logo upload and custom motifs.</span></a>
+            <a class="seo-link-card" href="/embroidered-tshirts/"><strong>Embroidered T-shirts</strong><span>Minimal everyday pieces with stitch detail.</span></a>
+            <a class="seo-link-card" href="/embroidered-hats/"><strong>Embroidered hats</strong><span>Caps and accessories for personal or business orders.</span></a>
+            <a class="seo-link-card" href="/embroidered-tote-bags/"><strong>Embroidered tote bags</strong><span>Shopper bags, gifts and event pieces.</span></a>
+          </div>
+        </div>
+      </section>
+
       <section class="custom-band" id="custom" aria-labelledby="custom-title">
         <div class="custom-inner">
           <div class="custom-copy">
@@ -96,6 +113,14 @@
               Motif
               <input id="motifInput" type="text" placeholder="for example: wildflowers" />
             </label>
+            <label>
+              Quantity
+              <input id="customQuantity" type="number" min="1" step="1" value="1" inputmode="numeric" />
+            </label>
+            <label>
+              Notes for quote
+              <textarea id="customNotes" rows="3" placeholder="Logo placement, deadline, business name or stitch details"></textarea>
+            </label>
             <fieldset class="upload-field">
               <legend>Files for sketch</legend>
               <input
@@ -114,13 +139,50 @@
                   </svg>
                 </span>
                 <span>
-                  <strong>Upload images or files</strong>
-                  <small>PNG, JPG, PDF, AI, PSD, SVG, DOC</small>
+                  <strong>Upload or drag files here</strong>
+                  <small>Accepted: PNG, JPG, PDF, SVG, AI, EPS, PSD, DOC</small>
                 </span>
               </label>
               <div class="file-preview" id="filePreview" aria-live="polite"></div>
             </fieldset>
+            <div class="quote-steps" aria-label="Quote steps">
+              <span>1. Upload file</span>
+              <span>2. Choose base</span>
+              <span>3. Confirm quote</span>
+            </div>
+            <a class="bulk-link" href="#order">Business or bulk embroidery request</a>
             <button class="button primary wide" type="button" id="customAdd">Add estimate to cart</button>
+          </div>
+        </div>
+      </section>
+
+      <section class="business-band" aria-labelledby="business-title">
+        <div class="business-inner">
+          <div>
+            <p class="eyebrow">business embroidery</p>
+            <h2 id="business-title">Logo embroidery for teams and small brands</h2>
+            <p class="section-copy">A simple quote path for staff apparel, launch pieces, event merch and small batch embroidered goods.</p>
+          </div>
+          <div class="business-actions">
+            <a class="button primary" href="#custom">Upload logo</a>
+            <a class="button ghost dark" href="/locations/">View service areas</a>
+          </div>
+        </div>
+      </section>
+
+      <section class="home-link-band service-preview-band" aria-labelledby="service-areas-title">
+        <div class="home-link-inner">
+          <div>
+            <p class="eyebrow">service coverage</p>
+            <h2 id="service-areas-title">Custom embroidery across growing service areas</h2>
+            <p class="section-copy">Locations are kept in the background so the main experience stays boutique and simple.</p>
+          </div>
+          <div class="location-chip-row">
+            <a class="location-chip" href="/locations/indiana/indianapolis/">Indianapolis</a>
+            <a class="location-chip" href="/locations/indiana/fort-wayne/">Fort Wayne</a>
+            <a class="location-chip" href="/locations/indiana/bloomington/">Bloomington</a>
+            <a class="location-chip" href="/locations/indiana/south-bend/">South Bend</a>
+            <a class="location-chip" href="/locations/illinois/chicago/">Chicago</a>
           </div>
         </div>
       </section>

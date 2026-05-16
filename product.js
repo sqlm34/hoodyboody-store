@@ -120,7 +120,7 @@ function updateBackLink() {
   if (!backLink) return;
 
   const returnPage = params.get("from");
-  if (returnPage && /^[a-z0-9-]+\.html$/i.test(returnPage)) {
+  if (returnPage && (/^[a-z0-9-]+\.html$/i.test(returnPage) || /^\/[a-z0-9/-]+\/$/i.test(returnPage))) {
     backLink.href = returnPage;
     backLink.textContent = "Back to catalog";
     return;

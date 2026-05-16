@@ -63,13 +63,13 @@
   };
 
   const LOCATION_URLS = {
-    locations: "locations.html",
-    indiana: "indiana.html",
-    indianapolis: "indianapolis.html",
-    "fort-wayne": "fort-wayne.html",
-    evansville: "evansville.html",
-    "south-bend": "south-bend.html",
-    bloomington: "bloomington.html"
+    locations: "/locations/",
+    indiana: "/locations/indiana/",
+    indianapolis: "/locations/indiana/indianapolis/",
+    "fort-wayne": "/locations/indiana/fort-wayne/",
+    evansville: "/locations/indiana/evansville/",
+    "south-bend": "/locations/indiana/south-bend/",
+    bloomington: "/locations/indiana/bloomington/"
   };
 
   const LOCATION_STATES = [
