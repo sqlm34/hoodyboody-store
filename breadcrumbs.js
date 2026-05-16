@@ -1,13 +1,36 @@
 (function () {
   const CATEGORY_PAGES = {
-    outerwear: { title: "Jackets", url: "outerwear.html" },
-    tops: { title: "Tops", url: "tops.html" },
-    accessories: { title: "Accessories", url: "accessories.html" }
+    outerwear: { title: "Jackets", url: "jackets.html" },
+    tops: { title: "Tops", url: "embroidered-tops.html" },
+    accessories: { title: "Accessories", url: "embroidered-accessories.html" }
   };
   let categories = Object.entries(CATEGORY_PAGES).map(([id, meta]) => ({ id, title: meta.title, url: meta.url }));
-  const PAGE_CATEGORY_TYPES = Object.fromEntries(
-    Object.entries(CATEGORY_PAGES).map(([type, meta]) => [meta.url, type])
-  );
+  const PAGE_CATEGORY_TYPES = Object.fromEntries([
+    ...Object.entries(CATEGORY_PAGES).map(([type, meta]) => [meta.url, type]),
+    ["outerwear.html", "outerwear"],
+    ["tops.html", "tops"],
+    ["accessories.html", "accessories"],
+    ["embroidered-hoodies.html", "tops"],
+    ["embroidered-t-shirts.html", "tops"],
+    ["embroidered-caps.html", "accessories"]
+  ]);
+  const PRODUCT_SECTION_PAGES = {
+    "jackets.html": "Embroidered Jackets",
+    "embroidered-tops.html": "Embroidered Tops",
+    "embroidered-accessories.html": "Embroidered Accessories",
+    "embroidered-hoodies.html": "Embroidered Hoodies",
+    "embroidered-t-shirts.html": "Embroidered T-Shirts",
+    "embroidered-caps.html": "Embroidered Caps"
+  };
+  const LOCATION_PAGES = {
+    "locations.html": ["Locations", "locations.html"],
+    "indiana.html": ["Indiana", "indiana.html"],
+    "indianapolis.html": ["Indianapolis", "indianapolis.html"],
+    "fort-wayne.html": ["Fort Wayne", "fort-wayne.html"],
+    "evansville.html": ["Evansville", "evansville.html"],
+    "south-bend.html": ["South Bend", "south-bend.html"],
+    "bloomington.html": ["Bloomington", "bloomington.html"]
+  };
   const STATIC_PAGES = {
     "checkout.html": "Checkout",
     "account.html": "Account",
@@ -110,8 +133,19 @@
     if (pageName === "product.html") {
       const [products] = await Promise.all([getProducts(), getCategories()]);
       const product = products.find((item) => item.id === params.get("id"));
+      const returnPage = params.get("from") || "";
+      if (PRODUCT_SECTION_PAGES[returnPage]) {
+        trail.push({ name: "Categories", url: "index.html#catalog" });
+        trail.push({ name: PRODUCT_SECTION_PAGES[returnPage], url: returnPage });
+      } else if (LOCATION_PAGES[returnPage]) {
+        trail.push({ name: "Locations", url: "locations.html" });
+        if (returnPage !== "locations.html") {
+          trail.push({ name: LOCATION_PAGES[returnPage][0], url: returnPage });
+        }
+      } else {
       const categoryType = getCategoryType(product);
       trail = addCategoryTrail(trail, categoryType);
+      }
       trail.push({
         name: product?.title || "Product",
         url: window.location.pathname.split("/").pop() + window.location.search
@@ -120,6 +154,32 @@
     }
 
     await getCategories();
+    if (LOCATION_PAGES[pageName]) {
+      trail.push({
+        name: "Locations",
+        url: "locations.html"
+      });
+      if (pageName !== "locations.html") {
+        trail.push({
+          name: LOCATION_PAGES[pageName][0],
+          url: LOCATION_PAGES[pageName][1]
+        });
+      }
+      return trail;
+    }
+
+    if (PRODUCT_SECTION_PAGES[pageName]) {
+      trail.push({
+        name: "Categories",
+        url: "index.html#catalog"
+      });
+      trail.push({
+        name: PRODUCT_SECTION_PAGES[pageName],
+        url: pageName
+      });
+      return trail;
+    }
+
     const categoryType = getCategoryType();
     if (categoryType) {
       return addCategoryTrail(trail, categoryType);

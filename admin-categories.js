@@ -92,9 +92,9 @@ function getBlankCategory() {
 
 function getCategoryUrl(categoryId) {
   const staticPages = {
-    outerwear: "outerwear.html",
-    tops: "tops.html",
-    accessories: "accessories.html"
+    outerwear: "jackets.html",
+    tops: "embroidered-tops.html",
+    accessories: "embroidered-accessories.html"
   };
 
   return staticPages[categoryId] || `category.html?type=${encodeURIComponent(categoryId)}`;

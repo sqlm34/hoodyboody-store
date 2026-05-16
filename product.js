@@ -4,9 +4,9 @@ const DISCOUNT_THRESHOLD = 20000;
 const DISCOUNT_LABEL = "10%";
 const DISCOUNT_RATE = 0.1;
 const CATEGORY_PAGES = {
-  outerwear: "outerwear.html",
-  tops: "tops.html",
-  accessories: "accessories.html"
+  outerwear: "jackets.html",
+  tops: "embroidered-tops.html",
+  accessories: "embroidered-accessories.html"
 };
 
 let products = window.NITKA_PRODUCTS || [];
@@ -118,6 +118,13 @@ function getCategoryUrl(type) {
 
 function updateBackLink() {
   if (!backLink) return;
+
+  const returnPage = params.get("from");
+  if (returnPage && /^[a-z0-9-]+\.html$/i.test(returnPage)) {
+    backLink.href = returnPage;
+    backLink.textContent = "Back to catalog";
+    return;
+  }
 
   const categoryType = getReturnCategoryType();
   backLink.href = categoryType ? getCategoryUrl(categoryType) : "index.html#catalog";

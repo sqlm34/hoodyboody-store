@@ -58,13 +58,19 @@ const ALL_CATALOG_META = {
   copy: "Browse every embroidered piece from the current collection."
 };
 const CATEGORY_PAGES = {
-  outerwear: "outerwear.html",
-  tops: "tops.html",
-  accessories: "accessories.html"
+  outerwear: "jackets.html",
+  tops: "embroidered-tops.html",
+  accessories: "embroidered-accessories.html"
 };
-const PAGE_CATEGORY_TYPES = Object.fromEntries(
-  Object.entries(CATEGORY_PAGES).map(([type, page]) => [page, type])
-);
+const LEGACY_CATEGORY_PAGES = {
+  outerwear: ["outerwear.html"],
+  tops: ["tops.html"],
+  accessories: ["accessories.html"]
+};
+const PAGE_CATEGORY_TYPES = Object.fromEntries([
+  ...Object.entries(CATEGORY_PAGES).map(([type, page]) => [page, type]),
+  ...Object.entries(LEGACY_CATEGORY_PAGES).flatMap(([type, pages]) => pages.map((page) => [page, type]))
+]);
 const pageParams = new URLSearchParams(window.location.search);
 const categoryPageRoot = document.querySelector("[data-category-page]");
 const isCategoryPage = Boolean(categoryPageRoot);
@@ -72,6 +78,10 @@ const pathPageName = window.location.pathname.split("/").pop() || "";
 const pageCategoryType = categoryPageRoot?.dataset.categoryType || PAGE_CATEGORY_TYPES[pathPageName];
 const requestedCategoryType = pageParams.get("type") || pageCategoryType;
 const initialCatalogFilter = isCategoryPage && requestedCategoryType ? requestedCategoryType : "all";
+const pageProductKeywords = (categoryPageRoot?.dataset.productKeywords || "")
+  .split(",")
+  .map((keyword) => keyword.trim().toLowerCase())
+  .filter(Boolean);
 
 function loadStoredCart() {
   try {
@@ -168,7 +178,12 @@ async function loadCategories() {
   try {
     const data = await api("/api/categories");
     applyCategories(data.categories);
-    categoriesLoaded = true;
+    if (!categoryDefinitions.length) {
+      applyCategories(DEFAULT_CATEGORIES);
+      categoriesLoaded = false;
+    } else {
+      categoriesLoaded = true;
+    }
   } catch {
     applyCategories(DEFAULT_CATEGORIES);
     categoriesLoaded = false;
@@ -242,6 +257,9 @@ function getProductUrl(productId, type = "") {
 
   if (categoryType) {
     productParams.set("category", categoryType);
+  }
+  if (isCategoryPage && pathPageName) {
+    productParams.set("from", pathPageName);
   }
 
   return `product.html?${productParams.toString()}`;
@@ -361,6 +379,23 @@ function getCategoryMeta(type) {
   };
 }
 
+function getPageMeta(baseMeta) {
+  const data = categoryPageRoot?.dataset || {};
+  if (!data.pageTitle && !data.pageCopy && !data.pageEyebrow && !data.pageImage && !data.pageBackground) {
+    return baseMeta;
+  }
+
+  return {
+    ...baseMeta,
+    eyebrow: data.pageEyebrow || baseMeta.eyebrow,
+    title: data.pageTitle || baseMeta.title,
+    copy: data.pageCopy || baseMeta.copy,
+    image: data.pageImage || baseMeta.image,
+    focus: data.pageFocus || baseMeta.focus,
+    background: data.pageBackground || baseMeta.background
+  };
+}
+
 function isKnownCategory(type) {
   return categoryDefinitions.some((category) => category.id === type);
 }
@@ -407,6 +442,23 @@ function getCategoryFocus(type) {
 
 function getCategoryBackground(type) {
   return CATEGORY_META[type]?.background || "linear-gradient(135deg, #f7f8f5 0%, #e4eee8 100%)";
+}
+
+function productMatchesPageKeywords(product) {
+  if (!pageProductKeywords.length) return true;
+  const haystack = [
+    product.id,
+    product.title,
+    product.type,
+    product.badge,
+    product.description,
+    product.longDescription,
+    ...(Array.isArray(product.sizes) ? product.sizes : [])
+  ]
+    .join(" ")
+    .toLowerCase();
+
+  return pageProductKeywords.some((keyword) => haystack.includes(keyword));
 }
 
 function setCatalogFilter(filter, options = {}) {
@@ -460,9 +512,11 @@ function updateCatalogViewHead(visibleCount) {
         title: "Category unavailable",
         copy: "This category is no longer available on the site."
       }
-    : state.filter === "all"
-      ? ALL_CATALOG_META
-      : getCategoryMeta(state.filter);
+    : getPageMeta(
+        state.filter === "all"
+          ? ALL_CATALOG_META
+          : getCategoryMeta(state.filter)
+      );
   if (catalogViewEyebrow) {
     catalogViewEyebrow.textContent = meta.eyebrow;
   }
@@ -489,22 +543,24 @@ function renderCategoryHero() {
   if (!categoryHero) return;
 
   const heroType = state.filter === "all" ? getCatalogTypes()[0] : state.filter;
+  const heroMeta = isCategoryPage ? getPageMeta(getCategoryMeta(heroType)) : {};
   categoryHero.dataset.category = heroType || "collection";
-  categoryHero.style.setProperty("--category-image", `url('${getCategoryImage(heroType)}')`);
-  categoryHero.style.setProperty("--focus", getCategoryFocus(heroType));
-  categoryHero.style.setProperty("--category-bg", getCategoryBackground(heroType));
+  categoryHero.style.setProperty("--category-image", `url('${heroMeta.image || getCategoryImage(heroType)}')`);
+  categoryHero.style.setProperty("--focus", heroMeta.focus || getCategoryFocus(heroType));
+  categoryHero.style.setProperty("--category-bg", heroMeta.background || getCategoryBackground(heroType));
 }
 
 function renderCatalog() {
   renderCatalogSections();
   if (!catalogGrid) return;
 
-  const visibleProducts =
+  const baseProducts =
     categoriesLoaded && state.filter !== "all" && !isKnownCategory(state.filter)
       ? []
       : state.filter === "all"
       ? products
       : products.filter((product) => product.type === state.filter);
+  const visibleProducts = baseProducts.filter(productMatchesPageKeywords);
 
   updateCatalogViewHead(visibleProducts.length);
   renderCategoryHero();
