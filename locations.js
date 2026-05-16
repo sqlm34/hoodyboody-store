@@ -72,6 +72,13 @@
     bloomington: "bloomington.html"
   };
 
+  const LOCATION_STATES = [
+    {
+      id: "indiana",
+      cities: ["indianapolis", "fort-wayne", "evansville", "south-bend", "bloomington"]
+    }
+  ];
+
   const escapeHtml = (value) =>
     String(value || "").replace(/[&<>"']/g, (char) => {
       const entities = { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" };
@@ -100,10 +107,34 @@
     }
   }
 
+  function getLocationLabel(id) {
+    const item = LOCATION_PAGES[id];
+    return item?.title
+      .replace("Embroidery clothing in ", "")
+      .replace("Embroidery service areas", "All locations") || "";
+  }
+
   function cityLink(id) {
     const item = LOCATION_PAGES[id];
     if (!item) return "";
-    return `<a class="location-chip" href="${LOCATION_URLS[id]}">${escapeHtml(item.title.replace("Embroidery clothing in ", "").replace("Embroidery service areas", "All locations"))}</a>`;
+    return `<a class="location-chip${id === locationId ? " active" : ""}" href="${LOCATION_URLS[id]}">${escapeHtml(getLocationLabel(id))}</a>`;
+  }
+
+  function renderLocationMenu() {
+    return `
+      <a class="location-chip${locationId === "locations" ? " active" : ""}" href="${LOCATION_URLS.locations}">All locations</a>
+      ${LOCATION_STATES.map((state) => `
+        <div class="location-state-menu${state.id === locationId || state.cities.includes(locationId) ? " active" : ""}">
+          <a class="location-state-trigger" href="${LOCATION_URLS[state.id]}">
+            <span>${escapeHtml(getLocationLabel(state.id))}</span>
+            <i class="fa-solid fa-chevron-down" aria-hidden="true"></i>
+          </a>
+          <div class="location-city-menu">
+            ${state.cities.map(cityLink).join("")}
+          </div>
+        </div>
+      `).join("")}
+    `;
   }
 
   function productCard(product) {
@@ -148,7 +179,7 @@
         </div>
       </div>
       <div class="location-chip-row">
-        ${(location.cities || []).map(cityLink).join("")}
+        ${renderLocationMenu()}
       </div>
     </section>
 

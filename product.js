@@ -146,8 +146,12 @@ function saveCart(cart) {
   renderCartDrawer();
 }
 
+function getCartItemCount(cart = loadCart()) {
+  return cart.reduce((sum, item) => sum + Math.max(0, Number(item.quantity) || 0), 0);
+}
+
 function updateCartLink() {
-  const count = loadCart().reduce((sum, item) => sum + item.quantity, 0);
+  const count = getCartItemCount();
   if (productCartCount) productCartCount.textContent = count;
   productCartLink.setAttribute("aria-label", `Open cart, ${count} item${count === 1 ? "" : "s"}`);
 }
@@ -164,12 +168,15 @@ function getCartQuantityForProductId(productId, cart = loadCart()) {
 }
 
 function hasCartItems(cart = loadCart()) {
-  return cart.some((item) => Number(item.quantity) > 0);
+  return getCartItemCount(cart) > 0;
 }
 
 function updateProductGoCartState(cart = loadCart()) {
   if (!productGoCart) return;
-  productGoCart.disabled = !hasCartItems(cart);
+  const isActive = hasCartItems(cart);
+  productGoCart.disabled = !isActive;
+  productGoCart.setAttribute("aria-disabled", String(!isActive));
+  productGoCart.classList.toggle("is-active", isActive);
 }
 
 function getStockForCartItem(item, cart = loadCart()) {
@@ -200,7 +207,7 @@ function renderCartDrawer() {
   if (!cartItems || !cartEmpty || !cartTotal || !checkoutLink || !cartDeliveryNotice) return;
 
   const cart = loadCart();
-  const itemCount = cart.reduce((sum, item) => sum + item.quantity, 0);
+  const itemCount = getCartItemCount(cart);
   const subtotal = cart.reduce((sum, item) => sum + item.price * item.quantity, 0);
   const discount = getCartDiscount(cart, subtotal);
   const total = Math.max(0, subtotal - discount);
@@ -584,6 +591,7 @@ function addToCart() {
   }
 
   saveCart(cart);
+  updateProductGoCartState(cart);
   selectedQuantity = 1;
   renderStock();
   productNote.textContent = "Product added to cart.";
@@ -628,6 +636,7 @@ function renderProduct() {
   loadInventory();
   refreshReviewsAndAccess();
   updateCartLink();
+  updateProductGoCartState();
   renderCartDrawer();
 }
 
@@ -696,6 +705,18 @@ checkoutLink.addEventListener("click", (event) => {
   if (loadCart().length === 0) return;
 
   window.location.href = "checkout.html";
+});
+
+window.addEventListener("storage", (event) => {
+  if (event.key === CART_STORAGE_KEY) {
+    updateProductGoCartState();
+    updateCartLink();
+  }
+});
+
+window.addEventListener("focus", () => {
+  updateProductGoCartState();
+  updateCartLink();
 });
 
 reviewForm.addEventListener("submit", async (event) => {

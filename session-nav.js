@@ -28,13 +28,35 @@ const PRODUCT_NAV_ITEMS = [
 
 const LOCATION_NAV_ITEMS = [
   { label: "All locations", href: "locations.html" },
-  { label: "Indiana", href: "indiana.html" },
-  { label: "Indianapolis", href: "indianapolis.html" },
-  { label: "Fort Wayne", href: "fort-wayne.html" },
-  { label: "Evansville", href: "evansville.html" },
-  { label: "South Bend", href: "south-bend.html" },
-  { label: "Bloomington", href: "bloomington.html" }
+  {
+    label: "Indiana",
+    href: "indiana.html",
+    children: [
+      { label: "Indianapolis", href: "indianapolis.html" },
+      { label: "Fort Wayne", href: "fort-wayne.html" },
+      { label: "Evansville", href: "evansville.html" },
+      { label: "South Bend", href: "south-bend.html" },
+      { label: "Bloomington", href: "bloomington.html" }
+    ]
+  }
 ];
+
+function renderNavItem(item) {
+  if (!item.children?.length) return `<a href="${item.href}">${item.label}</a>`;
+
+  return `
+    <div class="nav-subgroup">
+      <button class="nav-subgroup-button" type="button" aria-expanded="false">
+        <span>${item.label}</span>
+        <i class="fa-solid fa-chevron-right" aria-hidden="true"></i>
+      </button>
+      <div class="nav-submenu">
+        <a href="${item.href}">${item.label} state</a>
+        ${item.children.map((child) => `<a href="${child.href}">${child.label}</a>`).join("")}
+      </div>
+    </div>
+  `;
+}
 
 function renderNavGroup(label, items) {
   return `
@@ -44,7 +66,7 @@ function renderNavGroup(label, items) {
         <i class="fa-solid fa-chevron-down" aria-hidden="true"></i>
       </button>
       <div class="nav-dropdown">
-        ${items.map((item) => `<a href="${item.href}">${item.label}</a>`).join("")}
+        ${items.map(renderNavItem).join("")}
       </div>
     </div>
   `;
@@ -80,6 +102,14 @@ function enhanceSiteNavigation() {
   });
 
   nav.addEventListener("click", (event) => {
+    const subgroupButton = event.target.closest(".nav-subgroup-button");
+    if (subgroupButton) {
+      const subgroup = subgroupButton.closest(".nav-subgroup");
+      const isOpen = subgroup.classList.toggle("open");
+      subgroupButton.setAttribute("aria-expanded", String(isOpen));
+      return;
+    }
+
     const button = event.target.closest(".nav-group-button");
     if (button) {
       const group = button.closest(".nav-group");
@@ -100,6 +130,10 @@ function enhanceSiteNavigation() {
       header.querySelectorAll(".nav-group.open").forEach((group) => {
         group.classList.remove("open");
         group.querySelector(".nav-group-button")?.setAttribute("aria-expanded", "false");
+      });
+      header.querySelectorAll(".nav-subgroup.open").forEach((subgroup) => {
+        subgroup.classList.remove("open");
+        subgroup.querySelector(".nav-subgroup-button")?.setAttribute("aria-expanded", "false");
       });
     }
   });
