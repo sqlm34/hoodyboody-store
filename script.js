@@ -614,11 +614,12 @@ function renderCatalog() {
 
 function addToCart(item) {
   const existing = state.cart.find((cartItem) => cartItem.id === item.id);
+  const quantity = Math.max(1, Math.floor(Number(item.quantity) || 1));
 
   if (existing) {
-    existing.quantity += 1;
+    existing.quantity += quantity;
   } else {
-    state.cart.push({ ...item, quantity: 1 });
+    state.cart.push({ ...item, quantity });
   }
 
   renderCart();

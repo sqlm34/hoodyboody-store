@@ -594,6 +594,7 @@ function addToCart() {
   updateProductGoCartState(cart);
   selectedQuantity = 1;
   renderStock();
+  openCart();
   productNote.textContent = "Product added to cart.";
   productNote.classList.remove("error");
 }
