@@ -121,20 +121,8 @@
   }
 
   function renderLocationMenu() {
-    return `
-      <a class="location-chip${locationId === "locations" ? " active" : ""}" href="${LOCATION_URLS.locations}">All locations</a>
-      ${LOCATION_STATES.map((state) => `
-        <div class="location-state-menu${state.id === locationId || state.cities.includes(locationId) ? " active" : ""}">
-          <a class="location-state-trigger" href="${LOCATION_URLS[state.id]}">
-            <span>${escapeHtml(getLocationLabel(state.id))}</span>
-            <i class="fa-solid fa-chevron-down" aria-hidden="true"></i>
-          </a>
-          <div class="location-city-menu">
-            ${state.cities.map(cityLink).join("")}
-          </div>
-        </div>
-      `).join("")}
-    `;
+    const currentState = LOCATION_STATES.find((state) => state.id === locationId || state.cities.includes(locationId)) || LOCATION_STATES[0];
+    return currentState.cities.map(cityLink).join("");
   }
 
   function productCard(product) {
@@ -171,27 +159,15 @@
       <div class="location-hero-media" aria-hidden="true"></div>
     </section>
 
-    <section class="location-section" aria-labelledby="nearby-title">
+    <section class="location-section location-city-buttons-section" aria-labelledby="nearby-title">
       <div class="section-head">
         <div>
-          <p class="eyebrow">service area menu</p>
-          <h2 id="nearby-title">Choose a location</h2>
+          <p class="eyebrow">cities</p>
+          <h2 id="nearby-title">Choose your city</h2>
         </div>
       </div>
       <div class="location-chip-row">
         ${renderLocationMenu()}
-      </div>
-    </section>
-
-    <section class="location-section" aria-labelledby="location-services-title">
-      <div class="section-head">
-        <div>
-          <p class="eyebrow">what you can order</p>
-          <h2 id="location-services-title">Embroidery catalog for this area</h2>
-        </div>
-      </div>
-      <div class="location-grid">
-        ${(location.highlights || []).map((item) => `<article class="location-card"><strong>${escapeHtml(item)}</strong><p>Browse ready products or request a custom embroidery order.</p></article>`).join("")}
       </div>
     </section>
 

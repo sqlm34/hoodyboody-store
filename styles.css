@@ -1252,6 +1252,12 @@ h3 {
   font-weight: 780;
 }
 
+.location-city-buttons-section .location-chip {
+  min-width: 150px;
+  padding: 12px 18px;
+  text-align: center;
+}
+
 .location-chip.active {
   border-color: rgba(31, 107, 90, 0.34);
   color: var(--pine);
