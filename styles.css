@@ -2131,32 +2131,33 @@ textarea:focus {
 }
 
 .checkout-topbar {
-  color: var(--ink);
-  background: rgba(251, 251, 248, 0.9);
-  border-bottom-color: var(--line);
+  color: var(--white);
+  background: rgba(22, 26, 29, 0.58);
+  border-bottom-color: rgba(255, 255, 255, 0.18);
 }
 
 .checkout-topbar .brand-mark,
 .checkout-topbar .icon-button,
 .checkout-topbar .account-pill {
-  border-color: var(--line);
-  background: var(--white);
+  border-color: rgba(255, 255, 255, 0.34);
+  background: rgba(255, 255, 255, 0.12);
 }
 
 .checkout-topbar .account-pill:hover,
 .checkout-topbar .account-pill:focus-visible {
-  border-color: var(--pine);
-  color: var(--pine);
+  border-color: rgba(255, 255, 255, 0.42);
+  color: var(--white);
+  background: rgba(255, 255, 255, 0.2);
 }
 
 .checkout-topbar .nav-links a {
-  color: var(--muted);
+  color: rgba(255, 255, 255, 0.86);
 }
 
 .checkout-topbar .nav-links a:hover,
 .checkout-topbar .nav-links a:focus-visible {
-  color: var(--ink);
-  background: #eef3f1;
+  color: var(--white);
+  background: rgba(255, 255, 255, 0.14);
 }
 
 .checkout-page {
