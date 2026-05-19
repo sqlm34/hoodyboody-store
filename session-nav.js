@@ -17,44 +17,100 @@ async function logout() {
   }
 }
 
-const PRODUCT_NAV_ITEMS = [
-  { label: "Hoodies", href: "/embroidered-hoodies/" },
-  { label: "T-shirts", href: "/embroidered-tshirts/" },
-  { label: "Sweatshirts", href: "/embroidered-sweatshirts/" },
-  { label: "Hats", href: "/embroidered-hats/" },
-  { label: "Tote bags", href: "/embroidered-tote-bags/" },
-  { label: "Jackets", href: "/embroidered-jackets/" }
-];
+const GEO_FALLBACK = {
+  stateName: "Indiana",
+  stateCode: "IN",
+  stateSlug: "indiana",
+  locationsUrl: "/locations/indiana/",
+  cities: [
+    { cityName: "Indianapolis", url: "/locations/indiana/indianapolis/" },
+    { cityName: "Fort Wayne", url: "/locations/indiana/fort-wayne/" },
+    { cityName: "Bloomington", url: "/locations/indiana/bloomington/" },
+    { cityName: "South Bend", url: "/locations/indiana/south-bend/" },
+    { cityName: "Evansville", url: "/locations/indiana/evansville/" }
+  ]
+};
+let geoTargetPromise = null;
 
-function renderNavItem(item) {
-  if (!item.children?.length) return `<a href="${item.href}">${item.label}</a>`;
+const escapeHtml = (value) =>
+  String(value || "").replace(/[&<>"']/g, (char) => {
+    const entities = {
+      "&": "&amp;",
+      "<": "&lt;",
+      ">": "&gt;",
+      '"': "&quot;",
+      "'": "&#39;"
+    };
+    return entities[char];
+  });
 
+function normalizeGeoTarget(data) {
+  const stateName = String(data?.stateName || GEO_FALLBACK.stateName).trim() || GEO_FALLBACK.stateName;
+  const locationsUrl = String(data?.locationsUrl || GEO_FALLBACK.locationsUrl).trim() || GEO_FALLBACK.locationsUrl;
+  const cities = Array.isArray(data?.cities) && data.cities.length ? data.cities : GEO_FALLBACK.cities;
+  return {
+    ...GEO_FALLBACK,
+    ...data,
+    stateName,
+    locationsUrl,
+    cities: cities.map((city) => ({
+      cityName: String(city.cityName || "").trim(),
+      url: String(city.url || "").trim()
+    })).filter((city) => city.cityName && city.url)
+  };
+}
+
+function getGeoTargetApiUrl() {
+  const params = new URLSearchParams();
+  const pathState = window.location.pathname.match(/^\/locations\/([^/]+)/)?.[1] || "";
+  const queryState = new URLSearchParams(window.location.search).get("state") || "";
+  const state = pathState || queryState;
+  if (state) params.set("state", state);
+  return params.toString() ? `/api/geo-target?${params.toString()}` : "/api/geo-target";
+}
+
+function getGeoTarget() {
+  if (!geoTargetPromise) {
+    geoTargetPromise = fetch(getGeoTargetApiUrl(), { headers: { Accept: "application/json" } })
+      .then((response) => (response.ok ? response.json() : GEO_FALLBACK))
+      .then(normalizeGeoTarget)
+      .catch(() => GEO_FALLBACK);
+  }
+  return geoTargetPromise;
+}
+
+function renderGeoCityChips(geoTarget, limit = 5) {
+  return geoTarget.cities
+    .slice(0, limit)
+    .map((city) => `<a class="location-chip" href="${escapeHtml(city.url)}">${escapeHtml(city.cityName)}</a>`)
+    .join("");
+}
+
+function renderGeoFooterLinks(geoTarget) {
   return `
-    <div class="nav-subgroup">
-      <button class="nav-subgroup-button" type="button" aria-expanded="false">
-        <span>${item.label}</span>
-        <i class="fa-solid fa-chevron-right" aria-hidden="true"></i>
-      </button>
-      <div class="nav-submenu">
-        <a href="${item.href}">${item.label} state</a>
-        ${item.children.map((child) => `<a href="${child.href}">${child.label}</a>`).join("")}
-      </div>
-    </div>
+    <strong>${escapeHtml(geoTarget.stateName)} service areas</strong>
+    ${geoTarget.cities.slice(0, 5).map((city) => `<a href="${escapeHtml(city.url)}">${escapeHtml(city.cityName)}</a>`).join("")}
+    <a href="${escapeHtml(geoTarget.locationsUrl)}">All ${escapeHtml(geoTarget.stateName)} areas</a>
   `;
 }
 
-function renderNavGroup(label, items) {
-  return `
-    <div class="nav-group">
-      <button class="nav-group-button" type="button" aria-expanded="false">
-        <span>${label}</span>
-        <i class="fa-solid fa-chevron-down" aria-hidden="true"></i>
-      </button>
-      <div class="nav-dropdown">
-        ${items.map(renderNavItem).join("")}
-      </div>
-    </div>
-  `;
+function applyGeoTarget(geoTarget) {
+  document.querySelectorAll(".geo-location-link").forEach((link) => {
+    link.setAttribute("href", geoTarget.locationsUrl);
+    link.textContent = geoTarget.stateName;
+  });
+
+  document.querySelectorAll("[data-geo-city-row]").forEach((row) => {
+    row.innerHTML = renderGeoCityChips(geoTarget);
+  });
+
+  document.querySelectorAll("[data-geo-footer-links]").forEach((nav) => {
+    nav.innerHTML = renderGeoFooterLinks(geoTarget);
+  });
+}
+
+function hydrateGeoTarget() {
+  getGeoTarget().then(applyGeoTarget);
 }
 
 function enhanceSiteNavigation() {
@@ -65,11 +121,9 @@ function enhanceSiteNavigation() {
 
   header.dataset.siteMenuReady = "true";
   nav.innerHTML = `
-    <a href="/">Home</a>
-    ${renderNavGroup("Shop", PRODUCT_NAV_ITEMS)}
-    <a href="/locations/">Locations</a>
+    <a href="/#catalog">Shop</a>
     <a href="/#custom">Embroidery</a>
-    <a href="/checkout.html">Checkout</a>
+    <a class="geo-location-link" href="${GEO_FALLBACK.locationsUrl}">${GEO_FALLBACK.stateName}</a>
   `;
 
   const toggle = document.createElement("button");
@@ -147,14 +201,7 @@ function enhanceSiteFooter() {
             <a href="/embroidered-hats/">Embroidered hats</a>
             <a href="/embroidered-tote-bags/">Embroidered tote bags</a>
           </nav>
-          <nav class="footer-links" aria-label="Service areas">
-            <strong>Service areas</strong>
-            <a href="/locations/indiana/indianapolis/">Indianapolis</a>
-            <a href="/locations/indiana/fort-wayne/">Fort Wayne</a>
-            <a href="/locations/indiana/bloomington/">Bloomington</a>
-            <a href="/locations/indiana/south-bend/">South Bend</a>
-            <a href="/locations/illinois/chicago/">Chicago</a>
-          </nav>
+          <nav class="footer-links" aria-label="Service areas" data-geo-footer-links>${renderGeoFooterLinks(GEO_FALLBACK)}</nav>
           <nav class="footer-links" aria-label="Custom embroidery">
             <strong>Custom</strong>
             <a href="/#custom">Upload logo or design</a>
@@ -214,6 +261,7 @@ async function initSessionNav() {
 initSessionNav();
 enhanceSiteNavigation();
 enhanceSiteFooter();
+hydrateGeoTarget();
 
 function loadLiveChatWidget() {
   const path = window.location.pathname.toLowerCase();

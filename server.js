@@ -49,6 +49,13 @@ function loadLocalEnv() {
 }
 
 const localEnv = loadLocalEnv();
+const configuredGeoStateSlug = String(
+  process.env.GEO_TARGET_STATE || process.env.HOODYBOODY_GEO_STATE || localEnv.GEO_TARGET_STATE || localEnv.HOODYBOODY_GEO_STATE || "indiana"
+)
+  .trim()
+  .toLowerCase()
+  .replace(/[^a-z0-9]+/g, "-")
+  .replace(/^-+|-+$/g, "");
 const root = __dirname;
 const port = Number(process.env.PORT) || 8000;
 const adminEmail = process.env.NITKA_ADMIN_EMAIL || localEnv.NITKA_ADMIN_EMAIL || "owner@nitka.local";
@@ -1463,10 +1470,59 @@ function findLocationCity(state, citySlug) {
   return (state?.cities || []).find((city) => city.slug === citySlug) || null;
 }
 
-function getFeaturedCities(locationData) {
-  return (locationData.states || [])
-    .flatMap((state) => (state.cities || []).slice(0, 5).map((city) => ({ ...city, stateSlug: state.slug, stateName: state.stateName })))
-    .slice(0, 8);
+function getPrimaryLocationState(locationData) {
+  const states = Array.isArray(locationData.states) ? locationData.states : [];
+  return findLocationState(locationData, configuredGeoStateSlug) || states[0] || null;
+}
+
+function getRequestGeoState(locationData, req) {
+  const states = Array.isArray(locationData.states) ? locationData.states : [];
+  if (!states.length) return null;
+
+  try {
+    const url = new URL(req.url || "/", getRequestOrigin(req));
+    const queryState = String(url.searchParams.get("state") || url.searchParams.get("geoState") || "")
+      .trim()
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, "-")
+      .replace(/^-+|-+$/g, "");
+    const pathState = stripTrailingSlash(url.pathname).match(/^\/locations\/([^/]+)/)?.[1];
+    const requestedState = findLocationState(locationData, pathState) || findLocationState(locationData, queryState);
+    if (requestedState) return requestedState;
+  } catch {
+    // Fall through to the configured state.
+  }
+
+  return getPrimaryLocationState(locationData);
+}
+
+function getGeoCities(state, limit = 8) {
+  return (state?.cities || [])
+    .slice(0, limit)
+    .map((city) => ({
+      ...city,
+      stateSlug: state.slug,
+      stateName: state.stateName,
+      stateCode: state.stateCode,
+      url: getCityUrl(state.slug, city.slug)
+    }));
+}
+
+function getGeoTargetPayload(locationData, req) {
+  const state = getRequestGeoState(locationData, req);
+  return {
+    stateName: state?.stateName || "",
+    stateCode: state?.stateCode || "",
+    stateSlug: state?.slug || "",
+    locationsUrl: state ? getStateUrl(state.slug) : "/locations/",
+    cities: getGeoCities(state, 12).map((city) => ({
+      cityName: city.cityName,
+      slug: city.slug,
+      stateSlug: city.stateSlug,
+      stateCode: city.stateCode,
+      url: city.url
+    }))
+  };
 }
 
 function jsonLdScript(data) {
@@ -1491,8 +1547,10 @@ function renderSiteTopbar() {
   `;
 }
 
-function renderSeoFooter(locationData) {
-  const cities = getFeaturedCities(locationData);
+function renderSeoFooter(locationData, req) {
+  const geoTarget = getGeoTargetPayload(locationData, req);
+  const cities = geoTarget.cities.slice(0, 5);
+  const stateLabel = geoTarget.stateName ? `${geoTarget.stateName} service areas` : "Service areas";
   return `
     <footer class="site-footer" data-footer-ready="true">
       <div class="site-footer-inner">
@@ -1508,9 +1566,9 @@ function renderSeoFooter(locationData) {
           <a href="/embroidered-tote-bags/">Embroidered tote bags</a>
         </nav>
         <nav class="footer-links" aria-label="Service areas">
-          <strong>Service areas</strong>
-          ${cities.map((city) => `<a href="${getCityUrl(city.stateSlug, city.slug)}">${escapeHtmlAttribute(city.cityName)}</a>`).join("")}
-          <a href="/locations/">All service areas</a>
+          <strong>${escapeHtmlAttribute(stateLabel)}</strong>
+          ${cities.map((city) => `<a href="${escapeHtmlAttribute(city.url)}">${escapeHtmlAttribute(city.cityName)}</a>`).join("")}
+          <a href="${escapeHtmlAttribute(geoTarget.locationsUrl)}">All ${escapeHtmlAttribute(geoTarget.stateName || "service")} areas</a>
         </nav>
         <nav class="footer-links" aria-label="Custom embroidery">
           <strong>Custom embroidery</strong>
@@ -1597,7 +1655,7 @@ function renderPageShell(req, options) {
       ${renderBreadcrumbsHtml(breadcrumbs)}
       ${options.body || ""}
     </main>
-    ${renderSeoFooter(locationData)}
+    ${renderSeoFooter(locationData, req)}
     <script src="/session-nav.js"></script>
   </body>
 </html>`);
@@ -1642,7 +1700,8 @@ async function renderProductLandingPage(req, page) {
   const db = await readDbAsync();
   const productsForPage = publicProducts(db).filter((product) => productMatchesLanding(product, page)).slice(0, 8);
   const locationData = getLocationContent();
-  const featuredCities = getFeaturedCities(locationData).slice(0, 5);
+  const geoTarget = getGeoTargetPayload(locationData, req);
+  const featuredCities = geoTarget.cities.slice(0, 5);
   const canonicalPath = `/${page.slug}/`;
   const breadcrumbs = [
     { name: "Home", url: "/" },
@@ -1673,7 +1732,7 @@ async function renderProductLandingPage(req, page) {
           <p>${escapeHtmlAttribute(page.intro)}</p>
           <div class="location-actions">
             <a class="button primary" href="/#custom">Start custom embroidery</a>
-            <a class="button ghost dark" href="/locations/">Service areas</a>
+            <a class="button ghost dark" href="${escapeHtmlAttribute(geoTarget.locationsUrl)}">${escapeHtmlAttribute(geoTarget.stateName || "Service areas")}</a>
           </div>
         </div>
         <div class="seo-hero-media" aria-hidden="true"></div>
@@ -1691,7 +1750,7 @@ async function renderProductLandingPage(req, page) {
       </section>
       <section class="location-section">
         <div class="section-head"><div><p class="eyebrow">available in</p><h2>Service areas</h2></div></div>
-        <div class="location-chip-row">${featuredCities.map((city) => `<a class="location-chip" href="${getCityUrl(city.stateSlug, city.slug)}">${escapeHtmlAttribute(city.cityName)}</a>`).join("")}</div>
+        <div class="location-chip-row">${featuredCities.map((city) => `<a class="location-chip" href="${escapeHtmlAttribute(city.url)}">${escapeHtmlAttribute(city.cityName)}</a>`).join("")}</div>
       </section>
     `
   });
@@ -1705,14 +1764,17 @@ function renderFaqItems(faq) {
 
 async function renderLocationsIndexPage(req) {
   const locationData = getLocationContent();
+  const geoTarget = getGeoTargetPayload(locationData, req);
+  const state = findLocationState(locationData, geoTarget.stateSlug) || getPrimaryLocationState(locationData);
+  const cities = geoTarget.cities;
   const breadcrumbs = [
     { name: "Home", url: "/" },
     { name: "Locations", url: "/locations/" }
   ];
 
   return renderPageShell(req, {
-    title: "Embroidery Service Areas | HOODYBOODY",
-    description: "Browse HOODYBOODY custom embroidery service areas by state and city.",
+    title: state?.seoTitle || "Embroidery Service Areas | HOODYBOODY",
+    description: state?.metaDescription || "Browse HOODYBOODY custom embroidery service areas by state and city.",
     canonicalPath: "/locations/",
     mainClass: "seo-page location-page",
     breadcrumbs,
@@ -1720,25 +1782,27 @@ async function renderLocationsIndexPage(req) {
       {
         "@context": "https://schema.org",
         "@type": "CollectionPage",
-        name: "HOODYBOODY service areas",
+        name: state ? `HOODYBOODY service areas in ${state.stateName}` : "HOODYBOODY service areas",
         url: absoluteUrl(req, "/locations/")
       }
     ],
     body: `
       <section class="seo-hero">
         <div class="seo-hero-copy">
-          <p class="eyebrow">locations</p>
-          <h1>Custom embroidery service areas</h1>
-          <p>HOODYBOODY keeps the main site simple while service-area pages scale quietly in the background.</p>
+          <p class="eyebrow">${escapeHtmlAttribute(state?.stateName || "locations")}</p>
+          <h1>${escapeHtmlAttribute((state?.seoTitle || "Custom embroidery service areas").replace(" | HOODYBOODY", ""))}</h1>
+          <p>${escapeHtmlAttribute(state?.intro || "HOODYBOODY keeps the main site simple while service-area pages scale quietly in the background.")}</p>
           <div class="location-actions"><a class="button primary" href="/#custom">Start custom order</a><a class="button ghost dark" href="/#catalog">Shop categories</a></div>
         </div>
         <div class="seo-hero-media" aria-hidden="true"></div>
       </section>
+      <section class="location-section location-city-buttons-section">
+        <div class="section-head"><div><p class="eyebrow">${escapeHtmlAttribute(state?.stateCode || "geo")}</p><h2>Choose your city</h2></div></div>
+        <div class="location-chip-row">${cities.map((city) => `<a class="location-chip" href="${escapeHtmlAttribute(city.url)}">${escapeHtmlAttribute(city.cityName)}</a>`).join("")}</div>
+      </section>
       <section class="location-section">
-        <div class="section-head"><div><p class="eyebrow">states</p><h2>Choose a state</h2></div></div>
-        <div class="seo-link-grid">
-          ${(locationData.states || []).map((state) => `<a class="seo-link-card" href="${getStateUrl(state.slug)}"><strong>${escapeHtmlAttribute(state.stateName)}</strong><span>${escapeHtmlAttribute(state.intro)}</span></a>`).join("")}
-        </div>
+        <div class="section-head"><div><p class="eyebrow">categories</p><h2>Embroidery products</h2></div></div>
+        <div class="seo-link-grid">${renderCategoryLinkGrid(req)}</div>
       </section>
     `
   });
@@ -1916,14 +1980,18 @@ async function tryRenderSeoRoute(req, res, pathname) {
 function renderSitemapXml(req) {
   const productPages = getProductPageContent().pages || [];
   const locationData = getLocationContent();
+  const geoState = getPrimaryLocationState(locationData);
+  const geoUrls = geoState
+    ? [
+        getStateUrl(geoState.slug),
+        ...(geoState.cities || []).map((city) => getCityUrl(geoState.slug, city.slug))
+      ]
+    : [];
   const urls = [
     "/",
     "/locations/",
     ...productPages.map((page) => `/${page.slug}/`),
-    ...(locationData.states || []).flatMap((state) => [
-      getStateUrl(state.slug),
-      ...(state.cities || []).map((city) => getCityUrl(state.slug, city.slug))
-    ])
+    ...geoUrls
   ];
 
   return `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n${urls
@@ -2719,6 +2787,11 @@ async function handleApi(req, res) {
 
     if (url.pathname === "/api/categories" && method === "GET") {
       sendJson(res, 200, { categories: publicCategories(db) });
+      return;
+    }
+
+    if (url.pathname === "/api/geo-target" && method === "GET") {
+      sendJson(res, 200, getGeoTargetPayload(getLocationContent(), req));
       return;
     }
 

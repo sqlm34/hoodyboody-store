@@ -1,9 +1,9 @@
 (function () {
   const LOCATION_PAGES = {
     locations: {
-      title: "Embroidery service areas",
-      eyebrow: "locations",
-      description: "Browse HOODYBOODY embroidery catalog pages by state and city. We started with Indiana and built the menu so more US states can be added cleanly.",
+      title: "Embroidery clothing in Indiana",
+      eyebrow: "indiana",
+      description: "Browse HOODYBOODY embroidery catalog pages for Indiana cities only.",
       parent: "",
       cities: ["indiana", "indianapolis", "fort-wayne", "evansville", "south-bend", "bloomington"],
       highlights: [
@@ -130,7 +130,7 @@
     const href = `product.html?id=${encodeURIComponent(product.id)}&location=${encodeURIComponent(locationId)}&from=${encodeURIComponent(from)}`;
     return `
       <a class="location-product-card" href="${href}">
-        <span class="location-product-photo" style="--product-image: url('${escapeHtml(product.image || "assets/embroidered-collection.png")}'); --focus: ${escapeHtml(product.focus || "center")}"></span>
+        <span class="location-product-photo" style="--product-image: url('${escapeHtml(product.image || "assets/tshirt.webp")}'); --focus: ${escapeHtml(product.focus || "center")}"></span>
         <strong>${escapeHtml(product.title)}</strong>
         <p>${escapeHtml(product.description)}</p>
         <span class="price">${formatPrice(product.price)}</span>

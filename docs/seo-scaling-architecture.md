@@ -13,12 +13,11 @@ Indexing status: disabled. The site keeps `noindex, nofollow, noarchive` in meta
 
 ## 2. URL Structure
 
-Preferred scalable URL pattern:
+Preferred scalable URL pattern for the active geo state:
 
 - `/locations/indiana/`
 - `/locations/indiana/indianapolis/`
 - `/locations/indiana/fort-wayne/`
-- `/locations/illinois/chicago/`
 
 Product landing pages:
 
@@ -39,7 +38,7 @@ This is more scalable than one-off URLs such as `/indianapolis-custom-embroidery
 
 ## 4. Routing Structure
 
-Current stack is Express/static, not Next.js. Clean routes are rendered in Express:
+Current stack is Express/static, not Next.js. Clean routes are rendered in Express. Public discovery is filtered to the active state from `GEO_TARGET_STATE` or `HOODYBOODY_GEO_STATE`:
 
 - `/locations/`
 - `/locations/:state/`
@@ -119,7 +118,7 @@ Indiana currently includes:
 - South Bend
 - Bloomington
 
-Illinois includes Chicago as an example of future state expansion.
+Additional states can remain in `content/locations.json`, but they are not linked in the menu, footer, `/locations/` page, or sitemap unless that state is selected as the active geo target.
 
 ## 10. Internal Linking Strategy
 
@@ -128,11 +127,11 @@ Illinois includes Chicago as an example of future state expansion.
 - City pages link to product pages, nearby cities and custom order CTA.
 - Footer contains restrained service-area links.
 
-## 11. Scaling To All US States
+## 11. Scaling To Another State
 
-Add new states and cities to `content/locations.json`.
+Add or update states and cities in `content/locations.json`, then set `GEO_TARGET_STATE` to the state slug that should be exposed.
 
-Do not add all states to the main menu. Let the footer and `/locations/` index handle discovery.
+Do not add all states to the main menu. The top menu and sitemap should expose only the active state.
 
 ## 12. Avoiding Thin Content
 
