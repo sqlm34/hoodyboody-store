@@ -5663,25 +5663,10 @@ body.preloader-active {
   transform: translateX(0);
 }
 
-.live-chat-logo,
-.live-chat-logo-fallback {
-  grid-row: 1 / span 2;
-  width: 38px;
-  height: 38px;
-  border-radius: 50%;
-}
-
-.live-chat-logo-fallback {
+.live-chat-brand {
   display: grid;
-  place-items: center;
-  color: #ffffff;
-  background: #050505;
-  font-family: "Cormorant Garamond", Georgia, serif;
-  font-weight: 700;
-}
-
-.live-chat-logo-fallback[hidden] {
-  display: none;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 5px;
 }
 
 @media (max-width: 780px) {
@@ -5721,17 +5706,8 @@ body.preloader-active {
     margin: 0;
   }
 
-  .live-chat-logo,
-  .live-chat-logo-fallback {
-    grid-row: auto;
-    order: 2;
-    width: 42px;
-    height: 42px;
-    margin-top: 2px;
-  }
-
   .live-chat-head h2 {
-    order: 3;
+    order: 2;
     max-width: 100%;
     font-size: 1.72rem;
     line-height: 1;

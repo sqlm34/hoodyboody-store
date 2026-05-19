@@ -58,8 +58,6 @@
     <aside class="live-chat-panel" id="liveChatPanel" aria-hidden="true">
       <div class="live-chat-head">
         <div class="live-chat-brand">
-          <img class="live-chat-logo" data-chat-logo alt="" hidden />
-          <span class="live-chat-logo-fallback" data-chat-logo-fallback aria-hidden="true">HB</span>
           <p class="eyebrow">online support</p>
           <h2 data-chat-title>Live chat</h2>
         </div>
@@ -107,8 +105,6 @@
   const closeButton = root.querySelector(".live-chat-close");
   const panel = root.querySelector(".live-chat-panel");
   const status = root.querySelector("[data-chat-status]");
-  const logoImage = root.querySelector("[data-chat-logo]");
-  const logoFallback = root.querySelector("[data-chat-logo-fallback]");
   const titleText = root.querySelector("[data-chat-title]");
   const messagesBox = root.querySelector("[data-chat-messages]");
   const form = root.querySelector("[data-chat-form]");
@@ -156,14 +152,6 @@
     root.style.setProperty("--chat-accent", settings.accentColor || "#263b73");
     root.style.setProperty("--chat-time-color", settings.timeColor || "#59616a");
     titleText.textContent = settings.logoText || "Live chat";
-    if (settings.logoImage) {
-      logoImage.src = settings.logoImage;
-      logoImage.hidden = false;
-      logoFallback.hidden = true;
-    } else {
-      logoImage.hidden = true;
-      logoFallback.hidden = false;
-    }
   }
 
   function setConversation(conversation) {
