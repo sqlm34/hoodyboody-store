@@ -114,7 +114,6 @@ const state = {
   cart: loadStoredCart(),
   reviewSummary: {},
   inventory: null,
-  threadColor: "Pine",
   uploads: []
 };
 
@@ -854,14 +853,6 @@ checkoutLink?.addEventListener("click", (event) => {
   window.location.href = "checkout.html";
 });
 
-document.querySelectorAll(".swatch").forEach((button) => {
-  button.addEventListener("click", () => {
-    document.querySelectorAll(".swatch").forEach((item) => item.classList.remove("active"));
-    button.classList.add("active");
-    state.threadColor = button.dataset.color;
-  });
-});
-
 function formatFileSize(bytes) {
   if (bytes < 1024 * 1024) {
     return `${Math.max(1, Math.round(bytes / 1024))} KB`;
@@ -946,7 +937,7 @@ document.querySelector("#customAdd")?.addEventListener("click", () => {
   addToCart({
     id: `custom-${Date.now()}`,
     title: `Custom: ${motif}`,
-    description: `${base}, palette: ${state.threadColor}, quantity request: ${quantity}${fileSummary}${notesSummary}`,
+    description: `${base}, quantity request: ${quantity}${fileSummary}${notesSummary}`,
     price: 3500,
     sizes: ["custom"],
     type: "custom",

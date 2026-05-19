@@ -124,7 +124,7 @@ window.NITKA_PRODUCTS = [
       { name: "Milky", value: "#f3eadb" }
     ],
     longDescription:
-      "Soft bomber with large embroidery on the back to order. You can adapt the motif, scale and thread palette.",
+      "Soft bomber with large embroidery on the back to order. You can adapt the motif, scale and placement.",
     gallery: [
       { label: "General view", focus: "64% 62%" },
       { label: "Back", focus: "66% 55%" },

@@ -16,35 +16,33 @@ function startServer() {
   });
 }
 
-test("clean location routes render SEO-ready content while staying noindex", async () => {
+test("homepage removes featured categories, service coverage, and thread palette controls", async () => {
   const { server, baseUrl } = await startServer();
   try {
-    const response = await fetch(`${baseUrl}/locations/indiana/indianapolis/`);
+    const response = await fetch(`${baseUrl}/`);
     const html = await response.text();
 
     assert.equal(response.status, 200);
     assert.match(response.headers.get("x-robots-tag") || "", /noindex/);
     assert.match(html, /<meta name="robots" content="noindex, nofollow, noarchive" \/>/);
-    assert.match(html, /Custom Embroidery in Indianapolis/);
-    assert.match(html, /FAQPage/);
-    assert.match(html, /<link rel="canonical" href="http:\/\/127\.0\.0\.1:\d+\/locations\/indiana\/indianapolis\/" \/>/);
-    assert.doesNotMatch(html, /Chicago/);
+    assert.doesNotMatch(html, /featured categories/i);
+    assert.doesNotMatch(html, /service coverage/i);
+    assert.doesNotMatch(html, /View service areas/i);
+    assert.doesNotMatch(html, /Thread palette/i);
+    assert.doesNotMatch(html, /data-service-city-row/);
   } finally {
     server.close();
   }
 });
 
-test("location pages stay static without automatic geo targeting", async () => {
+test("location pages and automatic geo targeting remain removed", async () => {
   const { server, baseUrl } = await startServer();
   try {
     const locations = await fetch(`${baseUrl}/locations/`);
-    const html = await locations.text();
+    const cityLocation = await fetch(`${baseUrl}/locations/indiana/indianapolis/`);
 
-    assert.equal(locations.status, 200);
-    assert.match(html, /Custom Embroidery in Indiana/);
-    assert.match(html, /Indianapolis/);
-    assert.doesNotMatch(html, /Choose a state/);
-    assert.doesNotMatch(html, /Chicago/);
+    assert.equal(locations.status, 404);
+    assert.equal(cityLocation.status, 404);
 
     const removedApi = await fetch(`${baseUrl}/api/geo-target`);
     const removedApiJson = await removedApi.json();
@@ -62,6 +60,7 @@ test("location pages stay static without automatic geo targeting", async () => {
     assert.match(homeHtml, /Too Cool <span class="hero-title-for">for<\/span> Stitches/);
     assert.doesNotMatch(homeHtml, /hero-title-location/);
     assert.doesNotMatch(homeHtml, /geo-location-link/);
+    assert.doesNotMatch(homeHtml, /\/locations\//);
   } finally {
     server.close();
   }
@@ -115,8 +114,7 @@ test("sitemap architecture is generated without opening indexing", async () => {
 
     assert.equal(sitemap.status, 200);
     assert.match(sitemap.headers.get("x-robots-tag") || "", /noindex/);
-    assert.match(sitemapXml, /\/locations\/indiana\/indianapolis\//);
-    assert.doesNotMatch(sitemapXml, /\/locations\/illinois\/chicago\//);
+    assert.doesNotMatch(sitemapXml, /\/locations\//);
     assert.match(sitemapXml, /\/embroidered-hoodies\//);
     assert.match(robotsTxt, /Disallow: \//);
     assert.match(robots.headers.get("x-robots-tag") || "", /noindex/);

@@ -62,57 +62,6 @@ function initSitePreloader() {
   }, durationMs);
 }
 
-const SERVICE_AREAS = {
-  stateName: "Indiana",
-  stateCode: "IN",
-  stateSlug: "indiana",
-  locationsUrl: "/locations/indiana/",
-  cities: [
-    { cityName: "Indianapolis", url: "/locations/indiana/indianapolis/" },
-    { cityName: "Fort Wayne", url: "/locations/indiana/fort-wayne/" },
-    { cityName: "Bloomington", url: "/locations/indiana/bloomington/" },
-    { cityName: "South Bend", url: "/locations/indiana/south-bend/" },
-    { cityName: "Evansville", url: "/locations/indiana/evansville/" }
-  ]
-};
-
-const escapeNavHtml = (value) =>
-  String(value || "").replace(/[&<>"']/g, (char) => {
-    const entities = {
-      "&": "&amp;",
-      "<": "&lt;",
-      ">": "&gt;",
-      '"': "&quot;",
-      "'": "&#39;"
-    };
-    return entities[char];
-  });
-
-function renderServiceCityChips(serviceAreas = SERVICE_AREAS, limit = 5) {
-  return serviceAreas.cities
-    .slice(0, limit)
-    .map((city) => `<a class="location-chip" href="${escapeNavHtml(city.url)}">${escapeNavHtml(city.cityName)}</a>`)
-    .join("");
-}
-
-function renderServiceFooterLinks(serviceAreas = SERVICE_AREAS) {
-  return `
-    <strong>${escapeNavHtml(serviceAreas.stateName)} service areas</strong>
-    ${serviceAreas.cities.slice(0, 5).map((city) => `<a href="${escapeNavHtml(city.url)}">${escapeNavHtml(city.cityName)}</a>`).join("")}
-    <a href="${escapeNavHtml(serviceAreas.locationsUrl)}">All ${escapeNavHtml(serviceAreas.stateName)} areas</a>
-  `;
-}
-
-function hydrateServiceAreas() {
-  document.querySelectorAll("[data-service-city-row]").forEach((row) => {
-    row.innerHTML = renderServiceCityChips();
-  });
-
-  document.querySelectorAll("[data-service-footer-links]").forEach((nav) => {
-    nav.innerHTML = renderServiceFooterLinks();
-  });
-}
-
 function enhanceSiteNavigation() {
   const header = document.querySelector(".topbar");
   const nav = header?.querySelector(".nav-links");
@@ -214,7 +163,6 @@ function enhanceSiteFooter() {
             <a href="/embroidered-hats/">Embroidered hats</a>
             <a href="/embroidered-tote-bags/">Embroidered tote bags</a>
           </nav>
-          <nav class="footer-links" aria-label="Service areas" data-service-footer-links>${renderServiceFooterLinks()}</nav>
           <nav class="footer-links" aria-label="Custom embroidery">
             <strong>Custom</strong>
             <a href="/#custom">Upload logo or design</a>
@@ -274,7 +222,6 @@ async function initSessionNav() {
 initSitePreloader();
 enhanceSiteNavigation();
 enhanceSiteFooter();
-hydrateServiceAreas();
 initSessionNav();
 
 function loadLiveChatWidget() {

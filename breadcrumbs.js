@@ -22,15 +22,6 @@
     "embroidered-t-shirts.html": "Embroidered T-Shirts",
     "embroidered-caps.html": "Embroidered Caps"
   };
-  const LOCATION_PAGES = {
-    "locations.html": ["Locations", "locations.html"],
-    "indiana.html": ["Indiana", "indiana.html"],
-    "indianapolis.html": ["Indianapolis", "indianapolis.html"],
-    "fort-wayne.html": ["Fort Wayne", "fort-wayne.html"],
-    "evansville.html": ["Evansville", "evansville.html"],
-    "south-bend.html": ["South Bend", "south-bend.html"],
-    "bloomington.html": ["Bloomington", "bloomington.html"]
-  };
   const STATIC_PAGES = {
     "checkout.html": "Checkout",
     "account.html": "Account",
@@ -137,14 +128,9 @@
       if (PRODUCT_SECTION_PAGES[returnPage]) {
         trail.push({ name: "Categories", url: "index.html#catalog" });
         trail.push({ name: PRODUCT_SECTION_PAGES[returnPage], url: returnPage });
-      } else if (LOCATION_PAGES[returnPage]) {
-        trail.push({ name: "Locations", url: "locations.html" });
-        if (returnPage !== "locations.html") {
-          trail.push({ name: LOCATION_PAGES[returnPage][0], url: returnPage });
-        }
       } else {
-      const categoryType = getCategoryType(product);
-      trail = addCategoryTrail(trail, categoryType);
+        const categoryType = getCategoryType(product);
+        trail = addCategoryTrail(trail, categoryType);
       }
       trail.push({
         name: product?.title || "Product",
@@ -154,20 +140,6 @@
     }
 
     await getCategories();
-    if (LOCATION_PAGES[pageName]) {
-      trail.push({
-        name: "Locations",
-        url: "locations.html"
-      });
-      if (pageName !== "locations.html") {
-        trail.push({
-          name: LOCATION_PAGES[pageName][0],
-          url: LOCATION_PAGES[pageName][1]
-        });
-      }
-      return trail;
-    }
-
     if (PRODUCT_SECTION_PAGES[pageName]) {
       trail.push({
         name: "Categories",
