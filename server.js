@@ -138,6 +138,7 @@ const defaultInventory = {
   "linen-shirt": 14,
   "soft-bomber": 6
 };
+const DEFAULT_PRODUCT_IMAGE = "assets/tshirt.webp";
 const defaultProducts = [
   {
     id: "linen-jacket",
@@ -148,7 +149,7 @@ const defaultProducts = [
     price: 12900,
     sizes: ["XS", "S", "M", "L"],
     focus: "38% 45%",
-    image: "assets/embroidered-collection.png",
+    image: DEFAULT_PRODUCT_IMAGE,
     colors: [
       { name: "Milky", value: "#f3eadb" },
       { name: "Sage", value: "#7f9b89" },
@@ -171,7 +172,7 @@ const defaultProducts = [
     price: 7900,
     sizes: ["S", "M", "L", "XL"],
     focus: "56% 35%",
-    image: "assets/embroidered-collection.png",
+    image: DEFAULT_PRODUCT_IMAGE,
     colors: [
       { name: "Graphite", value: "#3d4248" },
       { name: "Milky", value: "#f3eadb" },
@@ -194,7 +195,7 @@ const defaultProducts = [
     price: 9200,
     sizes: ["S", "M", "L"],
     focus: "72% 52%",
-    image: "assets/embroidered-collection.png",
+    image: DEFAULT_PRODUCT_IMAGE,
     colors: [
       { name: "Indigo", value: "#263b73" },
       { name: "White", value: "#f7f7f2" },
@@ -217,7 +218,7 @@ const defaultProducts = [
     price: 4200,
     sizes: ["One size"],
     focus: "44% 68%",
-    image: "assets/embroidered-collection.png",
+    image: DEFAULT_PRODUCT_IMAGE,
     colors: [
       { name: "Natural", value: "#d8c6a1" },
       { name: "Black", value: "#202326" },
@@ -240,7 +241,7 @@ const defaultProducts = [
     price: 8700,
     sizes: ["XS", "S", "M", "L", "XL"],
     focus: "28% 58%",
-    image: "assets/embroidered-collection.png",
+    image: DEFAULT_PRODUCT_IMAGE,
     colors: [
       { name: "White", value: "#f7f7f2" },
       { name: "Sky", value: "#9bbbd0" },
@@ -263,7 +264,7 @@ const defaultProducts = [
     price: 14800,
     sizes: ["S", "M", "L"],
     focus: "64% 62%",
-    image: "assets/embroidered-collection.png",
+    image: DEFAULT_PRODUCT_IMAGE,
     colors: [
       { name: "Black", value: "#202326" },
       { name: "Indigo", value: "#263b73" },
@@ -1250,7 +1251,7 @@ function publicProduct(product) {
     price: normalizedProduct.price,
     sizes: Array.isArray(normalizedProduct.sizes) ? normalizedProduct.sizes : [],
     focus: normalizedProduct.focus || "center",
-    image: normalizedProduct.image || "assets/embroidered-collection.png",
+    image: normalizedProduct.image || DEFAULT_PRODUCT_IMAGE,
     imageName: normalizedProduct.imageName || "",
     colors: Array.isArray(normalizedProduct.colors) ? normalizedProduct.colors : [],
     longDescription: normalizedProduct.longDescription || normalizedProduct.description,
@@ -1619,7 +1620,7 @@ function renderProductCards(products, fromPath) {
     .map(
       (product) => `
         <a class="location-product-card" href="/product.html?id=${encodeURIComponent(product.id)}&from=${encodeURIComponent(fromPath)}">
-          <span class="location-product-photo" style="--product-image: url('${escapeHtmlAttribute(product.image || "assets/embroidered-collection.png")}'); --focus: ${escapeHtmlAttribute(product.focus || "center")}"></span>
+          <span class="location-product-photo" style="--product-image: url('${escapeHtmlAttribute(product.image || DEFAULT_PRODUCT_IMAGE)}'); --focus: ${escapeHtmlAttribute(product.focus || "center")}"></span>
           <strong>${escapeHtmlAttribute(product.title)}</strong>
           <p>${escapeHtmlAttribute(product.description)}</p>
           <span class="price">${new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format((Number(product.price) || 0) / 100)}</span>
@@ -3172,7 +3173,7 @@ async function handleApi(req, res) {
         badge: "new",
         description: "Short product description.",
         longDescription: "Detailed product description.",
-        image: "assets/embroidered-collection.png",
+        image: DEFAULT_PRODUCT_IMAGE,
         imageName: "",
         focus: "50% 50%",
         price: 0,
@@ -3180,7 +3181,7 @@ async function handleApi(req, res) {
         isDigital: false,
         shipping: getDefaultProductShipping({ type: "tops" }),
         colors: [{ name: "Black", value: "#202326" }],
-        gallery: [{ label: "General view", focus: "50% 50%", image: "assets/embroidered-collection.png" }]
+        gallery: [{ label: "General view", focus: "50% 50%", image: DEFAULT_PRODUCT_IMAGE }]
       };
       const productPatch = sanitizeProductPatch(body, baseProduct);
       const nextProduct = productPatch.product;
@@ -3389,7 +3390,7 @@ async function handleApi(req, res) {
       }
 
       const nextCover = nextGallery.find((item) => item?.image);
-      const nextImage = product.image === imageUrl ? nextCover?.image || "assets/embroidered-collection.png" : product.image;
+      const nextImage = product.image === imageUrl ? nextCover?.image || DEFAULT_PRODUCT_IMAGE : product.image;
       const nextImageName = product.image === imageUrl ? nextCover?.label || "" : product.imageName || "";
 
       delete db.productImages[imageId];

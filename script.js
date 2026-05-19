@@ -1,5 +1,6 @@
 let products = window.NITKA_PRODUCTS || [];
 
+const DEFAULT_PRODUCT_IMAGE = "assets/tshirt.webp";
 const CART_STORAGE_KEY = "nitka-cart";
 const DISCOUNT_THRESHOLD = 20000;
 const DISCOUNT_LABEL = "10%";
@@ -587,7 +588,7 @@ function renderCatalog() {
           tabindex="0"
           aria-label="View details for ${escapeHtml(product.title)}"
         >
-          <div class="product-image" style="--focus: ${product.focus}; --product-image: url('${escapeHtml(product.image || "assets/embroidered-collection.png")}')">
+          <div class="product-image" style="--focus: ${product.focus}; --product-image: url('${escapeHtml(product.image || DEFAULT_PRODUCT_IMAGE)}')">
             <span class="product-badge">${escapeHtml(product.badge)}</span>
           </div>
           <div class="product-body">

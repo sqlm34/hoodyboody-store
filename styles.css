@@ -1,4 +1,4 @@
-@import url("https://fonts.googleapis.com/css2?family=Unbounded:wght@400;500;600;700;800;900&display=swap");
+@import url("https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;500;600;700&family=Jost:wght@400;500;600;700&family=Unbounded:wght@400;500;600;700;800;900&display=swap");
 
 /* Theme */
 :root {
@@ -1514,7 +1514,7 @@ h3 {
 .location-product-photo {
   min-height: 180px;
   border-radius: 8px;
-  background-image: var(--product-image, url("assets/embroidered-collection.png"));
+  background-image: var(--product-image, url("assets/tshirt.webp"));
   background-position: var(--focus, center);
   background-size: cover;
 }
@@ -1711,7 +1711,7 @@ h3 {
   position: relative;
   min-height: 238px;
   border-radius: 7px 7px 0 0;
-  background-image: var(--product-image, url("assets/embroidered-collection.png"));
+  background-image: var(--product-image, url("assets/tshirt.webp"));
   background-position: var(--focus, center);
   background-repeat: no-repeat;
   background-size: cover;
@@ -3376,7 +3376,7 @@ textarea:focus {
   overflow: hidden;
   border-radius: 7px;
   background-color: #f8faf8;
-  background-image: var(--product-image, url("assets/embroidered-collection.png"));
+  background-image: var(--product-image, url("assets/tshirt.webp"));
   background-position: var(--focus, center);
   background-repeat: no-repeat;
   background-size: cover;
@@ -3414,7 +3414,7 @@ textarea:focus {
   min-height: 0;
   border-radius: 8px;
   border: 1px solid var(--line);
-  background-image: var(--product-image, url("assets/embroidered-collection.png"));
+  background-image: var(--product-image, url("assets/tshirt.webp"));
   background-position: var(--focus, center);
   background-repeat: no-repeat;
   background-size: cover;
@@ -3508,7 +3508,7 @@ textarea:focus {
   display: block;
   aspect-ratio: 1 / 1;
   border-radius: 6px;
-  background-image: var(--product-image, url("assets/embroidered-collection.png"));
+  background-image: var(--product-image, url("assets/tshirt.webp"));
   background-position: var(--focus, center);
   background-repeat: no-repeat;
   background-size: cover;
@@ -3822,7 +3822,7 @@ textarea:focus {
   display: block;
   aspect-ratio: 1 / 1;
   border-radius: 6px;
-  background-image: var(--product-image, url("assets/embroidered-collection.png"));
+  background-image: var(--product-image, url("assets/tshirt.webp"));
   background-position: var(--focus, center);
   background-repeat: no-repeat;
   background-size: cover;
@@ -4378,5 +4378,702 @@ textarea:focus {
 
   .thumbnail {
     flex-basis: 96px;
+  }
+}
+
+/* Rubi-inspired editorial storefront */
+:root {
+  --ink: #050505;
+  --muted: #626262;
+  --line: #dfddd3;
+  --paper: #ffffff;
+  --white: #ffffff;
+  --pine: #111111;
+  --coral: #c65a43;
+  --indigo: #050505;
+  --gold: #a99255;
+  --rubi-cream: #e9e5d7;
+  --rubi-smoke: #f7f6f1;
+  --shadow: 0 20px 45px rgba(5, 5, 5, 0.1);
+}
+
+body {
+  background: #ffffff;
+  color: var(--ink);
+  font-family: "Jost", Arial, sans-serif;
+  font-size: 16px;
+  line-height: 1.55;
+}
+
+h1,
+h2,
+h3,
+.brand,
+.site-footer .brand,
+.catalog-section-title {
+  font-family: "Cormorant Garamond", Georgia, serif;
+  font-weight: 600;
+  letter-spacing: 0;
+}
+
+.topbar {
+  position: absolute;
+  min-height: 92px;
+  padding: 28px 5.2vw;
+  border: 0;
+  background: transparent;
+  color: #ffffff;
+  box-shadow: none;
+  backdrop-filter: none;
+}
+
+.checkout-topbar,
+.category-page .topbar {
+  position: fixed;
+  background: #ffffff;
+  color: #050505;
+  border-bottom: 1px solid var(--line);
+}
+
+.brand {
+  gap: 0;
+  font-size: 1.72rem;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  text-transform: uppercase;
+}
+
+.brand-mark {
+  display: none;
+}
+
+.nav-links {
+  gap: clamp(22px, 3.3vw, 52px);
+}
+
+.nav-links a,
+.nav-group-button,
+.nav-subgroup-button {
+  padding: 0 0 4px;
+  border-radius: 0;
+  color: currentColor;
+  font-size: 0.82rem;
+  font-weight: 700;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+}
+
+.nav-links a:hover,
+.nav-links a:focus-visible,
+.nav-group-button:hover,
+.nav-group-button:focus-visible,
+.nav-subgroup-button:hover,
+.nav-subgroup-button:focus-visible {
+  color: currentColor;
+  background: transparent;
+  box-shadow: inset 0 -1px 0 currentColor;
+}
+
+.top-actions {
+  gap: 16px;
+}
+
+.account-pill,
+.icon-button {
+  border-color: currentColor;
+  border-radius: 0;
+  background: transparent;
+  color: currentColor;
+  box-shadow: none;
+}
+
+.account-pill {
+  min-height: 34px;
+  padding: 4px 0;
+  border: 0;
+  font-size: 0.74rem;
+  font-weight: 700;
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+}
+
+.icon-button {
+  width: 40px;
+  height: 40px;
+  border: 0;
+}
+
+.cart-count {
+  top: 0;
+  right: -3px;
+  min-width: 18px;
+  height: 18px;
+  color: #ffffff;
+  background: #050505;
+  font-family: "Jost", Arial, sans-serif;
+  font-size: 0.68rem;
+}
+
+.hero {
+  min-height: 580px;
+  height: min(760px, 78vh);
+  isolation: isolate;
+  color: #ffffff;
+  background: #111111;
+}
+
+.hero-media {
+  background-image: url("assets/embroidered-collection.png");
+  background-position: center;
+  background-size: cover;
+  filter: saturate(0.72) contrast(1.08) brightness(0.72);
+  transform: scale(1.01);
+}
+
+.hero-overlay {
+  background:
+    linear-gradient(180deg, rgba(0, 0, 0, 0.44), rgba(0, 0, 0, 0.1) 42%, rgba(0, 0, 0, 0.34)),
+    linear-gradient(90deg, rgba(0, 0, 0, 0.34), transparent 28%, rgba(0, 0, 0, 0.24));
+}
+
+.hero-content {
+  display: grid;
+  width: min(1040px, calc(100% - 48px));
+  min-height: 100%;
+  place-items: center;
+  margin: 0 auto;
+  padding: 134px 0 74px;
+  text-align: center;
+}
+
+.hero .eyebrow {
+  display: none;
+}
+
+.hero h1 {
+  max-width: 980px;
+  margin: 0;
+  color: #ffffff;
+  font-size: clamp(4.6rem, 8vw, 8.6rem);
+  font-weight: 500;
+  line-height: 0.82;
+  text-transform: uppercase;
+  text-wrap: balance;
+}
+
+.hero-copy {
+  max-width: 520px;
+  margin: 22px auto 0;
+  color: rgba(255, 255, 255, 0.86);
+  font-size: 1rem;
+}
+
+.hero-actions {
+  justify-content: center;
+  margin-top: 24px;
+}
+
+.button {
+  min-height: 44px;
+  border-radius: 0;
+  padding: 12px 22px;
+  font-family: "Jost", Arial, sans-serif;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+.button.primary {
+  color: #ffffff;
+  background: #050505;
+  border-color: #050505;
+}
+
+.button.primary:hover,
+.button.primary:focus-visible {
+  color: #050505;
+  background: #ffffff;
+}
+
+.button.ghost {
+  color: #ffffff;
+  border-color: rgba(255, 255, 255, 0.88);
+  background: transparent;
+}
+
+.button.ghost:hover,
+.button.ghost:focus-visible {
+  color: #050505;
+  background: #ffffff;
+}
+
+.button.ghost.dark {
+  color: #050505;
+  border-color: #050505;
+  background: transparent;
+}
+
+.button.ghost.dark:hover,
+.button.ghost.dark:focus-visible {
+  color: #ffffff;
+  border-color: #050505;
+  background: #050505;
+}
+
+.eyebrow {
+  margin-bottom: 14px;
+  color: var(--gold);
+  font-size: 0.76rem;
+  font-weight: 700;
+  letter-spacing: 0.36em;
+  text-transform: uppercase;
+}
+
+.shop-band {
+  padding: clamp(86px, 9vw, 150px) 5.2vw clamp(92px, 11vw, 170px);
+  background: #ffffff;
+}
+
+.shop-band .section-head {
+  display: block;
+  width: min(1320px, 100%);
+  margin-bottom: clamp(44px, 6vw, 88px);
+}
+
+.shop-band .section-head h2,
+.home-link-inner h2,
+.business-inner h2,
+.custom-copy h2,
+.order-copy h2 {
+  font-size: clamp(3rem, 6vw, 6.6rem);
+  line-height: 0.86;
+  text-transform: uppercase;
+}
+
+.section-copy {
+  max-width: 560px;
+  color: #303030;
+  font-size: 1rem;
+}
+
+.catalog-sections {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: clamp(36px, 5vw, 76px);
+  width: min(1320px, 100%);
+  margin: 0 auto;
+}
+
+.catalog-section-card,
+.catalog-section-card.reverse {
+  display: grid;
+  grid-template-columns: 1fr;
+  min-height: 0;
+  overflow: visible;
+  border: 0;
+  background: transparent;
+  color: #050505;
+  text-align: center;
+  box-shadow: none;
+  transition: transform 0.25s ease;
+}
+
+.catalog-section-card:hover,
+.catalog-section-card:focus-visible,
+.catalog-section-card.active {
+  transform: translateY(-6px);
+  box-shadow: none;
+}
+
+.catalog-section-card.reverse .catalog-section-photo,
+.catalog-section-card.reverse .catalog-section-content {
+  grid-column: auto;
+  grid-row: auto;
+}
+
+.catalog-section-photo {
+  min-height: clamp(320px, 33vw, 460px);
+  background-color: #ffffff;
+  background-position: var(--focus, center);
+  background-repeat: no-repeat;
+  background-size: contain;
+}
+
+.catalog-section-content {
+  display: grid;
+  gap: 12px;
+  max-width: 360px;
+  min-height: 0;
+  place-content: start center;
+  margin: 0 auto;
+  padding: 22px 0 0;
+}
+
+.catalog-section-kicker {
+  color: var(--gold);
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.28em;
+  text-transform: uppercase;
+}
+
+.catalog-section-title {
+  color: #050505;
+  font-size: clamp(2.3rem, 3.6vw, 4.4rem);
+  font-weight: 500;
+  line-height: 0.88;
+  text-transform: uppercase;
+}
+
+.catalog-section-copy {
+  color: #303030;
+}
+
+.catalog-section-action {
+  justify-self: center;
+  border-bottom: 1px solid currentColor;
+  color: #050505;
+  font-size: 0.76rem;
+  font-weight: 700;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+}
+
+.catalog-grid {
+  grid-template-columns: repeat(4, minmax(150px, 1fr));
+  gap: clamp(48px, 6vw, 96px) clamp(30px, 4vw, 70px);
+}
+
+.product-card {
+  display: block;
+  overflow: visible;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+  text-align: center;
+}
+
+.product-card:hover,
+.product-card:focus-visible {
+  border-color: transparent;
+  box-shadow: none;
+  transform: translateY(-6px);
+}
+
+.product-image {
+  min-height: 310px;
+  border-radius: 0;
+  background-color: #ffffff;
+  background-size: contain;
+}
+
+.product-badge,
+.product-body p,
+.product-card-footer {
+  display: none;
+}
+
+.product-body {
+  display: block;
+  padding: 22px 0 0;
+}
+
+.product-meta {
+  display: grid;
+  justify-content: center;
+  gap: 10px;
+}
+
+.product-meta h3 {
+  max-width: 220px;
+  margin: 0 auto;
+  color: #050505;
+  font-family: "Cormorant Garamond", Georgia, serif;
+  font-size: clamp(1.7rem, 2vw, 2.25rem);
+  font-weight: 500;
+  line-height: 0.9;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+}
+
+.price,
+.product-page-price {
+  color: #182333;
+  font-size: 1rem;
+  font-weight: 500;
+  letter-spacing: 0.02em;
+}
+
+.home-link-band,
+.custom-band,
+.order-band,
+.business-band {
+  padding: clamp(82px, 8vw, 138px) 5.2vw;
+}
+
+.custom-band,
+.business-band {
+  background: var(--rubi-cream);
+}
+
+.home-link-band,
+.order-band {
+  background: #ffffff;
+}
+
+.custom-inner,
+.order-inner,
+.business-inner,
+.home-link-inner {
+  width: min(1180px, 100%);
+  gap: clamp(42px, 6vw, 88px);
+}
+
+.custom-panel,
+.order-form,
+.checkout-panel,
+.summary-panel,
+.product-page-info,
+.seo-link-card,
+.location-chip {
+  border: 1px solid var(--line);
+  border-radius: 0;
+  background: #ffffff;
+  box-shadow: none;
+}
+
+label,
+fieldset,
+legend {
+  color: #050505;
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+input,
+select,
+textarea {
+  border-width: 0 0 1px;
+  border-color: #9c9a91;
+  border-radius: 0;
+  padding: 13px 0;
+  background: transparent;
+  color: #050505;
+  font-family: "Jost", Arial, sans-serif;
+  letter-spacing: 0;
+}
+
+input:focus,
+select:focus,
+textarea:focus {
+  border-color: #050505;
+  outline: 0;
+  background: transparent;
+}
+
+.swatch,
+.upload-icon,
+.file-thumb,
+.cart-drawer,
+.cart-item,
+.free-delivery-notice,
+.thank-you-dialog,
+.option-tile,
+.summary-item,
+.choice-pill,
+.color-choice,
+.review-card,
+.order-card,
+.live-chat-panel,
+.live-chat-button,
+.live-chat-message,
+.chat-thread-message {
+  border-radius: 0;
+}
+
+.upload-box {
+  border-color: #9c9a91;
+  border-radius: 0;
+  background: transparent;
+}
+
+.site-footer {
+  position: relative;
+  overflow: hidden;
+  padding: clamp(76px, 9vw, 130px) 5.2vw 40px;
+  background: #050505;
+  color: #ffffff;
+}
+
+.site-footer-inner {
+  grid-template-columns: minmax(260px, 1.2fr) repeat(3, minmax(130px, 0.75fr));
+  gap: clamp(34px, 5vw, 80px);
+}
+
+.site-footer .brand {
+  color: #ffffff;
+  font-size: clamp(1.8rem, 3vw, 3.2rem);
+  text-transform: uppercase;
+}
+
+.footer-links strong {
+  font-size: 0.82rem;
+  letter-spacing: 0.34em;
+  text-transform: uppercase;
+}
+
+.footer-links a {
+  font-size: 0.82rem;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+}
+
+.cart-head h2,
+.checkout-hero h1,
+.product-page-info h1 {
+  font-family: "Cormorant Garamond", Georgia, serif;
+  text-transform: uppercase;
+}
+
+.product-page,
+.checkout-page,
+.auth-layout,
+.account-layout,
+.admin-page,
+.category-page {
+  background: #ffffff;
+  font-family: "Jost", Arial, sans-serif;
+}
+
+.product-photo-main,
+.thumbnail-image,
+.admin-product-tile-photo,
+.admin-product-preview {
+  border-radius: 0;
+  background-size: contain;
+}
+
+@media (max-width: 1100px) {
+  .catalog-sections,
+  .catalog-grid {
+    grid-template-columns: repeat(2, minmax(150px, 1fr));
+  }
+}
+
+@media (max-width: 920px) {
+  .topbar {
+    position: static;
+    min-height: 76px;
+    padding: 18px 24px;
+    background: #ffffff;
+    color: #050505;
+  }
+
+  .checkout-topbar,
+  .category-page .topbar {
+    position: fixed;
+  }
+
+  .nav-links {
+    display: none;
+  }
+
+  .brand {
+    font-size: 1.45rem;
+  }
+
+  .hero {
+    height: 560px;
+    min-height: 560px;
+    margin-top: 0;
+  }
+
+  .hero-content {
+    width: min(680px, calc(100% - 32px));
+    padding: 60px 0 54px;
+  }
+
+  .hero h1 {
+    font-size: clamp(3.3rem, 14vw, 5.4rem);
+  }
+
+  .custom-inner,
+  .order-inner,
+  .business-inner {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 620px) {
+  .topbar {
+    display: flex;
+    min-height: 70px;
+    padding: 16px 20px;
+  }
+
+  .brand span:last-child {
+    max-width: none;
+  }
+
+  .top-actions {
+    max-width: none;
+  }
+
+  .account-pill:not(.logout-button):not(.cart-icon-link),
+  .logout-button {
+    display: none !important;
+  }
+
+  .hero {
+    height: 382px;
+    min-height: 382px;
+  }
+
+  .hero-media {
+    background-position: 38% center;
+  }
+
+  .hero-content {
+    padding: 42px 0 38px;
+  }
+
+  .hero h1 {
+    font-size: clamp(3rem, 16vw, 4.4rem);
+  }
+
+  .hero-copy,
+  .hero-actions {
+    display: none;
+  }
+
+  .shop-band,
+  .home-link-band,
+  .custom-band,
+  .order-band,
+  .business-band {
+    padding: 72px 20px;
+  }
+
+  .catalog-sections,
+  .catalog-grid {
+    grid-template-columns: 1fr;
+    gap: 54px;
+  }
+
+  .catalog-section-photo,
+  .product-image {
+    min-height: 280px;
+  }
+
+  .shop-band .section-head h2,
+  .home-link-inner h2,
+  .business-inner h2,
+  .custom-copy h2,
+  .order-copy h2 {
+    font-size: 3rem;
   }
 }

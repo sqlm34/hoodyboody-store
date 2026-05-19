@@ -1,5 +1,5 @@
 const CART_STORAGE_KEY = "nitka-cart";
-const DEFAULT_IMAGE_URL = "assets/embroidered-collection.png";
+const DEFAULT_IMAGE_URL = "assets/tshirt.webp";
 const DISCOUNT_THRESHOLD = 20000;
 const DISCOUNT_LABEL = "10%";
 const DISCOUNT_RATE = 0.1;

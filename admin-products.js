@@ -1,6 +1,6 @@
 let products = window.NITKA_PRODUCTS || [];
 
-const DEFAULT_IMAGE_URL = "assets/embroidered-collection.png";
+const DEFAULT_IMAGE_URL = "assets/tshirt.webp";
 const DEFAULT_SIZE_OPTIONS = ["XXS", "XS", "S", "M", "L", "XL", "XXL", "One size"];
 const PACKAGE_TYPE_OPTIONS = ["parcel", "soft_pack", "padded_envelope", "box", "tube", "custom"];
 const DEFAULT_CATEGORY_OPTIONS = [

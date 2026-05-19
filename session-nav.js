@@ -65,8 +65,8 @@ function enhanceSiteNavigation() {
 
   header.dataset.siteMenuReady = "true";
   nav.innerHTML = `
-    <a href="/#catalog">Categories</a>
-    ${renderNavGroup("Products", PRODUCT_NAV_ITEMS)}
+    <a href="/">Home</a>
+    ${renderNavGroup("Shop", PRODUCT_NAV_ITEMS)}
     <a href="/locations/">Locations</a>
     <a href="/#custom">Embroidery</a>
     <a href="/checkout.html">Checkout</a>
