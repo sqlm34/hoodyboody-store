@@ -159,12 +159,20 @@ async function loadAccount() {
       return;
     }
 
-    const { orders } = await api("/api/orders");
     fillProfile(user);
-    renderOrders(orders);
     setViewMode();
   } catch {
     window.location.href = "auth.html";
+    return;
+  }
+
+  try {
+    const { orders } = await api("/api/orders");
+    renderOrders(orders);
+  } catch (error) {
+    renderOrders([]);
+    profileNote.textContent = error.message || "Profile loaded, but order history is temporarily unavailable.";
+    profileNote.classList.add("error");
   }
 }
 

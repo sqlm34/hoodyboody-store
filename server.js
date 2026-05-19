@@ -815,6 +815,14 @@ function normalizeEmail(email) {
   return String(email || "").trim().toLowerCase();
 }
 
+function normalizeLoginIdentifier(value) {
+  return String(value || "").trim().toLowerCase();
+}
+
+function normalizePhoneIdentifier(value) {
+  return String(value || "").replace(/\D/g, "");
+}
+
 function hashPassword(password, salt) {
   return crypto.scryptSync(password, salt, 64).toString("hex");
 }
@@ -2497,9 +2505,14 @@ async function handleApi(req, res) {
 
     if (url.pathname === "/api/login" && method === "POST") {
       const body = await readJson(req);
-      const email = normalizeEmail(body.email);
+      const login = normalizeLoginIdentifier(body.login || body.email);
+      const loginPhone = normalizePhoneIdentifier(login);
       const password = String(body.password || "");
-      const user = db.users.find((item) => item.email === email);
+      const user = db.users.find((item) => {
+        if (normalizeEmail(item.email) === login) return true;
+        const userPhone = normalizePhoneIdentifier(item.phone);
+        return loginPhone && userPhone && (userPhone === loginPhone || userPhone.endsWith(loginPhone) || loginPhone.endsWith(userPhone));
+      });
 
       if (!user || hashPassword(password, user.passwordSalt) !== user.passwordHash) {
         sendJson(res, 401, { message: "Incorrect email or password." });

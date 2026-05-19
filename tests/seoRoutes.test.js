@@ -66,6 +66,44 @@ test("geo target pages only expose the active state", async () => {
   }
 });
 
+test("customer can log in with phone and keep account session", async () => {
+  const { server, baseUrl } = await startServer();
+  try {
+    const register = await fetch(`${baseUrl}/api/register`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        name: "Transition Test",
+        phone: "+1 317 555 0199",
+        email: "transition-test@example.com",
+        password: "secret123"
+      })
+    });
+    assert.equal(register.status, 201);
+
+    const login = await fetch(`${baseUrl}/api/login`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        login: "3175550199",
+        password: "secret123"
+      })
+    });
+    const cookie = login.headers.get("set-cookie") || "";
+    assert.equal(login.status, 200);
+    assert.match(cookie, /nitka_session=/);
+
+    const session = await fetch(`${baseUrl}/api/session`, {
+      headers: { Cookie: cookie }
+    });
+    const sessionJson = await session.json();
+    assert.equal(session.status, 200);
+    assert.equal(sessionJson.user.email, "transition-test@example.com");
+  } finally {
+    server.close();
+  }
+});
+
 test("sitemap architecture is generated without opening indexing", async () => {
   const { server, baseUrl } = await startServer();
   try {

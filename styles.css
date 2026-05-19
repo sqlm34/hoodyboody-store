@@ -5452,3 +5452,101 @@ textarea:focus {
     height: 286px;
   }
 }
+
+/* Smooth state transitions */
+:root {
+  --motion-fast: 150ms;
+  --motion-base: 240ms;
+  --motion-slow: 420ms;
+  --motion-ease: cubic-bezier(0.22, 1, 0.36, 1);
+  --motion-ease-soft: cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+:where(
+  a,
+  button,
+  input,
+  select,
+  textarea,
+  summary,
+  label,
+  [role="button"],
+  [tabindex],
+  .button,
+  .account-pill,
+  .icon-button,
+  .site-menu-toggle,
+  .nav-links,
+  .nav-links a,
+  .nav-group,
+  .nav-group-button,
+  .nav-dropdown,
+  .nav-subgroup-button,
+  .nav-submenu,
+  .product-card,
+  .product-image,
+  .product-card-actions,
+  .catalog-section-card,
+  .catalog-section-title,
+  .catalog-section-kicker,
+  .seo-link-card,
+  .location-chip,
+  .checkout-panel,
+  .summary-panel,
+  .custom-panel,
+  .order-form,
+  .cart-drawer,
+  .cart-item,
+  .scrim,
+  .swatch,
+  .choice-pill,
+  .option-tile,
+  .thumbnail,
+  .thumbnail-image,
+  .upload-box,
+  .file-thumb,
+  .review-card,
+  .order-card,
+  .admin-product-tile,
+  .live-chat-button,
+  .live-chat-panel,
+  .live-chat-message
+) {
+  transition-duration: var(--motion-base);
+  transition-property: background-color, border-color, box-shadow, color, opacity, filter, transform, visibility;
+  transition-timing-function: var(--motion-ease);
+}
+
+:where(input, select, textarea) {
+  transition-duration: var(--motion-fast);
+}
+
+:where(.cart-drawer, .live-chat-panel, .nav-dropdown, .nav-submenu, .scrim) {
+  transition-duration: var(--motion-slow);
+  transition-timing-function: var(--motion-ease-soft);
+}
+
+:where(a, button, .button, .account-pill, .icon-button, .site-menu-toggle, .swatch, .choice-pill, .option-tile, .thumbnail):active {
+  transform: translateY(1px);
+}
+
+:where(a, button, input, select, textarea, summary, [tabindex]):focus-visible {
+  outline: 1px solid currentColor;
+  outline-offset: 4px;
+}
+
+:where(.product-card, .catalog-section-card, .seo-link-card, .location-chip, .order-card, .review-card, .admin-product-tile):hover,
+:where(.product-card, .catalog-section-card, .seo-link-card, .location-chip, .order-card, .review-card, .admin-product-tile):focus-within {
+  transition-duration: var(--motion-base);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    scroll-behavior: auto !important;
+    transition-duration: 1ms !important;
+    animation-duration: 1ms !important;
+    animation-iteration-count: 1 !important;
+  }
+}

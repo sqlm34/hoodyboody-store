@@ -17,6 +17,16 @@ function setNote(element, text, isError = false) {
   element.classList.toggle("error", isError);
 }
 
+async function openCabinetAfterAuth(note) {
+  const { user } = await api("/api/session");
+  if (!user) {
+    throw new Error("Login succeeded, but the browser did not save the session. Please enable cookies and try again.");
+  }
+
+  setNote(note, "Done. Opening cabinet...");
+  window.location.assign("account.html");
+}
+
 async function redirectIfLoggedIn() {
   try {
     const { user } = await api("/api/session");
@@ -54,7 +64,7 @@ document.querySelector("#registerForm").addEventListener("submit", async (event)
       })
     });
     setNote(note, "Cabinet created. Opening profile...");
-    window.location.href = "account.html";
+    await openCabinetAfterAuth(note);
   } catch (error) {
     setNote(note, error.message, true);
   }
@@ -70,12 +80,11 @@ document.querySelector("#loginForm").addEventListener("submit", async (event) =>
     await api("/api/login", {
       method: "POST",
       body: JSON.stringify({
-        email: data.email,
+        login: data.login,
         password: data.password
       })
     });
-    setNote(note, "Done. Opening cabinet...");
-    window.location.href = "account.html";
+    await openCabinetAfterAuth(note);
   } catch (error) {
     setNote(note, error.message, true);
   }
