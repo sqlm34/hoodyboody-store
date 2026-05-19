@@ -21,16 +21,21 @@ const GEO_FALLBACK = {
   stateName: "Indiana",
   stateCode: "IN",
   stateSlug: "indiana",
+  cityName: "Indianapolis",
+  citySlug: "indianapolis",
+  cityUrl: "/locations/indiana/indianapolis/",
   locationsUrl: "/locations/indiana/",
   cities: [
-    { cityName: "Indianapolis", url: "/locations/indiana/indianapolis/" },
-    { cityName: "Fort Wayne", url: "/locations/indiana/fort-wayne/" },
-    { cityName: "Bloomington", url: "/locations/indiana/bloomington/" },
-    { cityName: "South Bend", url: "/locations/indiana/south-bend/" },
-    { cityName: "Evansville", url: "/locations/indiana/evansville/" }
+    { cityName: "Indianapolis", slug: "indianapolis", stateName: "Indiana", stateCode: "IN", stateSlug: "indiana", url: "/locations/indiana/indianapolis/", latitude: 39.7684, longitude: -86.1581 },
+    { cityName: "Fort Wayne", slug: "fort-wayne", stateName: "Indiana", stateCode: "IN", stateSlug: "indiana", url: "/locations/indiana/fort-wayne/", latitude: 41.0793, longitude: -85.1394 },
+    { cityName: "Bloomington", slug: "bloomington", stateName: "Indiana", stateCode: "IN", stateSlug: "indiana", url: "/locations/indiana/bloomington/", latitude: 39.1653, longitude: -86.5264 },
+    { cityName: "South Bend", slug: "south-bend", stateName: "Indiana", stateCode: "IN", stateSlug: "indiana", url: "/locations/indiana/south-bend/", latitude: 41.6764, longitude: -86.252 },
+    { cityName: "Evansville", slug: "evansville", stateName: "Indiana", stateCode: "IN", stateSlug: "indiana", url: "/locations/indiana/evansville/", latitude: 37.9716, longitude: -87.5711 }
   ]
 };
+GEO_FALLBACK.knownCities = GEO_FALLBACK.cities;
 let geoTargetPromise = null;
+let browserGeoRequested = false;
 
 const escapeNavHtml = (value) =>
   String(value || "").replace(/[&<>"']/g, (char) => {
@@ -44,19 +49,64 @@ const escapeNavHtml = (value) =>
     return entities[char];
   });
 
+function toFiniteNumber(value) {
+  if (value === null || value === undefined || String(value).trim() === "") return null;
+  const number = Number(value);
+  return Number.isFinite(number) ? number : null;
+}
+
+function normalizeGeoCity(city, fallback = {}) {
+  const stateSlug = String(city?.stateSlug || fallback.stateSlug || "").trim();
+  const slug = String(city?.slug || city?.citySlug || fallback.slug || "").trim();
+  return {
+    cityName: String(city?.cityName || fallback.cityName || "").trim(),
+    slug,
+    stateName: String(city?.stateName || fallback.stateName || "").trim(),
+    stateCode: String(city?.stateCode || fallback.stateCode || "").trim(),
+    stateSlug,
+    url: String(city?.url || (stateSlug && slug ? `/locations/${stateSlug}/${slug}/` : fallback.url || "")).trim(),
+    latitude: toFiniteNumber(city?.latitude ?? fallback.latitude),
+    longitude: toFiniteNumber(city?.longitude ?? fallback.longitude)
+  };
+}
+
 function normalizeGeoTarget(data) {
   const stateName = String(data?.stateName || GEO_FALLBACK.stateName).trim() || GEO_FALLBACK.stateName;
+  const stateCode = String(data?.stateCode || GEO_FALLBACK.stateCode).trim() || GEO_FALLBACK.stateCode;
+  const stateSlug = String(data?.stateSlug || GEO_FALLBACK.stateSlug).trim() || GEO_FALLBACK.stateSlug;
   const locationsUrl = String(data?.locationsUrl || GEO_FALLBACK.locationsUrl).trim() || GEO_FALLBACK.locationsUrl;
   const cities = Array.isArray(data?.cities) && data.cities.length ? data.cities : GEO_FALLBACK.cities;
+  const normalizedCities = cities
+    .map((city) => normalizeGeoCity(city, { stateName, stateCode, stateSlug }))
+    .filter((city) => city.cityName && city.url);
+  const fallbackCity = normalizedCities[0] || normalizeGeoCity({
+    cityName: GEO_FALLBACK.cityName,
+    slug: GEO_FALLBACK.citySlug,
+    stateName,
+    stateCode,
+    stateSlug,
+    url: GEO_FALLBACK.cityUrl
+  });
+  const cityName = String(data?.cityName || fallbackCity.cityName || GEO_FALLBACK.cityName).trim();
+  const citySlug = String(data?.citySlug || fallbackCity.slug || GEO_FALLBACK.citySlug).trim();
+  const cityUrl = String(data?.cityUrl || fallbackCity.url || GEO_FALLBACK.cityUrl).trim();
+  const knownCitiesSource = Array.isArray(data?.knownCities) && data.knownCities.length ? data.knownCities : normalizedCities;
+  const knownCities = knownCitiesSource
+    .map((city) => normalizeGeoCity(city, { stateName, stateCode, stateSlug }))
+    .filter((city) => city.cityName && city.url);
+
   return {
     ...GEO_FALLBACK,
     ...data,
     stateName,
+    stateCode,
+    stateSlug,
+    cityName,
+    citySlug,
+    cityUrl,
     locationsUrl,
-    cities: cities.map((city) => ({
-      cityName: String(city.cityName || "").trim(),
-      url: String(city.url || "").trim()
-    })).filter((city) => city.cityName && city.url)
+    cities: normalizedCities,
+    knownCities: knownCities.length ? knownCities : normalizedCities
   };
 }
 
@@ -94,11 +144,124 @@ function renderGeoFooterLinks(geoTarget) {
   `;
 }
 
+function getGeoLocationLabel(geoTarget) {
+  const cityName = String(geoTarget?.cityName || "").trim();
+  const stateLabel = String(geoTarget?.stateCode || geoTarget?.stateName || "").trim();
+  if (cityName && stateLabel) return `${cityName}, ${stateLabel}`;
+  return cityName || stateLabel;
+}
+
+function renderHeroGeoTitle(geoTarget) {
+  const heroTitle = document.querySelector("[data-geo-hero-title]");
+  if (!heroTitle) return;
+
+  const locationLabel = getGeoLocationLabel(geoTarget);
+  const titleLocation = locationLabel ? ` <span class="hero-title-location">in ${escapeNavHtml(locationLabel)}</span>` : "";
+
+  heroTitle.innerHTML = `Too Cool <span class="hero-title-for">for</span> Stitches${titleLocation}`;
+  document.title = locationLabel ? `HOODYBOODY | Embroidery in ${locationLabel}` : "HOODYBOODY | Embroidery clothes";
+}
+
+function degreesToRadians(value) {
+  return (value * Math.PI) / 180;
+}
+
+function getDistanceKm(first, second) {
+  const firstLatitude = toFiniteNumber(first?.latitude);
+  const firstLongitude = toFiniteNumber(first?.longitude);
+  const secondLatitude = toFiniteNumber(second?.latitude);
+  const secondLongitude = toFiniteNumber(second?.longitude);
+  if ([firstLatitude, firstLongitude, secondLatitude, secondLongitude].some((value) => value === null)) return Infinity;
+
+  const earthRadiusKm = 6371;
+  const latitudeDistance = degreesToRadians(secondLatitude - firstLatitude);
+  const longitudeDistance = degreesToRadians(secondLongitude - firstLongitude);
+  const a =
+    Math.sin(latitudeDistance / 2) * Math.sin(latitudeDistance / 2) +
+    Math.cos(degreesToRadians(firstLatitude)) *
+      Math.cos(degreesToRadians(secondLatitude)) *
+      Math.sin(longitudeDistance / 2) *
+      Math.sin(longitudeDistance / 2);
+
+  return earthRadiusKm * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+}
+
+function findNearestKnownCity(geoTarget, coords) {
+  const knownCities = Array.isArray(geoTarget?.knownCities) ? geoTarget.knownCities : [];
+  return knownCities
+    .filter((city) => toFiniteNumber(city.latitude) !== null && toFiniteNumber(city.longitude) !== null)
+    .map((city) => ({ ...city, distanceKm: getDistanceKm(coords, city) }))
+    .sort((first, second) => first.distanceKm - second.distanceKm)[0] || null;
+}
+
+function applyCityToGeoTarget(geoTarget, city) {
+  if (!city) return geoTarget;
+  const stateSlug = city.stateSlug || geoTarget.stateSlug;
+  return {
+    ...geoTarget,
+    stateName: city.stateName || geoTarget.stateName,
+    stateCode: city.stateCode || geoTarget.stateCode,
+    stateSlug,
+    cityName: city.cityName || geoTarget.cityName,
+    citySlug: city.slug || geoTarget.citySlug,
+    cityUrl: city.url || geoTarget.cityUrl,
+    locationsUrl: stateSlug ? `/locations/${stateSlug}/` : geoTarget.locationsUrl
+  };
+}
+
+function applyBrowserPositionToHero(geoTarget) {
+  if (browserGeoRequested || !document.querySelector("[data-geo-hero-title]") || !navigator.geolocation) return;
+
+  const hasPromptedForGeo = () => {
+    try {
+      return sessionStorage.getItem("hoodyboodyGeoPrompted") === "true";
+    } catch {
+      return false;
+    }
+  };
+
+  const rememberGeoPrompt = () => {
+    try {
+      sessionStorage.setItem("hoodyboodyGeoPrompted", "true");
+    } catch {
+      // Ignore storage restrictions and continue with the browser permission flow.
+    }
+  };
+
+  const requestPosition = () => {
+    browserGeoRequested = true;
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        const nearestCity = findNearestKnownCity(geoTarget, {
+          latitude: position.coords.latitude,
+          longitude: position.coords.longitude
+        });
+        if (nearestCity) renderHeroGeoTitle(applyCityToGeoTarget(geoTarget, nearestCity));
+      },
+      () => {},
+      { enableHighAccuracy: false, timeout: 3500, maximumAge: 86400000 }
+    );
+  };
+
+  if (!navigator.permissions?.query) {
+    requestPosition();
+    return;
+  }
+
+  navigator.permissions
+    .query({ name: "geolocation" })
+    .then((permission) => {
+      if (permission.state === "denied") return;
+      if (permission.state === "prompt" && hasPromptedForGeo()) return;
+      if (permission.state === "prompt") rememberGeoPrompt();
+      requestPosition();
+    })
+    .catch(requestPosition);
+}
+
 function applyGeoTarget(geoTarget) {
-  document.querySelectorAll(".geo-location-link").forEach((link) => {
-    link.setAttribute("href", geoTarget.locationsUrl);
-    link.textContent = geoTarget.stateName;
-  });
+  renderHeroGeoTitle(geoTarget);
+  applyBrowserPositionToHero(geoTarget);
 
   document.querySelectorAll("[data-geo-city-row]").forEach((row) => {
     row.innerHTML = renderGeoCityChips(geoTarget);
@@ -123,7 +286,6 @@ function enhanceSiteNavigation() {
   nav.innerHTML = `
     <a href="/#catalog">Shop</a>
     <a href="/#custom">Embroidery</a>
-    <a class="geo-location-link" href="${GEO_FALLBACK.locationsUrl}">${GEO_FALLBACK.stateName}</a>
   `;
 
   const toggle = document.createElement("button");

@@ -49,6 +49,9 @@ test("geo target pages only expose the active state", async () => {
     assert.doesNotMatch(html, /Chicago/);
     assert.equal(geoTarget.status, 200);
     assert.equal(geoJson.stateSlug, "indiana");
+    assert.equal(geoJson.cityName, "Indianapolis");
+    assert.equal(geoJson.cityUrl, "/locations/indiana/indianapolis/");
+    assert.ok(geoJson.knownCities.some((city) => city.cityName === "Chicago" && city.stateSlug === "illinois"));
     assert.deepEqual(
       geoJson.cities.map((city) => city.stateSlug),
       geoJson.cities.map(() => "indiana")
@@ -57,10 +60,33 @@ test("geo target pages only expose the active state", async () => {
     const illinoisTarget = await fetch(`${baseUrl}/api/geo-target?state=illinois`);
     const illinoisJson = await illinoisTarget.json();
     assert.equal(illinoisJson.stateSlug, "illinois");
+    assert.equal(illinoisJson.cityName, "Chicago");
     assert.deepEqual(
       illinoisJson.cities.map((city) => city.stateSlug),
       illinoisJson.cities.map(() => "illinois")
     );
+
+    const chicagoTarget = await fetch(`${baseUrl}/api/geo-target`, {
+      headers: {
+        "x-vercel-ip-city": "Chicago",
+        "x-vercel-ip-country-region": "IL"
+      }
+    });
+    const chicagoJson = await chicagoTarget.json();
+    assert.equal(chicagoJson.stateSlug, "illinois");
+    assert.equal(chicagoJson.cityName, "Chicago");
+    assert.equal(chicagoJson.cityUrl, "/locations/illinois/chicago/");
+
+    const chicagoHome = await fetch(`${baseUrl}/`, {
+      headers: {
+        "x-vercel-ip-city": "Chicago",
+        "x-vercel-ip-country-region": "IL"
+      }
+    });
+    const chicagoHomeHtml = await chicagoHome.text();
+    assert.match(chicagoHomeHtml, /<title>HOODYBOODY \| Embroidery in Chicago, IL<\/title>/);
+    assert.match(chicagoHomeHtml, /hero-title-location">in Chicago, IL<\/span>/);
+    assert.doesNotMatch(chicagoHomeHtml, /geo-location-link/);
   } finally {
     server.close();
   }
