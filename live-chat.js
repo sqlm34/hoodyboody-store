@@ -1,6 +1,8 @@
 (function () {
   const STORAGE_KEY = "hoodyboody-live-chat";
   const MAX_ATTACHMENT_BYTES = 5_000_000;
+  const MAX_PHONE_DIGITS = 15;
+  const MAX_PHONE_LENGTH = 20;
 
   function loadStoredChat() {
     const raw = localStorage.getItem(STORAGE_KEY) || "";
@@ -69,21 +71,21 @@
       <div class="live-chat-profile">
         <label>
           Name
-          <input data-chat-name type="text" autocomplete="name" placeholder="Your name" />
+          <input data-chat-name type="text" autocomplete="name" placeholder="Your name" maxlength="80" required />
         </label>
         <label>
           Email
-          <input data-chat-email type="email" autocomplete="email" placeholder="email@example.com" />
+          <input data-chat-email type="email" autocomplete="email" placeholder="email@example.com" maxlength="120" required />
         </label>
         <label>
           Phone
-          <input data-chat-phone type="tel" autocomplete="tel" placeholder="+1..." />
+          <input data-chat-phone type="tel" autocomplete="tel" inputmode="tel" placeholder="+1..." maxlength="${MAX_PHONE_LENGTH}" required />
         </label>
       </div>
       <div class="live-chat-messages" data-chat-messages aria-live="polite"></div>
       <form class="live-chat-form" data-chat-form>
         <div class="live-chat-attachments" data-chat-attachments hidden></div>
-        <textarea data-chat-text rows="2" placeholder="Write a message..."></textarea>
+        <textarea data-chat-text rows="2" placeholder="Write a message..." maxlength="1000" required></textarea>
         <div class="live-chat-tools" aria-label="Chat tools">
           <button class="icon-button live-chat-file-button" data-chat-file-button type="button" aria-label="Attach file">
             <i class="fa-solid fa-paperclip" aria-hidden="true"></i>
@@ -91,7 +93,7 @@
           </button>
         </div>
         <input data-chat-file type="file" multiple hidden />
-        <button class="button primary" type="submit">
+        <button class="button primary" type="submit" disabled aria-disabled="true">
           <i class="fa-solid fa-paper-plane" aria-hidden="true"></i>
           <span>Send</span>
         </button>
@@ -115,6 +117,66 @@
   const attachmentsBox = root.querySelector("[data-chat-attachments]");
   const fileInput = root.querySelector("[data-chat-file]");
   const fileButton = root.querySelector("[data-chat-file-button]");
+  const sendButton = root.querySelector('button[type="submit"]');
+
+  window.NITKA_PHONE?.init?.(root);
+  phoneInput.setAttribute("maxlength", String(MAX_PHONE_LENGTH));
+
+  function sanitizePhoneValue(value) {
+    let digits = 0;
+    let hasPlus = false;
+    let cleaned = "";
+
+    for (const char of String(value || "")) {
+      if (/\d/.test(char)) {
+        if (digits >= MAX_PHONE_DIGITS) continue;
+        digits += 1;
+        cleaned += char;
+        continue;
+      }
+
+      if (char === "+" && !hasPlus && !cleaned.length) {
+        hasPlus = true;
+        cleaned += char;
+        continue;
+      }
+
+      if (/[\s().-]/.test(char) && cleaned.length && digits < MAX_PHONE_DIGITS) {
+        cleaned += char;
+      }
+    }
+
+    return cleaned.replace(/\s{2,}/g, " ").slice(0, MAX_PHONE_LENGTH).trimStart();
+  }
+
+  function sanitizePhoneInput() {
+    const cleaned = sanitizePhoneValue(phoneInput.value);
+    if (phoneInput.value !== cleaned) phoneInput.value = cleaned;
+  }
+
+  function hasValidPhone() {
+    sanitizePhoneInput();
+    const value = phoneInput.value.trim();
+    if (!value) return false;
+    if (window.NITKA_PHONE?.validate) return window.NITKA_PHONE.validate(phoneInput, { quiet: true });
+
+    const digitCount = value.replace(/\D/g, "").length;
+    return digitCount >= 7 && digitCount <= MAX_PHONE_DIGITS;
+  }
+
+  function updateSubmitState() {
+    const isReady = Boolean(
+      nameInput.value.trim() &&
+        emailInput.value.trim() &&
+        emailInput.checkValidity() &&
+        hasValidPhone() &&
+        textInput.value.trim()
+    );
+
+    sendButton.disabled = !isReady;
+    sendButton.setAttribute("aria-disabled", String(!isReady));
+    return isReady;
+  }
 
   function setOpen(isOpen) {
     root.classList.toggle("open", isOpen);
@@ -168,13 +230,13 @@
     if (/^image\//i.test(attachment.type || "")) {
       return `<a class="chat-attachment image-file" href="${escapeHtml(attachment.dataUrl || "")}" download="${name}">
         <img src="${escapeHtml(attachment.dataUrl || "")}" alt="${name}" />
-        <span>${name}</span>
+        <span class="chat-attachment-name" title="${name}">${name}</span>
       </a>`;
     }
 
     return `<a class="chat-attachment file-message" href="${escapeHtml(attachment.dataUrl || attachment.url || "")}" download="${name}" target="_blank" rel="noopener">
       <i class="fa-solid fa-file-arrow-down" aria-hidden="true"></i>
-      <span>${name}</span>
+      <span class="chat-attachment-name" title="${name}">${name}</span>
     </a>`;
   }
 
@@ -217,7 +279,7 @@
         (attachment, index) => `
           <span class="chat-attachment-chip">
             <i class="fa-solid fa-paperclip" aria-hidden="true"></i>
-            <span>${escapeHtml(attachment.name || "Attachment")}</span>
+            <span class="chat-attachment-name" title="${escapeHtml(attachment.name || "Attachment")}">${escapeHtml(attachment.name || "Attachment")}</span>
             <button type="button" data-remove-attachment="${index}" aria-label="Remove attachment">
               <i class="fa-solid fa-xmark" aria-hidden="true"></i>
             </button>
@@ -231,6 +293,7 @@
     if (!attachment) return;
     state.attachments = [...state.attachments, attachment].slice(0, 4);
     renderComposerAttachments();
+    updateSubmitState();
   }
 
   function submitOnEnter(event) {
@@ -294,6 +357,7 @@
       emailInput.value = state.user.email || "";
       phoneInput.value = state.user.phone || "";
     }
+    updateSubmitState();
     setConversation(data.conversation);
   }
 
@@ -366,6 +430,7 @@
         setConversation(response?.conversation);
         state.attachments = [];
         renderComposerAttachments();
+        updateSubmitState();
       });
       return;
     }
@@ -380,21 +445,35 @@
     setConversation(data.conversation);
     state.attachments = [];
     renderComposerAttachments();
+    updateSubmitState();
     startPolling();
   }
 
   openButton.addEventListener("click", () => setOpen(!root.classList.contains("open")));
   closeButton.addEventListener("click", () => setOpen(false));
   textInput.addEventListener("keydown", submitOnEnter);
+  [nameInput, emailInput, phoneInput, textInput].forEach((input) => {
+    input.addEventListener("input", () => {
+      if (input === phoneInput) sanitizePhoneInput();
+      updateSubmitState();
+    });
+  });
+  phoneInput.addEventListener("phonevalidationchange", updateSubmitState);
   form.addEventListener("submit", async (event) => {
     event.preventDefault();
+    if (!updateSubmitState()) {
+      setStatus("Fill in name, email, phone and message before sending.");
+      return;
+    }
     const text = textInput.value.trim();
     if (!text && !state.attachments.length) return;
     textInput.value = "";
+    updateSubmitState();
     try {
       await sendMessage(text);
     } catch (error) {
       setStatus(error.message || "Message was not sent.");
+      updateSubmitState();
     }
   });
   attachmentsBox.addEventListener("click", (event) => {
@@ -402,6 +481,7 @@
     if (!button) return;
     state.attachments = state.attachments.filter((_, index) => index !== Number(button.dataset.removeAttachment));
     renderComposerAttachments();
+    updateSubmitState();
   });
   fileButton.addEventListener("click", () => fileInput.click());
   fileInput.addEventListener("change", async () => {
@@ -410,12 +490,15 @@
         addAttachment(await readFileAsAttachment(file));
       }
       fileInput.value = "";
+      updateSubmitState();
     } catch (error) {
       setStatus(error.message || "File could not be attached.");
+      updateSubmitState();
     }
   });
 
   renderMessages();
+  updateSubmitState();
   bootstrap()
     .catch(() => {})
     .finally(connectSocket);

@@ -1,5 +1,7 @@
 (function () {
   const instances = new WeakMap();
+  const MAX_PHONE_DIGITS = 15;
+  const MAX_PHONE_LENGTH = 20;
   const phoneErrorMessages = {
     1: "Invalid country code.",
     2: "Phone number is too short.",
@@ -18,6 +20,38 @@
     return phoneErrorMessages[errorCode] || "Enter a valid phone number.";
   }
 
+  function sanitizePhoneValue(value) {
+    let digits = 0;
+    let hasPlus = false;
+    let cleaned = "";
+
+    for (const char of String(value || "")) {
+      if (/\d/.test(char)) {
+        if (digits >= MAX_PHONE_DIGITS) continue;
+        digits += 1;
+        cleaned += char;
+        continue;
+      }
+
+      if (char === "+" && !hasPlus && !cleaned.length) {
+        hasPlus = true;
+        cleaned += char;
+        continue;
+      }
+
+      if (/[\s().-]/.test(char) && cleaned.length && digits < MAX_PHONE_DIGITS) {
+        cleaned += char;
+      }
+    }
+
+    return cleaned.replace(/\s{2,}/g, " ").slice(0, MAX_PHONE_LENGTH).trimStart();
+  }
+
+  function sanitizePhoneInput(input) {
+    const cleaned = sanitizePhoneValue(input.value);
+    if (input.value !== cleaned) input.value = cleaned;
+  }
+
   function initPhoneInputs(scope = document) {
     if (!window.intlTelInput) return [];
 
@@ -33,10 +67,11 @@
       });
 
       instances.set(input, instance);
-      input.setAttribute("maxlength", "24");
+      input.setAttribute("maxlength", String(MAX_PHONE_LENGTH));
       input.setAttribute("inputmode", "tel");
 
       input.addEventListener("input", () => {
+        sanitizePhoneInput(input);
         if (input.value.trim()) validatePhoneInput(input, { quiet: true });
         else setPhoneValidity(input);
         input.dispatchEvent(new CustomEvent("phonevalidationchange", { bubbles: true }));

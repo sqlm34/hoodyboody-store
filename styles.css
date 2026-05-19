@@ -235,10 +235,14 @@
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
+  min-width: 0;
+  max-width: 100%;
+  overflow: hidden;
 }
 
 .chat-attachment-chip {
-  display: inline-flex;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
   max-width: 100%;
   align-items: center;
   gap: 7px;
@@ -250,7 +254,9 @@
   font-size: 0.78rem;
 }
 
+.chat-attachment-name,
 .chat-attachment-chip span {
+  display: block;
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -272,6 +278,7 @@
 .chat-attachment {
   display: grid;
   gap: 7px;
+  min-width: 0;
   margin-top: 8px;
   color: inherit;
   text-decoration: none;
@@ -287,6 +294,7 @@
 .chat-attachment.file-message {
   grid-template-columns: auto minmax(0, 1fr);
   align-items: center;
+  max-width: 100%;
   border: 1px solid var(--line);
   border-radius: 8px;
   padding: 10px;
@@ -4293,6 +4301,23 @@ h3,
   position: static;
 }
 
+.shop-mega-menu::after {
+  content: "";
+  position: fixed;
+  top: 58px;
+  left: 0;
+  z-index: 44;
+  display: none;
+  width: 100vw;
+  height: 34px;
+}
+
+.shop-mega-menu:hover::after,
+.shop-mega-menu:focus-within::after,
+.shop-mega-menu.open::after {
+  display: block;
+}
+
 .nav-shop-trigger {
   height: auto;
   font-family: "Yantramanav", Arial, sans-serif;
@@ -4420,6 +4445,10 @@ h3,
   .shop-mega-menu {
     display: grid;
     width: 100%;
+  }
+
+  .shop-mega-menu::after {
+    display: none;
   }
 
   .shop-mega-panel {

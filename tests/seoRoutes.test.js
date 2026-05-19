@@ -93,6 +93,8 @@ test("shop navigation exposes Rubi-style mega menu markup", async () => {
   try {
     const response = await fetch(`${baseUrl}/session-nav.js`);
     const script = await response.text();
+    const cssResponse = await fetch(`${baseUrl}/styles.css`);
+    const css = await cssResponse.text();
 
     assert.equal(response.status, 200);
     assert.match(script, /shop-mega-menu/);
@@ -101,6 +103,34 @@ test("shop navigation exposes Rubi-style mega menu markup", async () => {
     assert.match(script, /Embroidered Hoodies/);
     assert.match(script, /Embroidered Tote Bags/);
     assert.match(script, /shop-mega-image/);
+    assert.match(script, /scheduleShopMegaClose/);
+    assert.match(script, /pointerenter/);
+    assert.match(css, /shop-mega-menu::after/);
+  } finally {
+    server.close();
+  }
+});
+
+test("live chat validates composer fields and contains long attachment names", async () => {
+  const { server, baseUrl } = await startServer();
+  try {
+    const scriptResponse = await fetch(`${baseUrl}/live-chat.js`);
+    const script = await scriptResponse.text();
+    const phoneResponse = await fetch(`${baseUrl}/phone-validation.js`);
+    const phoneScript = await phoneResponse.text();
+    const cssResponse = await fetch(`${baseUrl}/styles.css`);
+    const css = await cssResponse.text();
+
+    assert.equal(scriptResponse.status, 200);
+    assert.match(script, /MAX_PHONE_DIGITS = 15/);
+    assert.match(script, /sanitizePhoneValue/);
+    assert.match(script, /updateSubmitState/);
+    assert.match(script, /disabled aria-disabled="true"/);
+    assert.match(script, /Fill in name, email, phone and message before sending/);
+    assert.match(phoneScript, /MAX_PHONE_DIGITS = 15/);
+    assert.match(phoneScript, /sanitizePhoneInput/);
+    assert.match(css, /text-overflow: ellipsis/);
+    assert.match(css, /grid-template-columns: auto minmax\(0, 1fr\) auto/);
   } finally {
     server.close();
   }

@@ -182,6 +182,43 @@ function enhanceSiteNavigation() {
     }
   });
 
+  const shopMegaMenu = nav.querySelector(".shop-mega-menu");
+  const shopMegaPanel = nav.querySelector(".shop-mega-panel");
+  const shopMegaTrigger = nav.querySelector(".nav-shop-trigger");
+  const supportsHover = window.matchMedia("(hover: hover) and (pointer: fine)");
+  let shopMegaCloseTimer = 0;
+  const setShopMegaOpen = (isOpen) => {
+    clearTimeout(shopMegaCloseTimer);
+    shopMegaMenu?.classList.toggle("open", isOpen);
+    shopMegaTrigger?.setAttribute("aria-expanded", String(isOpen));
+  };
+  const scheduleShopMegaClose = () => {
+    clearTimeout(shopMegaCloseTimer);
+    shopMegaCloseTimer = window.setTimeout(() => {
+      if (shopMegaMenu?.matches(":hover") || shopMegaPanel?.matches(":hover")) return;
+      setShopMegaOpen(false);
+    }, 320);
+  };
+
+  if (shopMegaMenu && shopMegaPanel && shopMegaTrigger) {
+    shopMegaMenu.addEventListener("pointerenter", () => {
+      if (!supportsHover.matches) return;
+      setShopMegaOpen(true);
+    });
+    shopMegaMenu.addEventListener("pointerleave", () => {
+      if (!supportsHover.matches) return;
+      scheduleShopMegaClose();
+    });
+    shopMegaPanel.addEventListener("pointerenter", () => {
+      if (!supportsHover.matches) return;
+      setShopMegaOpen(true);
+    });
+    shopMegaPanel.addEventListener("pointerleave", () => {
+      if (!supportsHover.matches) return;
+      scheduleShopMegaClose();
+    });
+  }
+
   document.addEventListener("click", (event) => {
     if (!header.contains(event.target)) {
       header.querySelectorAll(".nav-group.open").forEach((group) => {
