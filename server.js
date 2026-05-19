@@ -49,8 +49,8 @@ function loadLocalEnv() {
 }
 
 const localEnv = loadLocalEnv();
-const configuredGeoStateSlug = String(
-  process.env.GEO_TARGET_STATE || process.env.HOODYBOODY_GEO_STATE || localEnv.GEO_TARGET_STATE || localEnv.HOODYBOODY_GEO_STATE || "indiana"
+const configuredLocationStateSlug = String(
+  process.env.LOCATION_TARGET_STATE || process.env.HOODYBOODY_LOCATION_STATE || localEnv.LOCATION_TARGET_STATE || localEnv.HOODYBOODY_LOCATION_STATE || "indiana"
 )
   .trim()
   .toLowerCase()
@@ -1480,7 +1480,7 @@ function findLocationCity(state, citySlug) {
 
 function getPrimaryLocationState(locationData) {
   const states = Array.isArray(locationData.states) ? locationData.states : [];
-  return findLocationState(locationData, configuredGeoStateSlug) || states[0] || null;
+  return findLocationState(locationData, configuredLocationStateSlug) || states[0] || null;
 }
 
 function normalizeLocationSlug(value) {
@@ -1488,7 +1488,7 @@ function normalizeLocationSlug(value) {
   try {
     text = decodeURIComponent(text);
   } catch {
-    // Keep the raw value if a proxy sends a partially encoded header.
+    // Keep the raw value if it is partially encoded.
   }
 
   return text
@@ -1497,176 +1497,24 @@ function normalizeLocationSlug(value) {
     .replace(/^-+|-+$/g, "");
 }
 
-function normalizeStateCode(value) {
-  return String(value || "")
-    .trim()
-    .toUpperCase()
-    .replace(/^US-/, "")
-    .replace(/[^A-Z0-9]+/g, "");
-}
-
-function decodeGeoHeader(value) {
-  let text = Array.isArray(value) ? value[0] : value;
-  text = String(text || "").trim();
-  if (!text) return "";
-
-  try {
-    return decodeURIComponent(text.replace(/\+/g, "%20")).trim();
-  } catch {
-    return text;
-  }
-}
-
-function getRequestHeader(req, name) {
-  return decodeGeoHeader(req?.headers?.[String(name).toLowerCase()]);
-}
-
-function parseGeoCoordinate(value) {
-  if (value === null || value === undefined || String(value).trim() === "") return null;
-  const number = Number(value);
-  return Number.isFinite(number) ? number : null;
-}
-
-function findLocationStateByCode(locationData, stateCode) {
-  const normalizedCode = normalizeStateCode(stateCode);
-  if (!normalizedCode) return null;
-  return (locationData.states || []).find((state) => normalizeStateCode(state.stateCode) === normalizedCode) || null;
-}
-
-function getKnownGeoCities(locationData) {
-  return (locationData.states || []).flatMap((state) =>
-    (state.cities || []).map((city) => ({
-      cityName: city.cityName,
-      slug: city.slug,
-      stateName: state.stateName,
-      stateCode: state.stateCode,
-      stateSlug: state.slug,
-      url: getCityUrl(state.slug, city.slug),
-      latitude: parseGeoCoordinate(city.latitude),
-      longitude: parseGeoCoordinate(city.longitude)
-    }))
-  );
-}
-
-function findKnownGeoCityByName(locationData, cityName, state = null) {
-  const citySlug = normalizeLocationSlug(cityName);
-  if (!citySlug) return null;
-
-  const knownCities = getKnownGeoCities(locationData);
-  const stateSlug = state?.slug || "";
-  return (
-    knownCities.find((city) => city.stateSlug === stateSlug && normalizeLocationSlug(city.cityName) === citySlug) ||
-    knownCities.find((city) => normalizeLocationSlug(city.cityName) === citySlug) ||
-    null
-  );
-}
-
-function degreesToRadians(value) {
-  return (value * Math.PI) / 180;
-}
-
-function getGeoDistanceKm(first, second) {
-  const firstLatitude = parseGeoCoordinate(first?.latitude);
-  const firstLongitude = parseGeoCoordinate(first?.longitude);
-  const secondLatitude = parseGeoCoordinate(second?.latitude);
-  const secondLongitude = parseGeoCoordinate(second?.longitude);
-  if (![firstLatitude, firstLongitude, secondLatitude, secondLongitude].every(Number.isFinite)) return Infinity;
-
-  const earthRadiusKm = 6371;
-  const latitudeDistance = degreesToRadians(secondLatitude - firstLatitude);
-  const longitudeDistance = degreesToRadians(secondLongitude - firstLongitude);
-  const a =
-    Math.sin(latitudeDistance / 2) * Math.sin(latitudeDistance / 2) +
-    Math.cos(degreesToRadians(firstLatitude)) *
-      Math.cos(degreesToRadians(secondLatitude)) *
-      Math.sin(longitudeDistance / 2) *
-      Math.sin(longitudeDistance / 2);
-
-  return earthRadiusKm * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-}
-
-function getNearestKnownGeoCity(locationData, latitude, longitude) {
-  const coords = { latitude: parseGeoCoordinate(latitude), longitude: parseGeoCoordinate(longitude) };
-  if (![coords.latitude, coords.longitude].every(Number.isFinite)) return null;
-
-  return (
-    getKnownGeoCities(locationData)
-      .filter((city) => Number.isFinite(city.latitude) && Number.isFinite(city.longitude))
-      .map((city) => ({ ...city, distanceKm: getGeoDistanceKm(coords, city) }))
-      .sort((first, second) => first.distanceKm - second.distanceKm)[0] || null
-  );
-}
-
-function getHeaderGeoSelection(locationData, req) {
-  const state =
-    findLocationStateByCode(locationData, getRequestHeader(req, "x-vercel-ip-country-region")) ||
-    findLocationState(locationData, normalizeLocationSlug(getRequestHeader(req, "x-vercel-ip-country-region")));
-  const cityName = getRequestHeader(req, "x-vercel-ip-city");
-  const headerCity = cityName ? findKnownGeoCityByName(locationData, cityName, state) : null;
-  const latitude = getRequestHeader(req, "x-vercel-ip-latitude");
-  const longitude = getRequestHeader(req, "x-vercel-ip-longitude");
-  const nearestCity = getNearestKnownGeoCity(locationData, latitude, longitude);
-  const city = headerCity || nearestCity || null;
-  const selectedState = city ? findLocationState(locationData, city.stateSlug) : state;
-
-  return {
-    state: selectedState || null,
-    city: city || null
-  };
-}
-
-function getFirstCityForState(state) {
-  const city = (state?.cities || [])[0] || null;
-  if (!city) return null;
-  return {
-    cityName: city.cityName,
-    slug: city.slug,
-    stateName: state.stateName,
-    stateCode: state.stateCode,
-    stateSlug: state.slug,
-    url: getCityUrl(state.slug, city.slug),
-    latitude: parseGeoCoordinate(city.latitude),
-    longitude: parseGeoCoordinate(city.longitude)
-  };
-}
-
-function getRequestGeoSelection(locationData, req) {
+function getRequestLocationState(locationData, req) {
   const states = Array.isArray(locationData.states) ? locationData.states : [];
-  if (!states.length) return { state: null, city: null };
+  if (!states.length) return null;
 
   try {
     const url = new URL(req.url || "/", getRequestOrigin(req));
-    const queryState = normalizeLocationSlug(url.searchParams.get("state") || url.searchParams.get("geoState") || "");
-    const queryCity = normalizeLocationSlug(url.searchParams.get("city") || url.searchParams.get("geoCity") || "");
+    const queryState = normalizeLocationSlug(url.searchParams.get("state") || "");
     const pathState = stripTrailingSlash(url.pathname).match(/^\/locations\/([^/]+)/)?.[1];
-    const pathCity = stripTrailingSlash(url.pathname).match(/^\/locations\/[^/]+\/([^/]+)/)?.[1];
     const requestedState = findLocationState(locationData, pathState) || findLocationState(locationData, queryState);
-    if (requestedState) {
-      const requestedCity = findLocationCity(requestedState, pathCity) || findLocationCity(requestedState, queryCity);
-      const city = requestedCity
-        ? getKnownGeoCities({ states: [requestedState] }).find((knownCity) => knownCity.slug === requestedCity.slug)
-        : getFirstCityForState(requestedState);
-      return { state: requestedState, city };
-    }
+    if (requestedState) return requestedState;
   } catch {
-    // Fall through to headers and the configured state.
+    // Fall through to the configured state.
   }
 
-  const headerSelection = getHeaderGeoSelection(locationData, req);
-  if (headerSelection.state || headerSelection.city) {
-    const state = headerSelection.state || findLocationState(locationData, headerSelection.city?.stateSlug);
-    return { state, city: headerSelection.city || getFirstCityForState(state) };
-  }
-
-  const fallbackState = getPrimaryLocationState(locationData);
-  return { state: fallbackState, city: getFirstCityForState(fallbackState) };
+  return getPrimaryLocationState(locationData);
 }
 
-function getRequestGeoState(locationData, req) {
-  return getRequestGeoSelection(locationData, req).state;
-}
-
-function getGeoCities(state, limit = 8) {
+function getLocationCities(state, limit = 8) {
   return (state?.cities || [])
     .slice(0, limit)
     .map((city) => ({
@@ -1674,33 +1522,25 @@ function getGeoCities(state, limit = 8) {
       stateSlug: state.slug,
       stateName: state.stateName,
       stateCode: state.stateCode,
-      url: getCityUrl(state.slug, city.slug),
-      latitude: parseGeoCoordinate(city.latitude),
-      longitude: parseGeoCoordinate(city.longitude)
+      url: getCityUrl(state.slug, city.slug)
     }));
 }
 
-function getGeoTargetPayload(locationData, req) {
-  const { state, city } = getRequestGeoSelection(locationData, req);
+function getServiceAreaPayload(locationData, req) {
+  const state = getRequestLocationState(locationData, req);
   return {
     stateName: state?.stateName || "",
     stateCode: state?.stateCode || "",
     stateSlug: state?.slug || "",
-    cityName: city?.cityName || "",
-    citySlug: city?.slug || "",
-    cityUrl: city?.url || "",
     locationsUrl: state ? getStateUrl(state.slug) : "/locations/",
-    cities: getGeoCities(state, 12).map((city) => ({
+    cities: getLocationCities(state, 12).map((city) => ({
       cityName: city.cityName,
       slug: city.slug,
       stateName: city.stateName,
       stateSlug: city.stateSlug,
       stateCode: city.stateCode,
-      url: city.url,
-      latitude: city.latitude,
-      longitude: city.longitude
-    })),
-    knownCities: getKnownGeoCities(locationData)
+      url: city.url
+    }))
   };
 }
 
@@ -1727,9 +1567,9 @@ function renderSiteTopbar() {
 }
 
 function renderSeoFooter(locationData, req) {
-  const geoTarget = getGeoTargetPayload(locationData, req);
-  const cities = geoTarget.cities.slice(0, 5);
-  const stateLabel = geoTarget.stateName ? `${geoTarget.stateName} service areas` : "Service areas";
+  const serviceAreas = getServiceAreaPayload(locationData, req);
+  const cities = serviceAreas.cities.slice(0, 5);
+  const stateLabel = serviceAreas.stateName ? `${serviceAreas.stateName} service areas` : "Service areas";
   return `
     <footer class="site-footer" data-footer-ready="true">
       <div class="site-footer-inner">
@@ -1747,7 +1587,7 @@ function renderSeoFooter(locationData, req) {
         <nav class="footer-links" aria-label="Service areas">
           <strong>${escapeHtmlAttribute(stateLabel)}</strong>
           ${cities.map((city) => `<a href="${escapeHtmlAttribute(city.url)}">${escapeHtmlAttribute(city.cityName)}</a>`).join("")}
-          <a href="${escapeHtmlAttribute(geoTarget.locationsUrl)}">All ${escapeHtmlAttribute(geoTarget.stateName || "service")} areas</a>
+          <a href="${escapeHtmlAttribute(serviceAreas.locationsUrl)}">All ${escapeHtmlAttribute(serviceAreas.stateName || "service")} areas</a>
         </nav>
         <nav class="footer-links" aria-label="Custom embroidery">
           <strong>Custom embroidery</strong>
@@ -1879,8 +1719,8 @@ async function renderProductLandingPage(req, page) {
   const db = await readDbAsync();
   const productsForPage = publicProducts(db).filter((product) => productMatchesLanding(product, page)).slice(0, 8);
   const locationData = getLocationContent();
-  const geoTarget = getGeoTargetPayload(locationData, req);
-  const featuredCities = geoTarget.cities.slice(0, 5);
+  const serviceAreas = getServiceAreaPayload(locationData, req);
+  const featuredCities = serviceAreas.cities.slice(0, 5);
   const canonicalPath = `/${page.slug}/`;
   const breadcrumbs = [
     { name: "Home", url: "/" },
@@ -1911,7 +1751,7 @@ async function renderProductLandingPage(req, page) {
           <p>${escapeHtmlAttribute(page.intro)}</p>
           <div class="location-actions">
             <a class="button primary" href="/#custom">Start custom embroidery</a>
-            <a class="button ghost dark" href="${escapeHtmlAttribute(geoTarget.locationsUrl)}">${escapeHtmlAttribute(geoTarget.stateName || "Service areas")}</a>
+            <a class="button ghost dark" href="${escapeHtmlAttribute(serviceAreas.locationsUrl)}">${escapeHtmlAttribute(serviceAreas.stateName || "Service areas")}</a>
           </div>
         </div>
         <div class="seo-hero-media" aria-hidden="true"></div>
@@ -1943,9 +1783,9 @@ function renderFaqItems(faq) {
 
 async function renderLocationsIndexPage(req) {
   const locationData = getLocationContent();
-  const geoTarget = getGeoTargetPayload(locationData, req);
-  const state = findLocationState(locationData, geoTarget.stateSlug) || getPrimaryLocationState(locationData);
-  const cities = geoTarget.cities;
+  const serviceAreas = getServiceAreaPayload(locationData, req);
+  const state = findLocationState(locationData, serviceAreas.stateSlug) || getPrimaryLocationState(locationData);
+  const cities = serviceAreas.cities;
   const breadcrumbs = [
     { name: "Home", url: "/" },
     { name: "Locations", url: "/locations/" }
@@ -1976,7 +1816,7 @@ async function renderLocationsIndexPage(req) {
         <div class="seo-hero-media" aria-hidden="true"></div>
       </section>
       <section class="location-section location-city-buttons-section">
-        <div class="section-head"><div><p class="eyebrow">${escapeHtmlAttribute(state?.stateCode || "geo")}</p><h2>Choose your city</h2></div></div>
+        <div class="section-head"><div><p class="eyebrow">${escapeHtmlAttribute(state?.stateCode || "locations")}</p><h2>Choose your city</h2></div></div>
         <div class="location-chip-row">${cities.map((city) => `<a class="location-chip" href="${escapeHtmlAttribute(city.url)}">${escapeHtmlAttribute(city.cityName)}</a>`).join("")}</div>
       </section>
       <section class="location-section">
@@ -2159,18 +1999,18 @@ async function tryRenderSeoRoute(req, res, pathname) {
 function renderSitemapXml(req) {
   const productPages = getProductPageContent().pages || [];
   const locationData = getLocationContent();
-  const geoState = getPrimaryLocationState(locationData);
-  const geoUrls = geoState
+  const locationState = getPrimaryLocationState(locationData);
+  const locationUrls = locationState
     ? [
-        getStateUrl(geoState.slug),
-        ...(geoState.cities || []).map((city) => getCityUrl(geoState.slug, city.slug))
+        getStateUrl(locationState.slug),
+        ...(locationState.cities || []).map((city) => getCityUrl(locationState.slug, city.slug))
       ]
     : [];
   const urls = [
     "/",
     "/locations/",
     ...productPages.map((page) => `/${page.slug}/`),
-    ...geoUrls
+    ...locationUrls
   ];
 
   return `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n${urls
@@ -2971,11 +2811,6 @@ async function handleApi(req, res) {
 
     if (url.pathname === "/api/categories" && method === "GET") {
       sendJson(res, 200, { categories: publicCategories(db) });
-      return;
-    }
-
-    if (url.pathname === "/api/geo-target" && method === "GET") {
-      sendJson(res, 200, getGeoTargetPayload(getLocationContent(), req));
       return;
     }
 
@@ -3849,29 +3684,6 @@ function applyNoIndexToHtml(html) {
   return html.replace(/<head([^>]*)>/i, `<head$1>\n    ${noIndexMeta}`);
 }
 
-function getGeoLocationLabel(geoTarget) {
-  const cityName = String(geoTarget?.cityName || "").trim();
-  const stateLabel = String(geoTarget?.stateCode || geoTarget?.stateName || "").trim();
-  if (cityName && stateLabel) return `${cityName}, ${stateLabel}`;
-  return cityName || stateLabel;
-}
-
-function renderHomepageHeroTitle(geoTarget) {
-  const locationLabel = getGeoLocationLabel(geoTarget);
-  const locationText = locationLabel ? ` <span class="hero-title-location">in ${escapeHtmlAttribute(locationLabel)}</span>` : "";
-  return `<h1 data-geo-hero-title>Too Cool <span class="hero-title-for">for</span> Stitches${locationText}</h1>`;
-}
-
-function applyHomepageGeoTarget(html, req) {
-  const geoTarget = getGeoTargetPayload(getLocationContent(), req);
-  const locationLabel = getGeoLocationLabel(geoTarget);
-  const pageTitle = locationLabel ? `HOODYBOODY | Embroidery in ${locationLabel}` : "HOODYBOODY | Embroidery clothes";
-
-  return html
-    .replace(/<title>[\s\S]*?<\/title>/i, `<title>${escapeHtmlAttribute(pageTitle)}</title>`)
-    .replace(/<h1\s+data-geo-hero-title[^>]*>[\s\S]*?<\/h1>/i, renderHomepageHeroTitle(geoTarget));
-}
-
 async function serveStatic(req, res) {
   const urlPath = decodeURIComponent(req.url.split("?")[0]);
   const requestedPath = urlPath === "/" ? "/index.html" : urlPath;
@@ -3895,11 +3707,7 @@ async function serveStatic(req, res) {
     let responseContent = content;
 
     if (ext === ".html") {
-      let html = applyNoIndexToHtml(responseContent.toString("utf8"));
-      if (requestedPath === "/index.html") {
-        html = applyHomepageGeoTarget(html, req);
-      }
-      responseContent = Buffer.from(html);
+      responseContent = Buffer.from(applyNoIndexToHtml(responseContent.toString("utf8")));
     }
 
     res.writeHead(200, { "Content-Type": types[ext] || "application/octet-stream", ...noIndexHeader });

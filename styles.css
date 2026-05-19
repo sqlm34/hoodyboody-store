@@ -5124,18 +5124,6 @@ textarea:focus {
   text-transform: none;
 }
 
-.hero h1 .hero-title-location {
-  display: block;
-  margin-top: 18px;
-  font-family: "Jost", Arial, sans-serif;
-  font-size: 0.96rem;
-  font-style: normal;
-  font-weight: 700;
-  letter-spacing: 0;
-  line-height: 1.25;
-  text-transform: uppercase;
-}
-
 .hero-copy,
 .hero-actions {
   display: none;
@@ -5350,11 +5338,6 @@ textarea:focus {
     font-size: 6rem;
   }
 
-  .hero h1 .hero-title-location {
-    margin-top: 16px;
-    font-size: 0.88rem;
-  }
-
   .rubi-catalog-layout {
     grid-template-columns: minmax(150px, 190px) minmax(0, 1fr);
     gap: 58px;
@@ -5392,11 +5375,6 @@ textarea:focus {
     font-size: 4.8rem;
   }
 
-  .hero h1 .hero-title-location {
-    margin-top: 14px;
-    font-size: 0.8rem;
-  }
-
   .rubi-catalog-layout {
     grid-template-columns: 1fr;
     gap: 58px;
@@ -5427,10 +5405,6 @@ textarea:focus {
 
   .hero h1 {
     font-size: 4rem;
-  }
-
-  .hero h1 .hero-title-location {
-    font-size: 0.74rem;
   }
 
   .catalog-sections {
@@ -5467,13 +5441,6 @@ textarea:focus {
 @media (max-width: 480px) {
   .hero h1 {
     font-size: 3.35rem;
-  }
-
-  .hero h1 .hero-title-location {
-    max-width: 260px;
-    margin-right: auto;
-    margin-left: auto;
-    font-size: 0.7rem;
   }
 
   .catalog-sections,

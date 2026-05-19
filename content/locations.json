@@ -12,8 +12,6 @@
         {
           "cityName": "Indianapolis",
           "slug": "indianapolis",
-          "latitude": 39.7684,
-          "longitude": -86.1581,
           "seoTitle": "Custom Embroidery in Indianapolis | HOODYBOODY",
           "metaDescription": "Premium custom embroidery in Indianapolis for hoodies, T-shirts, hats, tote bags and uploaded logo designs.",
           "intro": "Order embroidered clothing in Indianapolis with clean stitching, refined thread palettes and a simple custom upload flow.",
@@ -33,8 +31,6 @@
         {
           "cityName": "Fort Wayne",
           "slug": "fort-wayne",
-          "latitude": 41.0793,
-          "longitude": -85.1394,
           "seoTitle": "Custom Embroidery in Fort Wayne | HOODYBOODY",
           "metaDescription": "Custom embroidered apparel for Fort Wayne, including hoodies, T-shirts, hats, tote bags and logo embroidery.",
           "intro": "Fort Wayne customers can order clean embroidered apparel and upload designs for custom quotes.",
@@ -54,8 +50,6 @@
         {
           "cityName": "Evansville",
           "slug": "evansville",
-          "latitude": 37.9716,
-          "longitude": -87.5711,
           "seoTitle": "Custom Embroidery in Evansville | HOODYBOODY",
           "metaDescription": "Custom embroidery in Evansville for clothing, hats, tote bags, logo designs and boutique embroidered apparel.",
           "intro": "Evansville customers can shop embroidered pieces or start a custom logo/design embroidery request online.",
@@ -75,8 +69,6 @@
         {
           "cityName": "South Bend",
           "slug": "south-bend",
-          "latitude": 41.6764,
-          "longitude": -86.252,
           "seoTitle": "Custom Embroidery in South Bend | HOODYBOODY",
           "metaDescription": "South Bend custom embroidery for hoodies, T-shirts, sweatshirts, hats, tote bags and uploaded designs.",
           "intro": "South Bend customers can order custom embroidered apparel with a clean boutique look.",
@@ -96,8 +88,6 @@
         {
           "cityName": "Bloomington",
           "slug": "bloomington",
-          "latitude": 39.1653,
-          "longitude": -86.5264,
           "seoTitle": "Custom Embroidery in Bloomington | HOODYBOODY",
           "metaDescription": "Custom embroidered hoodies, shirts, caps and tote bags for Bloomington customers.",
           "intro": "Bloomington customers can order embroidered apparel and upload artwork for custom embroidery requests.",
@@ -127,8 +117,6 @@
         {
           "cityName": "Chicago",
           "slug": "chicago",
-          "latitude": 41.8781,
-          "longitude": -87.6298,
           "seoTitle": "Custom Embroidery in Chicago | HOODYBOODY",
           "metaDescription": "Custom embroidery in Chicago for hoodies, T-shirts, hats, tote bags, business apparel and uploaded logo designs.",
           "intro": "Chicago customers can use HOODYBOODY for boutique embroidered clothing, custom designs and logo embroidery requests.",
