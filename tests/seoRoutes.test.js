@@ -88,6 +88,24 @@ test("blog page renders Valeska-style single post functionality", async () => {
   }
 });
 
+test("shop navigation exposes Rubi-style mega menu markup", async () => {
+  const { server, baseUrl } = await startServer();
+  try {
+    const response = await fetch(`${baseUrl}/session-nav.js`);
+    const script = await response.text();
+
+    assert.equal(response.status, 200);
+    assert.match(script, /shop-mega-menu/);
+    assert.match(script, /shopMegaPanel/);
+    assert.match(script, /New Collection/);
+    assert.match(script, /Embroidered Hoodies/);
+    assert.match(script, /Embroidered Tote Bags/);
+    assert.match(script, /shop-mega-image/);
+  } finally {
+    server.close();
+  }
+});
+
 test("customer can log in with phone and keep account session", async () => {
   const { server, baseUrl } = await startServer();
   try {

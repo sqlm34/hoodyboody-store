@@ -71,7 +71,62 @@ function enhanceSiteNavigation() {
 
   header.dataset.siteMenuReady = "true";
   nav.innerHTML = `
-    <a href="/#catalog">Shop</a>
+    <div class="nav-group shop-mega-menu">
+      <button class="nav-group-button nav-shop-trigger" type="button" aria-expanded="false" aria-controls="shopMegaPanel">Shop</button>
+      <div class="shop-mega-panel" id="shopMegaPanel" aria-label="Shop categories">
+        <div class="shop-mega-inner">
+          <div class="shop-mega-grid">
+            <section class="shop-mega-column">
+              <h3><a href="/#catalog">Categories</a></h3>
+              <ul>
+                <li><a href="/jackets.html">Jackets</a></li>
+                <li><a href="/embroidered-tops.html">Tops</a></li>
+                <li><a href="/embroidered-accessories.html">Accessories</a></li>
+                <li><a href="/category.html?type=outerwear">Outerwear</a></li>
+                <li><a href="/category.html?type=tops">All Tops</a></li>
+                <li><a href="/category.html?type=accessories">All Accessories</a></li>
+              </ul>
+            </section>
+            <section class="shop-mega-column">
+              <h3><a href="/#catalog">Product Pages</a></h3>
+              <ul>
+                <li><a href="/embroidered-hoodies/">Embroidered Hoodies</a></li>
+                <li><a href="/embroidered-tshirts/">Embroidered T-shirts</a></li>
+                <li><a href="/embroidered-sweatshirts/">Embroidered Sweatshirts</a></li>
+                <li><a href="/embroidered-hats/">Embroidered Hats</a></li>
+                <li><a href="/embroidered-tote-bags/">Embroidered Tote Bags</a></li>
+                <li><a href="/embroidered-jackets/">Embroidered Jackets</a></li>
+              </ul>
+            </section>
+            <section class="shop-mega-column">
+              <h3><a href="/#custom">Custom Work</a></h3>
+              <ul>
+                <li><a href="/#custom">Upload Design</a></li>
+                <li><a href="/#custom">Logo Embroidery</a></li>
+                <li><a href="/#custom">Business Orders</a></li>
+                <li><a href="/#order">Request Quote</a></li>
+                <li><a href="/blog/">Embroidery Journal</a></li>
+              </ul>
+            </section>
+            <section class="shop-mega-column">
+              <h3><a href="/account.html">Shop Pages</a></h3>
+              <ul>
+                <li><a href="/account.html">My Account</a></li>
+                <li><a href="/checkout.html">Cart</a></li>
+                <li><a href="/checkout.html">Checkout</a></li>
+                <li><a href="/auth.html">Login</a></li>
+              </ul>
+            </section>
+            <section class="shop-mega-column shop-mega-feature">
+              <h3><a href="/#catalog">New Collection</a></h3>
+              <a class="shop-mega-image" href="/#catalog" aria-label="Open new collection">
+                <img src="/assets/embroidered-collection.png" alt="HOODYBOODY embroidered clothing collection" />
+              </a>
+            </section>
+          </div>
+        </div>
+      </div>
+    </div>
     <a href="/#custom">Embroidery</a>
     <a href="/blog/">Blog</a>
     <div class="mobile-menu-auth" aria-label="Account menu">
