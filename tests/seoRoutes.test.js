@@ -104,8 +104,13 @@ test("shop navigation exposes Rubi-style mega menu markup", async () => {
     assert.match(script, /Embroidered Tote Bags/);
     assert.match(script, /shop-mega-image/);
     assert.match(script, /scheduleShopMegaClose/);
+    assert.match(script, /closeShopMegaWithDissolve/);
+    assert.match(script, /shopMegaDissolveMs = 240/);
     assert.match(script, /pointerenter/);
+    assert.match(script, /window\.location\.assign\(destination\)/);
     assert.match(css, /shop-mega-menu::after/);
+    assert.match(css, /shop-mega-menu\.is-closing \.shop-mega-panel/);
+    assert.match(css, /pointer-events: none/);
   } finally {
     server.close();
   }

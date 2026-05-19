@@ -4318,6 +4318,10 @@ h3,
   display: block;
 }
 
+.shop-mega-menu.is-closing::after {
+  display: none;
+}
+
 .nav-shop-trigger {
   height: auto;
   font-family: "Yantramanav", Arial, sans-serif;
@@ -4347,6 +4351,15 @@ h3,
   overflow: visible;
   visibility: visible;
   transform: translateY(0);
+}
+
+.shop-mega-menu.is-closing .shop-mega-panel {
+  height: auto;
+  opacity: 0;
+  overflow: visible;
+  visibility: visible;
+  transform: translateY(-4px);
+  pointer-events: none;
 }
 
 .shop-mega-inner {
@@ -4467,6 +4480,15 @@ h3,
     overflow: visible;
     opacity: 1;
     visibility: visible;
+  }
+
+  .shop-mega-menu.is-closing .shop-mega-panel {
+    height: auto;
+    overflow: visible;
+    opacity: 0;
+    visibility: visible;
+    transform: none;
+    pointer-events: none;
   }
 
   .shop-mega-inner {

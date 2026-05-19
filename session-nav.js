@@ -171,6 +171,10 @@ function enhanceSiteNavigation() {
     if (button) {
       const group = button.closest(".nav-group");
       const isOpen = group.classList.toggle("open");
+      if (group.classList.contains("shop-mega-menu") && isOpen) {
+        clearTimeout(shopMegaNavigateTimer);
+        group.classList.remove("is-closing");
+      }
       button.setAttribute("aria-expanded", String(isOpen));
       return;
     }
@@ -186,11 +190,22 @@ function enhanceSiteNavigation() {
   const shopMegaPanel = nav.querySelector(".shop-mega-panel");
   const shopMegaTrigger = nav.querySelector(".nav-shop-trigger");
   const supportsHover = window.matchMedia("(hover: hover) and (pointer: fine)");
+  const shopMegaDissolveMs = 240;
   let shopMegaCloseTimer = 0;
+  let shopMegaNavigateTimer = 0;
   const setShopMegaOpen = (isOpen) => {
     clearTimeout(shopMegaCloseTimer);
+    if (isOpen) shopMegaMenu?.classList.remove("is-closing");
     shopMegaMenu?.classList.toggle("open", isOpen);
     shopMegaTrigger?.setAttribute("aria-expanded", String(isOpen));
+  };
+  const closeShopMegaWithDissolve = () => {
+    clearTimeout(shopMegaCloseTimer);
+    clearTimeout(shopMegaNavigateTimer);
+    shopMegaPanel?.querySelector(":focus")?.blur();
+    shopMegaMenu?.classList.remove("open");
+    shopMegaMenu?.classList.add("is-closing");
+    shopMegaTrigger?.setAttribute("aria-expanded", "false");
   };
   const scheduleShopMegaClose = () => {
     clearTimeout(shopMegaCloseTimer);
@@ -207,6 +222,7 @@ function enhanceSiteNavigation() {
     });
     shopMegaMenu.addEventListener("pointerleave", () => {
       if (!supportsHover.matches) return;
+      shopMegaMenu.classList.remove("is-closing");
       scheduleShopMegaClose();
     });
     shopMegaPanel.addEventListener("pointerenter", () => {
@@ -215,7 +231,33 @@ function enhanceSiteNavigation() {
     });
     shopMegaPanel.addEventListener("pointerleave", () => {
       if (!supportsHover.matches) return;
+      shopMegaMenu.classList.remove("is-closing");
       scheduleShopMegaClose();
+    });
+    shopMegaPanel.addEventListener("click", (event) => {
+      const link = event.target.closest("a[href]");
+      if (!link || event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+      if (link.target && link.target !== "_self") return;
+      if (link.hasAttribute("download")) return;
+
+      const destination = link.href;
+      if (!destination) return;
+
+      event.preventDefault();
+      closeShopMegaWithDissolve();
+
+      shopMegaNavigateTimer = window.setTimeout(() => {
+        header.classList.remove("site-menu-open");
+        toggle.setAttribute("aria-expanded", "false");
+        toggle.innerHTML = `<i class="fa-solid fa-bars" aria-hidden="true"></i>`;
+
+        if (destination !== window.location.href) {
+          window.location.assign(destination);
+          return;
+        }
+
+        shopMegaPanel.querySelector(":focus")?.blur();
+      }, shopMegaDissolveMs);
     });
   }
 
