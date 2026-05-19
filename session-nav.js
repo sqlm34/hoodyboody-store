@@ -280,12 +280,19 @@ function enhanceSiteNavigation() {
   const header = document.querySelector(".topbar");
   const nav = header?.querySelector(".nav-links");
   const brand = header?.querySelector(".brand");
+  const actions = header?.querySelector(".top-actions");
   if (!header || !nav || !brand || header.dataset.siteMenuReady === "true" || window.location.pathname.includes("admin")) return;
 
   header.dataset.siteMenuReady = "true";
   nav.innerHTML = `
     <a href="/#catalog">Shop</a>
     <a href="/#custom">Embroidery</a>
+    <div class="mobile-menu-auth" aria-label="Account menu">
+      <a class="mobile-menu-action login-link" href="/auth.html" hidden>Login</a>
+      <a class="mobile-menu-action cabinet-link" href="/account.html" hidden>Cabinet</a>
+      <a class="mobile-menu-action admin-link" href="/admin.html" hidden>Owner</a>
+      <button class="mobile-menu-action as-button logout-button" type="button" hidden>Logout</button>
+    </div>
   `;
 
   const toggle = document.createElement("button");
@@ -294,7 +301,14 @@ function enhanceSiteNavigation() {
   toggle.setAttribute("aria-label", "Open menu");
   toggle.setAttribute("aria-expanded", "false");
   toggle.innerHTML = `<i class="fa-solid fa-bars" aria-hidden="true"></i>`;
-  brand.insertAdjacentElement("afterend", toggle);
+  const cartAction = actions?.querySelector(".cart-toggle, .cart-icon-link");
+  if (cartAction) {
+    cartAction.insertAdjacentElement("beforebegin", toggle);
+  } else if (actions) {
+    actions.appendChild(toggle);
+  } else {
+    brand.insertAdjacentElement("afterend", toggle);
+  }
 
   toggle.addEventListener("click", () => {
     const isOpen = header.classList.toggle("site-menu-open");
@@ -420,10 +434,10 @@ async function initSessionNav() {
   });
 }
 
-initSessionNav();
 enhanceSiteNavigation();
 enhanceSiteFooter();
 hydrateGeoTarget();
+initSessionNav();
 
 function loadLiveChatWidget() {
   const path = window.location.pathname.toLowerCase();
