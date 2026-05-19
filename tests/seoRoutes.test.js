@@ -29,7 +29,7 @@ test("homepage removes featured categories, service coverage, and thread palette
     assert.match(response.headers.get("x-robots-tag") || "", /noindex/);
     assert.match(html, /<meta name="robots" content="noindex, nofollow, noarchive" \/>/);
     assert.match(css, /custom-order-cap\.png/);
-    assert.match(css, /width: min\(250px, 100%\)/);
+    assert.match(css, /width: min\(400px, 100%\)/);
     assert.equal(capImage.status, 200);
     assert.doesNotMatch(html, /featured categories/i);
     assert.doesNotMatch(html, /service coverage/i);

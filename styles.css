@@ -1782,8 +1782,8 @@ h3 {
 .custom-copy::after {
   content: "";
   display: block;
-  width: min(250px, 100%);
-  aspect-ratio: 250 / 167;
+  width: min(400px, 100%);
+  aspect-ratio: 400 / 267;
   margin-top: 30px;
   background: url("assets/custom-order-cap.png") center / contain no-repeat;
   pointer-events: none;
