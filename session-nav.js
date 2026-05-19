@@ -73,6 +73,7 @@ function enhanceSiteNavigation() {
   nav.innerHTML = `
     <a href="/#catalog">Shop</a>
     <a href="/#custom">Embroidery</a>
+    <a href="/blog/">Blog</a>
     <div class="mobile-menu-auth" aria-label="Account menu">
       <a class="mobile-menu-action login-link" href="/auth.html" hidden>Login</a>
       <a class="mobile-menu-action cabinet-link" href="/account.html" hidden>Cabinet</a>
@@ -167,6 +168,7 @@ function enhanceSiteFooter() {
             <strong>Custom</strong>
             <a href="/#custom">Upload logo or design</a>
             <a href="/#custom">Business embroidery</a>
+            <a href="/blog/">Blog</a>
             <a href="/checkout.html">Checkout</a>
           </nav>
         </div>

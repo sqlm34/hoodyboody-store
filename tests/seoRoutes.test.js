@@ -66,6 +66,28 @@ test("location pages and automatic geo targeting remain removed", async () => {
   }
 });
 
+test("blog page renders Valeska-style single post functionality", async () => {
+  const { server, baseUrl } = await startServer();
+  try {
+    const response = await fetch(`${baseUrl}/blog/`);
+    const html = await response.text();
+    const script = await fetch(`${baseUrl}/blog.js`);
+    const scriptText = await script.text();
+
+    assert.equal(response.status, 200);
+    assert.match(response.headers.get("x-robots-tag") || "", /noindex/);
+    assert.match(html, /Fashion Is Our Passion \| HOODYBOODY Blog/);
+    assert.match(html, /data-blog-gallery/);
+    assert.match(html, /blog-newsletter/);
+    assert.match(html, /data-blog-comment-form/);
+    assert.match(html, /href="\/blog\/">Blog/);
+    assert.match(scriptText, /data-blog-newsletter/);
+    assert.match(scriptText, /Slide \$\{activeIndex \+ 1\} of \$\{slides\.length\}/);
+  } finally {
+    server.close();
+  }
+});
+
 test("customer can log in with phone and keep account session", async () => {
   const { server, baseUrl } = await startServer();
   try {
@@ -115,6 +137,7 @@ test("sitemap architecture is generated without opening indexing", async () => {
     assert.equal(sitemap.status, 200);
     assert.match(sitemap.headers.get("x-robots-tag") || "", /noindex/);
     assert.doesNotMatch(sitemapXml, /\/locations\//);
+    assert.match(sitemapXml, /\/blog\//);
     assert.match(sitemapXml, /\/embroidered-hoodies\//);
     assert.match(robotsTxt, /Disallow: \//);
     assert.match(robots.headers.get("x-robots-tag") || "", /noindex/);

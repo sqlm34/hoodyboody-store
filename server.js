@@ -1492,6 +1492,7 @@ function renderSeoFooter() {
           <strong>Custom embroidery</strong>
           <a href="/#custom">Upload logo or design</a>
           <a href="/#custom">Business embroidery</a>
+          <a href="/blog/">Blog</a>
           <a href="/checkout.html">Checkout</a>
         </nav>
       </div>
@@ -1683,6 +1684,7 @@ function renderSitemapXml(req) {
   const productPages = getProductPageContent().pages || [];
   const urls = [
     "/",
+    "/blog/",
     ...productPages.map((page) => `/${page.slug}/`)
   ];
 
@@ -3406,6 +3408,12 @@ async function appHandler(req, res) {
   if (pathname === "/sitemap.xml") {
     res.writeHead(200, { "Content-Type": "application/xml; charset=utf-8", ...noIndexHeader });
     res.end(renderSitemapXml(req));
+    return;
+  }
+
+  if (stripTrailingSlash(pathname) === "/blog") {
+    req.url = "/blog.html";
+    serveStatic(req, res);
     return;
   }
 
