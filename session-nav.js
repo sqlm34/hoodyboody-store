@@ -17,6 +17,45 @@ async function logout() {
   }
 }
 
+function initSitePreloader() {
+  const path = window.location.pathname.toLowerCase();
+  if (path.includes("admin") || path.includes("owner") || document.querySelector("[data-site-preloader]")) return;
+
+  const preloader = document.createElement("div");
+  preloader.className = "site-preloader";
+  preloader.dataset.sitePreloader = "true";
+  preloader.setAttribute("aria-live", "polite");
+  preloader.innerHTML = `
+    <div class="site-preloader-logo" aria-label="HOODYBOODY">
+      <span class="site-preloader-mark">HB</span>
+      <span class="site-preloader-word">HOODYBOODY</span>
+    </div>
+    <div class="site-preloader-percent" data-preloader-percent>0%</div>
+  `;
+
+  document.body.classList.add("preloader-active");
+  document.body.appendChild(preloader);
+
+  const percent = preloader.querySelector("[data-preloader-percent]");
+  const durationMs = 5000;
+  const startedAt = performance.now();
+
+  function tick(now) {
+    const progress = Math.min(1, (now - startedAt) / durationMs);
+    if (percent) percent.textContent = `${Math.round(progress * 100)}%`;
+    if (progress < 1) {
+      requestAnimationFrame(tick);
+      return;
+    }
+
+    preloader.classList.add("is-complete");
+    document.body.classList.remove("preloader-active");
+    window.setTimeout(() => preloader.remove(), 520);
+  }
+
+  requestAnimationFrame(tick);
+}
+
 const GEO_FALLBACK = {
   stateName: "Indiana",
   stateCode: "IN",
@@ -434,6 +473,7 @@ async function initSessionNav() {
   });
 }
 
+initSitePreloader();
 enhanceSiteNavigation();
 enhanceSiteFooter();
 hydrateGeoTarget();
