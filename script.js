@@ -68,6 +68,15 @@ const LEGACY_CATEGORY_PAGES = {
   tops: ["tops.html"],
   accessories: ["accessories.html"]
 };
+
+function updateViewportHeight() {
+  document.documentElement.style.setProperty("--viewport-height", `${window.innerHeight}px`);
+}
+
+updateViewportHeight();
+window.addEventListener("resize", updateViewportHeight, { passive: true });
+window.visualViewport?.addEventListener("resize", updateViewportHeight, { passive: true });
+
 const PAGE_CATEGORY_TYPES = Object.fromEntries([
   ...Object.entries(CATEGORY_PAGES).map(([type, page]) => [page, type]),
   ...Object.entries(LEGACY_CATEGORY_PAGES).flatMap(([type, pages]) => pages.map((page) => [page, type]))
@@ -478,30 +487,43 @@ function setCatalogFilter(filter, options = {}) {
 function renderCatalogSections() {
   if (!catalogSections) return;
 
-  catalogSections.innerHTML = getCatalogTypes()
-    .map((type, index) => {
+  const allCount = products.filter(productMatchesPageKeywords).length;
+  const categoryLinks = getCatalogTypes()
+    .map((type) => {
       const meta = getCategoryMeta(type);
       const count = getCategoryProducts(type).length;
-      const reverse = index % 2 === 1 ? " reverse" : "";
+      const sampleProducts = getCategoryProducts(type)
+        .slice(0, 5)
+        .map((product) => `<span>${escapeHtml(product.title)}</span>`)
+        .join("");
+      const active = state.filter === type ? " active" : "";
 
       return `
         <a
-          class="catalog-section-card${reverse}"
+          class="catalog-section-card${active}"
           href="${getCategoryUrl(type)}"
           data-category="${escapeHtml(type)}"
           style="--category-image: url('${escapeHtml(getCategoryImage(type))}'); --focus: ${escapeHtml(getCategoryFocus(type))}; --category-bg: ${escapeHtml(getCategoryBackground(type))}"
         >
-          <span class="catalog-section-photo" aria-hidden="true"></span>
           <span class="catalog-section-content">
-            <span class="catalog-section-kicker">${escapeHtml(meta.eyebrow)} - ${count} ${count === 1 ? "piece" : "pieces"}</span>
             <span class="catalog-section-title">${escapeHtml(meta.title)}</span>
-            <span class="catalog-section-copy">${escapeHtml(meta.copy)}</span>
-            <span class="catalog-section-action">Open catalog</span>
+            <span class="catalog-section-kicker">${count} ${count === 1 ? "piece" : "pieces"}</span>
+            <span class="catalog-section-copy">${sampleProducts}</span>
           </span>
         </a>
       `;
     })
     .join("");
+
+  catalogSections.innerHTML = `
+    <a class="catalog-section-card catalog-section-all${state.filter === "all" ? " active" : ""}" href="#catalog" data-category="all">
+      <span class="catalog-section-content">
+        <span class="catalog-section-title">New</span>
+        <span class="catalog-section-kicker">${allCount} ${allCount === 1 ? "piece" : "pieces"}</span>
+      </span>
+    </a>
+    ${categoryLinks}
+  `;
 }
 
 function updateCatalogViewHead(visibleCount) {
@@ -590,6 +612,10 @@ function renderCatalog() {
         >
           <div class="product-image" style="--focus: ${product.focus}; --product-image: url('${escapeHtml(product.image || DEFAULT_PRODUCT_IMAGE)}')">
             <span class="product-badge">${escapeHtml(product.badge)}</span>
+          </div>
+          <div class="product-card-actions" aria-label="Product actions">
+            <button type="button" data-add-product="${escapeHtml(product.id)}">Add to cart</button>
+            <a href="${getProductUrl(product.id, product.type)}">Quick view</a>
           </div>
           <div class="product-body">
             <div class="product-meta">
@@ -745,8 +771,33 @@ if (catalogReset) {
   });
 }
 
+if (catalogSections) {
+  catalogSections.addEventListener("click", (event) => {
+    const section = event.target.closest(".catalog-section-card[data-category]");
+    if (!section || !catalogSections.contains(section)) return;
+
+    event.preventDefault();
+    setCatalogFilter(section.dataset.category || "all");
+  });
+}
+
 if (catalogGrid) {
   catalogGrid.addEventListener("click", (event) => {
+    const addButton = event.target.closest("[data-add-product]");
+    if (addButton) {
+      event.preventDefault();
+      event.stopPropagation();
+      const product = products.find((item) => item.id === addButton.dataset.addProduct);
+      if (!product) return;
+
+      addToCart({
+        ...product,
+        productId: product.id,
+        quantity: 1
+      });
+      return;
+    }
+
     if (event.target.closest("a, button, input, textarea, select")) return;
 
     const card = event.target.closest(".product-card[data-product-url]");

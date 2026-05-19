@@ -32,7 +32,7 @@ const GEO_FALLBACK = {
 };
 let geoTargetPromise = null;
 
-const escapeHtml = (value) =>
+const escapeNavHtml = (value) =>
   String(value || "").replace(/[&<>"']/g, (char) => {
     const entities = {
       "&": "&amp;",
@@ -82,15 +82,15 @@ function getGeoTarget() {
 function renderGeoCityChips(geoTarget, limit = 5) {
   return geoTarget.cities
     .slice(0, limit)
-    .map((city) => `<a class="location-chip" href="${escapeHtml(city.url)}">${escapeHtml(city.cityName)}</a>`)
+    .map((city) => `<a class="location-chip" href="${escapeNavHtml(city.url)}">${escapeNavHtml(city.cityName)}</a>`)
     .join("");
 }
 
 function renderGeoFooterLinks(geoTarget) {
   return `
-    <strong>${escapeHtml(geoTarget.stateName)} service areas</strong>
-    ${geoTarget.cities.slice(0, 5).map((city) => `<a href="${escapeHtml(city.url)}">${escapeHtml(city.cityName)}</a>`).join("")}
-    <a href="${escapeHtml(geoTarget.locationsUrl)}">All ${escapeHtml(geoTarget.stateName)} areas</a>
+    <strong>${escapeNavHtml(geoTarget.stateName)} service areas</strong>
+    ${geoTarget.cities.slice(0, 5).map((city) => `<a href="${escapeNavHtml(city.url)}">${escapeNavHtml(city.cityName)}</a>`).join("")}
+    <a href="${escapeNavHtml(geoTarget.locationsUrl)}">All ${escapeNavHtml(geoTarget.stateName)} areas</a>
   `;
 }
 

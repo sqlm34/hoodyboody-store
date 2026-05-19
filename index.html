@@ -40,7 +40,7 @@
         <div class="hero-overlay"></div>
         <div class="hero-content">
           <p class="eyebrow">hand and machine embroidery</p>
-          <h1>Too Cool for Stitches</h1>
+          <h1>Too Cool <span>for</span> Stitches</h1>
           <p class="hero-copy">
             Linen jackets, hoodies, shirts and accessories with neat stitches,
             personal monograms and seasonal motifs.
@@ -63,7 +63,14 @@
           </div>
         </div>
 
-        <div class="catalog-sections" id="catalogSections" aria-label="Product type sections"></div>
+        <div class="rubi-catalog-layout">
+          <aside class="catalog-sidebar" aria-label="Catalog filters">
+            <div class="catalog-sections" id="catalogSections" aria-label="Product type sections"></div>
+          </aside>
+          <div class="catalog-products">
+            <div class="catalog-grid" id="catalogGrid" aria-live="polite"></div>
+          </div>
+        </div>
       </section>
 
       <section class="home-link-band" aria-labelledby="featured-products-title">
