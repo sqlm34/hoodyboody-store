@@ -18,8 +18,16 @@ async function logout() {
 }
 
 function initSitePreloader() {
+  const storageKey = "hoodyboody-preloader-seen";
   const path = window.location.pathname.toLowerCase();
   if (path.includes("admin") || path.includes("owner") || document.querySelector("[data-site-preloader]")) return;
+
+  try {
+    if (window.localStorage.getItem(storageKey) === "true") return;
+    window.localStorage.setItem(storageKey, "true");
+  } catch {
+    // If storage is blocked, keep the visual loader available for this visit.
+  }
 
   const preloader = document.createElement("div");
   preloader.className = "site-preloader";
@@ -27,8 +35,7 @@ function initSitePreloader() {
   preloader.setAttribute("aria-live", "polite");
   preloader.innerHTML = `
     <div class="site-preloader-logo" aria-label="HOODYBOODY">
-      <span class="site-preloader-mark">HB</span>
-      <span class="site-preloader-word">HOODYBOODY</span>
+      <span class="site-preloader-word" data-text="HOODYBOODY">HOODYBOODY</span>
     </div>
     <div class="site-preloader-percent" data-preloader-percent>0%</div>
   `;
@@ -37,23 +44,22 @@ function initSitePreloader() {
   document.body.appendChild(preloader);
 
   const percent = preloader.querySelector("[data-preloader-percent]");
-  const durationMs = 5000;
+  const durationMs = 2000;
   const startedAt = performance.now();
 
-  function tick(now) {
-    const progress = Math.min(1, (now - startedAt) / durationMs);
+  function updatePercent() {
+    const progress = Math.min(1, (performance.now() - startedAt) / durationMs);
     if (percent) percent.textContent = `${Math.round(progress * 100)}%`;
-    if (progress < 1) {
-      requestAnimationFrame(tick);
-      return;
-    }
-
-    preloader.classList.add("is-complete");
-    document.body.classList.remove("preloader-active");
-    window.setTimeout(() => preloader.remove(), 520);
   }
 
-  requestAnimationFrame(tick);
+  const percentTimer = window.setInterval(updatePercent, 40);
+  window.setTimeout(() => {
+    window.clearInterval(percentTimer);
+    if (percent) percent.textContent = "100%";
+    preloader.classList.add("is-complete");
+    document.body.classList.remove("preloader-active");
+    window.setTimeout(() => preloader.remove(), 320);
+  }, durationMs);
 }
 
 const GEO_FALLBACK = {
