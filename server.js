@@ -65,6 +65,7 @@ const redisDbKey = process.env.NITKA_REDIS_DB_KEY || localEnv.NITKA_REDIS_DB_KEY
 const hasRedisDb = Boolean(redisRestUrl && redisRestToken);
 const maxJsonBodyBytes = 8_500_000;
 const maxProductImageBytes = 2_500_000;
+const maxBlogImageBytes = 3_500_000;
 const maxChatAttachmentBytes = 8_500_000;
 const defaultChatSettings = {
   chatColor: "#1f6b5a",
@@ -311,6 +312,55 @@ const defaultCategories = [
     sortOrder: 30
   }
 ];
+const defaultBlogPosts = [
+  {
+    id: "fashion-is-our-passion",
+    slug: "fashion-is-our-passion",
+    title: "Fashion Is Our Passion",
+    excerpt:
+      "HOODYBOODY blog post about custom embroidered clothing, authentic design, and the process of making wardrobe pieces with clean stitch detail.",
+    category: "Embroidery Journal",
+    author: "HOODYBOODY Studio",
+    date: "2026-05-19",
+    status: "published",
+    tags: ["Outfit", "Stylish"],
+    body: `Custom clothing feels strongest when the stitch work looks intentional, balanced, and quiet enough to live with every day. At HOODYBOODY, each piece begins with a simple wardrobe idea and grows into embroidery that feels personal without becoming loud.
+
+The best embroidered garments are not only decorative. They hold a memory, a brand mark, a small drawing, or a seasonal motif in a way that still feels wearable after the first impression passes.
+
+## Authentic Design
+
+We look at fabric weight, placement, thread contrast, and the rhythm of the artwork before a piece goes into production. A hoodie asks for a different scale than a linen shirt, and a tote bag can carry a bolder composition without losing ease.
+
+Every custom order is reviewed for stitch density, readability, and placement before we confirm the final quote. That slower first step keeps the finished product clean, durable, and close to the original idea.
+
+### Process Of Making Fashion Items
+
+The process moves from artwork review to thread direction, stitch sample, production, and final finishing. The goal is a piece that feels like it belonged in the wardrobe from the beginning, with embroidery that adds identity rather than noise.`,
+    gallery: [
+      { image: "/assets/embroidered-collection.png", alt: "Embroidered clothing collection on a studio rail", focus: "33% 50%" },
+      { image: "/assets/embroidered-collection.png", alt: "Close view of botanical embroidery on wardrobe pieces", focus: "50% 55%" },
+      { image: "/assets/embroidered-collection.png", alt: "Custom hoodie, jacket and tote with stitch detail", focus: "18% 52%" }
+    ],
+    comments: [
+      {
+        id: "comment-kyle-gentry",
+        name: "Kyle Gentry",
+        text: "The balance between simple clothing and detailed embroidery is exactly what makes custom pieces feel timeless.",
+        replies: [
+          {
+            id: "comment-hoodyboody-studio",
+            name: "HOODYBOODY Studio",
+            text: "That is the sweet spot: enough detail to feel special, enough restraint to keep wearing it.",
+            alt: true
+          }
+        ]
+      }
+    ],
+    createdAt: "2026-05-19T00:00:00.000Z",
+    updatedAt: "2026-05-19T00:00:00.000Z"
+  }
+];
 const emptyDb = {
   users: [],
   sessions: [],
@@ -322,6 +372,8 @@ const emptyDb = {
   products: [],
   productImages: {},
   categories: [],
+  blogPosts: JSON.parse(JSON.stringify(defaultBlogPosts)),
+  blogImages: {},
   chatConversations: [],
   chatMessages: [],
   chatPushTokens: [],
@@ -390,6 +442,8 @@ function ensureDbDefaults(db) {
   db.pendingStripeOrders ||= [];
   db.products ||= [];
   db.productImages ||= {};
+  db.blogPosts ||= [];
+  db.blogImages ||= {};
   db.chatConversations ||= [];
   db.chatMessages ||= [];
   db.chatPushTokens ||= [];
@@ -488,6 +542,21 @@ function ensureDbDefaults(db) {
     }
   });
 
+  if (!Array.isArray(db.blogPosts)) {
+    db.blogPosts = JSON.parse(JSON.stringify(defaultBlogPosts));
+    changed = true;
+  } else if (!db.blogPosts.length) {
+    db.blogPosts = JSON.parse(JSON.stringify(defaultBlogPosts));
+    changed = true;
+  }
+
+  const blogPostsBefore = JSON.stringify(db.blogPosts);
+  db.blogPosts = db.blogPosts
+    .map((post) => sanitizeBlogPost(post, post).post)
+    .filter(Boolean)
+    .sort((a, b) => new Date(b.date || b.createdAt || 0) - new Date(a.date || a.createdAt || 0));
+  if (blogPostsBefore !== JSON.stringify(db.blogPosts)) changed = true;
+
   const ownerEmail = normalizeEmail(adminEmail);
   const owner = db.users.find((user) => user.email === ownerEmail);
 
@@ -549,6 +618,8 @@ function writeDb(db) {
     memoryDb.products = db.products;
     memoryDb.productImages = db.productImages;
     memoryDb.categories = db.categories;
+    memoryDb.blogPosts = db.blogPosts;
+    memoryDb.blogImages = db.blogImages;
     memoryDb.chatConversations = db.chatConversations;
     memoryDb.chatMessages = db.chatMessages;
     memoryDb.chatPushTokens = db.chatPushTokens;
@@ -1274,6 +1345,112 @@ function publicProducts(db) {
   return products.map(publicProduct);
 }
 
+function slugifyBlogSlug(value) {
+  const slug = String(value || "")
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 70);
+
+  return slug || `blog-${Date.now().toString(36)}`;
+}
+
+function normalizeBlogGallery(value) {
+  const gallery = Array.isArray(value) ? value : [];
+  return gallery
+    .map((item) => ({
+      image: String(item?.image || "").trim().slice(0, 600),
+      alt: String(item?.alt || item?.label || "HOODYBOODY blog image").trim().slice(0, 160),
+      focus: String(item?.focus || "50% 50%").trim().slice(0, 40)
+    }))
+    .filter((item) => item.image)
+    .slice(0, 12);
+}
+
+function normalizeBlogComments(value) {
+  const comments = Array.isArray(value) ? value : [];
+  return comments
+    .map((comment, index) => ({
+      id: String(comment?.id || `comment-${index + 1}`).trim().slice(0, 80),
+      name: String(comment?.name || "Reader").trim().slice(0, 80),
+      text: String(comment?.text || "").trim().slice(0, 800),
+      alt: comment?.alt === true,
+      replies: normalizeBlogComments(comment?.replies || [])
+    }))
+    .filter((comment) => comment.text)
+    .slice(0, 20);
+}
+
+function sanitizeBlogPost(body = {}, currentPost = {}) {
+  const title = String(body.title ?? currentPost.title ?? "").trim().slice(0, 140);
+  const slug = slugifyBlogSlug(body.slug || currentPost.slug || title);
+  const excerpt = String(body.excerpt ?? currentPost.excerpt ?? "").trim().slice(0, 420);
+  const category = String(body.category ?? currentPost.category ?? "Embroidery Journal").trim().slice(0, 80);
+  const author = String(body.author ?? currentPost.author ?? "HOODYBOODY Studio").trim().slice(0, 90);
+  const date = String(body.date ?? currentPost.date ?? new Date().toISOString().slice(0, 10)).trim().slice(0, 10);
+  const status = String(body.status ?? currentPost.status ?? "draft").toLowerCase() === "published" ? "published" : "draft";
+  const blogBody = String(body.body ?? currentPost.body ?? "").trim().slice(0, 12000);
+  const tags = parseList(body.tags ?? currentPost.tags, currentPost.tags || ["Embroidery"]).slice(0, 12);
+  const gallery = normalizeBlogGallery(body.gallery ?? currentPost.gallery);
+  const comments = normalizeBlogComments(body.comments ?? currentPost.comments);
+
+  if (!title || !blogBody) {
+    return { post: null, message: "Fill blog title and text." };
+  }
+
+  return {
+    post: {
+      id: String(currentPost.id || body.id || crypto.randomUUID()),
+      slug,
+      title,
+      excerpt: excerpt || blogBody.replace(/\s+/g, " ").slice(0, 220),
+      category,
+      author,
+      date,
+      status,
+      tags,
+      body: blogBody,
+      gallery: gallery.length ? gallery : normalizeBlogGallery(defaultBlogPosts[0].gallery),
+      comments,
+      createdAt: currentPost.createdAt || new Date().toISOString(),
+      updatedAt: currentPost.updatedAt || new Date().toISOString(),
+      updatedBy: currentPost.updatedBy || ""
+    }
+  };
+}
+
+function publicBlogPost(post) {
+  return sanitizeBlogPost(post, post).post;
+}
+
+function publicBlogPosts(db, options = {}) {
+  const posts = Array.isArray(db.blogPosts) && db.blogPosts.length ? db.blogPosts : defaultBlogPosts;
+  return posts
+    .map(publicBlogPost)
+    .filter(Boolean)
+    .filter((post) => options.includeDrafts || post.status === "published")
+    .sort((a, b) => new Date(b.date || b.createdAt || 0) - new Date(a.date || a.createdAt || 0));
+}
+
+function getBlogPostBySlug(db, slug, options = {}) {
+  const cleanSlug = slugifyBlogSlug(slug || "");
+  return publicBlogPosts(db, options).find((post) => post.slug === cleanSlug) || null;
+}
+
+function getUniqueBlogSlug(db, value, currentPostId = "") {
+  const baseSlug = slugifyBlogSlug(value);
+  let slug = baseSlug;
+  let counter = 2;
+
+  while (db.blogPosts.some((post) => post.slug === slug && post.id !== currentPostId)) {
+    slug = `${baseSlug}-${counter}`;
+    counter += 1;
+  }
+
+  return slug;
+}
+
 function getProduct(productId, db) {
   return publicProducts(db).find((product) => product.id === productId) || null;
 }
@@ -1375,6 +1552,19 @@ function parseProductImageDataUrl(value) {
   };
 }
 
+function parseBlogImageDataUrl(value) {
+  const match = String(value || "").match(/^data:(image\/(?:jpeg|png|webp));base64,([a-z0-9+/=]+)$/i);
+  if (!match) return null;
+
+  const buffer = Buffer.from(match[2], "base64");
+  if (!buffer.length || buffer.length > maxBlogImageBytes) return null;
+
+  return {
+    mimeType: match[1].toLowerCase(),
+    buffer
+  };
+}
+
 function getImageExtension(mimeType) {
   if (mimeType === "image/png") return "png";
   if (mimeType === "image/webp") return "webp";
@@ -1388,13 +1578,20 @@ function getProductImageIdFromUrl(imageUrl) {
   return decodeURIComponent(value.slice(prefix.length).split(/[?#]/)[0]);
 }
 
-function safeFileName(value, extension) {
-  const base = String(value || "product-photo")
+function getBlogImageIdFromUrl(imageUrl) {
+  const prefix = "/api/blog-images/";
+  const value = String(imageUrl || "");
+  if (!value.startsWith(prefix)) return "";
+  return decodeURIComponent(value.slice(prefix.length).split(/[?#]/)[0]);
+}
+
+function safeFileName(value, extension, fallback = "product-photo") {
+  const base = String(value || fallback)
     .replace(/\.[^.]+$/, "")
     .replace(/[^a-z0-9_-]+/gi, "-")
     .replace(/^-+|-+$/g, "")
     .slice(0, 80);
-  return `${base || "product-photo"}.${extension}`;
+  return `${base || fallback}.${extension}`;
 }
 
 function getStripeUnitAmount(price) {
@@ -1417,6 +1614,10 @@ function escapeHtmlAttribute(value) {
     };
     return entities[char];
   });
+}
+
+function escapeHtml(value) {
+  return escapeHtmlAttribute(value);
 }
 
 function absoluteUrl(req, value) {
@@ -1680,11 +1881,221 @@ async function tryRenderSeoRoute(req, res, pathname) {
   return false;
 }
 
+function formatBlogDate(value) {
+  const date = value ? new Date(value) : new Date();
+  if (Number.isNaN(date.getTime())) return "";
+  return new Intl.DateTimeFormat("en-US", { month: "long", day: "numeric", year: "numeric" }).format(date);
+}
+
+function renderBlogGallery(post) {
+  const gallery = normalizeBlogGallery(post.gallery).length ? normalizeBlogGallery(post.gallery) : normalizeBlogGallery(defaultBlogPosts[0].gallery);
+
+  return `
+        <section class="blog-gallery" data-blog-gallery aria-label="Editorial image gallery">
+          <div class="blog-gallery-track">
+            ${gallery
+              .map(
+                (image, index) => `
+            <figure class="blog-gallery-slide ${index === 0 ? "is-active" : ""}" aria-hidden="${index === 0 ? "false" : "true"}">
+              <img src="${escapeHtmlAttribute(image.image)}" alt="${escapeHtmlAttribute(image.alt)}" style="object-position: ${escapeHtmlAttribute(image.focus)}" />
+            </figure>`
+              )
+              .join("")}
+          </div>
+          <button class="blog-gallery-arrow blog-gallery-prev" type="button" aria-label="Previous slide"></button>
+          <button class="blog-gallery-arrow blog-gallery-next" type="button" aria-label="Next slide"></button>
+          <p class="visually-hidden" data-blog-gallery-status aria-live="polite">Slide 1 of ${gallery.length}</p>
+        </section>`;
+}
+
+function renderBlogBodyHtml(body) {
+  const blocks = String(body || "")
+    .split(/\n{2,}/)
+    .map((block) => block.trim())
+    .filter(Boolean);
+
+  return blocks
+    .map((block) => {
+      if (block.startsWith("### ")) return `<h3>${escapeHtml(block.slice(4))}</h3>`;
+      if (block.startsWith("## ")) return `<h2>${escapeHtml(block.slice(3))}</h2>`;
+      return `<p>${escapeHtml(block).replace(/\n/g, "<br />")}</p>`;
+    })
+    .join("\n");
+}
+
+function renderBlogComments(comments = []) {
+  const safeComments = normalizeBlogComments(comments);
+  if (!safeComments.length) {
+    return `<p class="blog-empty-comments">No comments yet.</p>`;
+  }
+
+  const renderItems = (items) =>
+    items
+      .map(
+        (comment) => `
+            <li class="blog-comment">
+              <span class="blog-comment-avatar ${comment.alt ? "alt" : ""}"></span>
+              <div class="blog-comment-body">
+                <h6>${escapeHtml(comment.name)}</h6>
+                <button class="blog-reply-link" type="button" data-reply-to="${escapeHtmlAttribute(comment.name)}">Reply</button>
+                <p>${escapeHtml(comment.text)}</p>
+              </div>
+              ${comment.replies?.length ? `<ol>${renderItems(comment.replies)}</ol>` : ""}
+            </li>`
+      )
+      .join("");
+
+  return `<ol class="blog-comment-list">${renderItems(safeComments)}</ol>`;
+}
+
+function renderBlogPostPage(req, post) {
+  const canonicalPath = `/blog/${post.slug}/`;
+  const title = `${post.title} | HOODYBOODY Blog`;
+  const description = post.excerpt || "HOODYBOODY blog post about custom embroidered clothing and design.";
+  const gallery = normalizeBlogGallery(post.gallery);
+  const primaryImage = gallery[0]?.image || "/assets/embroidered-collection.png";
+
+  return applyNoIndexToHtml(`<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="robots" content="noindex, nofollow, noarchive" />
+    <title>${escapeHtml(title)}</title>
+    <meta name="description" content="${escapeHtmlAttribute(description)}" />
+    <link rel="canonical" href="${escapeHtmlAttribute(absoluteUrl(req, canonicalPath))}" />
+    <meta property="og:title" content="${escapeHtmlAttribute(title)}" />
+    <meta property="og:description" content="${escapeHtmlAttribute(description)}" />
+    <meta property="og:type" content="article" />
+    <meta property="og:url" content="${escapeHtmlAttribute(absoluteUrl(req, canonicalPath))}" />
+    <meta property="og:image" content="${escapeHtmlAttribute(absoluteUrl(req, primaryImage))}" />
+    <link rel="icon" href='data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><rect width="64" height="64" fill="black"/><text x="32" y="39" font-size="22" text-anchor="middle" fill="white" font-family="serif">HB</text></svg>' />
+    ${jsonLdScript({
+      "@context": "https://schema.org",
+      "@type": "BlogPosting",
+      headline: post.title,
+      description,
+      image: absoluteUrl(req, primaryImage),
+      author: { "@type": "Organization", name: post.author || "HOODYBOODY Studio" },
+      datePublished: post.date,
+      dateModified: post.updatedAt || post.date,
+      mainEntityOfPage: absoluteUrl(req, canonicalPath)
+    })}
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css" />
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body class="blog-page-body">
+    <header class="topbar checkout-topbar blog-topbar" aria-label="Site navigation">
+      <a class="brand" href="/" aria-label="HOODYBOODY"><span class="brand-mark">HB</span><span>HOODYBOODY</span></a>
+      <nav class="nav-links" aria-label="Site sections">
+        <a href="/#catalog">Shop</a>
+        <a href="/#custom">Embroidery</a>
+        <a href="/blog/">Blog</a>
+      </nav>
+      <div class="top-actions">
+        <a class="account-pill login-link" href="/auth.html" hidden>Login</a>
+        <a class="account-pill cabinet-link" href="/account.html" hidden>Cabinet</a>
+        <a class="account-pill admin-link" href="/admin.html" hidden>Owner</a>
+        <button class="account-pill as-button logout-button" type="button" hidden>Logout</button>
+      </div>
+    </header>
+
+    <main class="blog-single-page" id="qodef-page-content">
+      <article class="blog-article" aria-labelledby="blog-post-title">
+        ${renderBlogGallery(post)}
+        <div class="blog-post-meta">
+          <time datetime="${escapeHtmlAttribute(post.date)}">${escapeHtml(formatBlogDate(post.date))}</time>
+          <span>/</span>
+          <a href="/blog/">${escapeHtml(post.category || "Embroidery Journal")}</a>
+        </div>
+        <h1 class="blog-title" id="blog-post-title">${escapeHtml(post.title)}</h1>
+        <div class="blog-content">${renderBlogBodyHtml(post.body)}</div>
+        <footer class="blog-post-footer" aria-label="Post tags and share links">
+          <div class="blog-tags">
+            ${(post.tags || []).map((tag, index) => `${index ? "<span>,</span>" : ""}<a href="/blog/">${escapeHtml(tag)}</a>`).join("")}
+          </div>
+          <ul class="blog-share" aria-label="Share">
+            <li><a href="https://www.facebook.com/sharer/sharer.php" target="_blank" rel="noreferrer">fb</a></li>
+            <li><a href="https://twitter.com/intent/tweet" target="_blank" rel="noreferrer">tw</a></li>
+            <li><a href="https://www.pinterest.com/pin/create/button/" target="_blank" rel="noreferrer">pin</a></li>
+          </ul>
+        </footer>
+        <section class="blog-author" aria-labelledby="blog-author-title">
+          <a class="blog-author-photo" href="/blog/" aria-label="${escapeHtmlAttribute(post.author || "HOODYBOODY Studio")}"></a>
+          <div>
+            <h4 id="blog-author-title"><a href="/blog/">${escapeHtml(post.author || "HOODYBOODY Studio")}</a></h4>
+            <p>Embroidery notes, product decisions, and quiet wardrobe ideas from the HOODYBOODY worktable.</p>
+            <div class="blog-author-links">
+              <a href="/#custom">Custom</a>
+              <a href="/#catalog">Catalog</a>
+              <a href="/blog/">Journal</a>
+            </div>
+          </div>
+        </section>
+        <section class="blog-comments" aria-labelledby="blog-comments-title">
+          <h4 id="blog-comments-title">Comments</h4>
+          ${renderBlogComments(post.comments)}
+        </section>
+        <section class="blog-reply" aria-labelledby="blog-reply-title">
+          <h4 id="blog-reply-title">Leave a Reply</h4>
+          <p>Your email address will not be published. Required fields are marked *</p>
+          <form class="blog-reply-form" data-blog-comment-form>
+            <textarea name="comment" rows="7" placeholder="Your Comment *" required></textarea>
+            <input type="text" name="name" placeholder="Your Name *" autocomplete="name" required />
+            <input type="email" name="email" placeholder="Your Email *" autocomplete="email" required />
+            <input type="url" name="website" placeholder="Website" autocomplete="url" />
+            <label class="blog-check">
+              <input type="checkbox" name="remember" />
+              <span>Save my name, email, and website in this browser for the next time I comment.</span>
+            </label>
+            <button class="blog-submit" type="submit">Post Comment</button>
+            <p class="blog-form-status" role="status" aria-live="polite"></p>
+          </form>
+        </section>
+        <nav class="blog-post-nav" aria-label="Post navigation">
+          <a class="blog-post-nav-card previous" href="/blog/"><span class="blog-post-nav-thumb"></span><span>Previous</span></a>
+          <a class="blog-post-nav-card next" href="/blog/"><span>Next</span><span class="blog-post-nav-thumb"></span></a>
+        </nav>
+      </article>
+    </main>
+    <aside class="blog-newsletter" data-blog-newsletter aria-label="Newsletter subscription" aria-hidden="true">
+      <button class="blog-newsletter-close" type="button" aria-label="Close newsletter" data-blog-newsletter-close></button>
+      <div class="blog-newsletter-inner">
+        <h3>Keep In Touch</h3>
+        <p>Get notes about new embroidery drops and custom order openings.</p>
+        <form class="blog-newsletter-form" data-blog-newsletter-form>
+          <label class="visually-hidden" for="blogNewsletterEmail">Your e-mail</label>
+          <input id="blogNewsletterEmail" type="email" name="email" placeholder="Your e-mail" autocomplete="email" required />
+          <button type="submit">Subscribe</button>
+        </form>
+        <label class="blog-newsletter-disable">
+          <input type="checkbox" data-blog-newsletter-disable />
+          <span>Do not show again</span>
+        </label>
+        <p class="blog-newsletter-status" role="status" aria-live="polite"></p>
+      </div>
+    </aside>
+    <button class="blog-back-top" type="button" aria-label="Back to top" data-blog-back-top></button>
+    <script src="/session-nav.js"></script>
+    <script src="/blog.js"></script>
+  </body>
+</html>`);
+}
+
 function renderSitemapXml(req) {
   const productPages = getProductPageContent().pages || [];
+  let blogUrls = ["/blog/"];
+
+  try {
+    const db = readDb();
+    blogUrls = Array.from(new Set([...blogUrls, ...publicBlogPosts(db).map((post) => `/blog/${post.slug}/`)]));
+  } catch {
+    blogUrls = ["/blog/"];
+  }
+
   const urls = [
     "/",
-    "/blog/",
+    ...blogUrls,
     ...productPages.map((page) => `/${page.slug}/`)
   ];
 
@@ -2489,6 +2900,30 @@ async function handleApi(req, res) {
       return;
     }
 
+    if (url.pathname === "/api/blog/posts" && method === "GET") {
+      sendJson(res, 200, { posts: publicBlogPosts(db) });
+      return;
+    }
+
+    if (url.pathname.startsWith("/api/blog-images/") && method === "GET") {
+      const imageId = decodeURIComponent(url.pathname.slice("/api/blog-images/".length));
+      const image = db.blogImages?.[imageId];
+
+      if (!image?.data || !image?.mimeType) {
+        sendJson(res, 404, { message: "Blog image not found." });
+        return;
+      }
+
+      const buffer = Buffer.from(image.data, "base64");
+      res.writeHead(200, {
+        "Content-Type": image.mimeType,
+        "Content-Length": buffer.length,
+        "Cache-Control": "public, max-age=31536000, immutable"
+      });
+      res.end(buffer);
+      return;
+    }
+
     if (url.pathname.startsWith("/api/product-images/") && method === "GET") {
       const imageId = decodeURIComponent(url.pathname.slice("/api/product-images/".length));
       const image = db.productImages?.[imageId];
@@ -2901,6 +3336,244 @@ async function handleApi(req, res) {
       db.categories.splice(categoryIndex, 1);
       await writeDbAsync(db);
       sendJson(res, 200, { categories: publicCategories(db), productCount: db.products.filter((product) => product.type === categoryId).length });
+      return;
+    }
+
+    if (url.pathname === "/api/admin/blog/posts" && method === "GET") {
+      const user = getSessionUser(req, db);
+      if (!user) {
+        sendJson(res, 401, { message: "You must be logged in as the store owner." });
+        return;
+      }
+
+      if (!isAdmin(user)) {
+        sendJson(res, 403, { message: "Only the store owner can manage blog posts." });
+        return;
+      }
+
+      sendJson(res, 200, { posts: publicBlogPosts(db, { includeDrafts: true }) });
+      return;
+    }
+
+    if (url.pathname === "/api/admin/blog/posts" && method === "POST") {
+      const user = getSessionUser(req, db);
+      if (!user) {
+        sendJson(res, 401, { message: "You must be logged in as the store owner." });
+        return;
+      }
+
+      if (!isAdmin(user)) {
+        sendJson(res, 403, { message: "Only the store owner can create blog posts." });
+        return;
+      }
+
+      const body = await readJson(req);
+      const postPatch = sanitizeBlogPost(body, {
+        author: "HOODYBOODY Studio",
+        category: "Embroidery Journal",
+        status: "draft",
+        tags: ["Embroidery"],
+        comments: []
+      });
+      const nextPost = postPatch.post;
+
+      if (!nextPost) {
+        sendJson(res, 400, { message: postPatch.message || "Fill blog title and text." });
+        return;
+      }
+
+      nextPost.id = crypto.randomUUID();
+      nextPost.slug = getUniqueBlogSlug(db, nextPost.slug || nextPost.title);
+      nextPost.createdAt = new Date().toISOString();
+      nextPost.updatedAt = nextPost.createdAt;
+      nextPost.updatedBy = user.id;
+      db.blogPosts.push(nextPost);
+
+      await writeDbAsync(db);
+      sendJson(res, 201, { post: publicBlogPost(nextPost), posts: publicBlogPosts(db, { includeDrafts: true }) });
+      return;
+    }
+
+    if (url.pathname === "/api/admin/blog/posts" && method === "PATCH") {
+      const user = getSessionUser(req, db);
+      if (!user) {
+        sendJson(res, 401, { message: "You must be logged in as the store owner." });
+        return;
+      }
+
+      if (!isAdmin(user)) {
+        sendJson(res, 403, { message: "Only the store owner can edit blog posts." });
+        return;
+      }
+
+      const body = await readJson(req);
+      const postId = String(body.postId || body.id || "").trim();
+      const postIndex = db.blogPosts.findIndex((post) => post.id === postId);
+
+      if (postIndex === -1) {
+        sendJson(res, 404, { message: "Blog post not found." });
+        return;
+      }
+
+      const postPatch = sanitizeBlogPost(body, db.blogPosts[postIndex]);
+      const nextPost = postPatch.post;
+
+      if (!nextPost) {
+        sendJson(res, 400, { message: postPatch.message || "Fill blog title and text." });
+        return;
+      }
+
+      nextPost.id = db.blogPosts[postIndex].id;
+      nextPost.slug = getUniqueBlogSlug(db, nextPost.slug || nextPost.title, nextPost.id);
+      nextPost.createdAt = db.blogPosts[postIndex].createdAt || new Date().toISOString();
+      nextPost.updatedAt = new Date().toISOString();
+      nextPost.updatedBy = user.id;
+      db.blogPosts[postIndex] = nextPost;
+
+      await writeDbAsync(db);
+      sendJson(res, 200, { post: publicBlogPost(nextPost), posts: publicBlogPosts(db, { includeDrafts: true }) });
+      return;
+    }
+
+    if (url.pathname === "/api/admin/blog/posts" && method === "DELETE") {
+      const user = getSessionUser(req, db);
+      if (!user) {
+        sendJson(res, 401, { message: "You must be logged in as the store owner." });
+        return;
+      }
+
+      if (!isAdmin(user)) {
+        sendJson(res, 403, { message: "Only the store owner can delete blog posts." });
+        return;
+      }
+
+      const body = await readJson(req);
+      const postId = String(body.postId || body.id || "").trim();
+      const postIndex = db.blogPosts.findIndex((post) => post.id === postId);
+
+      if (postIndex === -1) {
+        sendJson(res, 404, { message: "Blog post not found." });
+        return;
+      }
+
+      const [removedPost] = db.blogPosts.splice(postIndex, 1);
+      normalizeBlogGallery(removedPost.gallery).forEach((image) => {
+        const imageId = getBlogImageIdFromUrl(image.image);
+        if (imageId) delete db.blogImages[imageId];
+      });
+
+      await writeDbAsync(db);
+      sendJson(res, 200, { posts: publicBlogPosts(db, { includeDrafts: true }) });
+      return;
+    }
+
+    if (url.pathname === "/api/admin/blog/posts/photo" && method === "POST") {
+      const user = getSessionUser(req, db);
+      if (!user) {
+        sendJson(res, 401, { message: "You must be logged in as the store owner." });
+        return;
+      }
+
+      if (!isAdmin(user)) {
+        sendJson(res, 403, { message: "Only the store owner can upload blog photos." });
+        return;
+      }
+
+      const body = await readJson(req, maxJsonBodyBytes);
+      const postId = String(body.postId || body.id || "").trim();
+      const postIndex = db.blogPosts.findIndex((post) => post.id === postId);
+
+      if (postIndex === -1) {
+        sendJson(res, 404, { message: "Blog post not found." });
+        return;
+      }
+
+      const parsed = parseBlogImageDataUrl(body.dataUrl);
+      if (!parsed) {
+        sendJson(res, 400, { message: "Upload JPG, PNG, or WEBP up to 3.5 MB after compression." });
+        return;
+      }
+
+      const post = db.blogPosts[postIndex];
+      const hash = crypto.createHash("sha256").update(parsed.buffer).digest("hex").slice(0, 16);
+      const extension = getImageExtension(parsed.mimeType);
+      const imageId = `${post.slug || post.id}-${Date.now().toString(36)}-${hash}.${extension}`;
+      const fileName = safeFileName(body.fileName, extension, "blog-photo");
+      const imageUrl = `/api/blog-images/${encodeURIComponent(imageId)}`;
+      const nextGallery = [
+        ...normalizeBlogGallery(post.gallery),
+        {
+          image: imageUrl,
+          alt: String(body.alt || fileName.replace(/\.[^.]+$/, "") || post.title).trim().slice(0, 160),
+          focus: String(body.focus || "50% 50%").trim().slice(0, 40)
+        }
+      ].slice(0, 12);
+
+      db.blogImages[imageId] = {
+        id: imageId,
+        postId,
+        fileName,
+        mimeType: parsed.mimeType,
+        data: parsed.buffer.toString("base64"),
+        size: parsed.buffer.length,
+        createdAt: new Date().toISOString(),
+        updatedBy: user.id
+      };
+
+      db.blogPosts[postIndex] = {
+        ...post,
+        gallery: nextGallery,
+        updatedAt: new Date().toISOString(),
+        updatedBy: user.id
+      };
+
+      await writeDbAsync(db);
+      sendJson(res, 200, { post: publicBlogPost(db.blogPosts[postIndex]), posts: publicBlogPosts(db, { includeDrafts: true }) });
+      return;
+    }
+
+    if (url.pathname === "/api/admin/blog/posts/photo" && method === "DELETE") {
+      const user = getSessionUser(req, db);
+      if (!user) {
+        sendJson(res, 401, { message: "You must be logged in as the store owner." });
+        return;
+      }
+
+      if (!isAdmin(user)) {
+        sendJson(res, 403, { message: "Only the store owner can delete blog photos." });
+        return;
+      }
+
+      const body = await readJson(req);
+      const postId = String(body.postId || body.id || "").trim();
+      const imageUrl = String(body.image || body.imageUrl || "").trim();
+      const imageId = getBlogImageIdFromUrl(imageUrl);
+      const postIndex = db.blogPosts.findIndex((post) => post.id === postId);
+
+      if (postIndex === -1) {
+        sendJson(res, 404, { message: "Blog post not found." });
+        return;
+      }
+
+      if (!imageId || !db.blogImages?.[imageId]) {
+        sendJson(res, 404, { message: "Blog photo not found." });
+        return;
+      }
+
+      delete db.blogImages[imageId];
+      const post = db.blogPosts[postIndex];
+      const fallbackGallery = normalizeBlogGallery(defaultBlogPosts[0].gallery);
+      let nextGallery = normalizeBlogGallery(post.gallery).filter((image) => image.image !== imageUrl);
+      if (!nextGallery.length) nextGallery = fallbackGallery;
+      db.blogPosts[postIndex] = {
+        ...post,
+        gallery: nextGallery,
+        updatedAt: new Date().toISOString(),
+        updatedBy: user.id
+      };
+
+      await writeDbAsync(db);
+      sendJson(res, 200, { post: publicBlogPost(db.blogPosts[postIndex]), posts: publicBlogPosts(db, { includeDrafts: true }) });
       return;
     }
 
@@ -3412,8 +4085,26 @@ async function appHandler(req, res) {
   }
 
   if (stripTrailingSlash(pathname) === "/blog") {
-    req.url = "/blog.html";
-    serveStatic(req, res);
+    const db = await readDbAsync();
+    const post = publicBlogPosts(db)[0] || publicBlogPost(defaultBlogPosts[0]);
+    res.writeHead(200, { "Content-Type": "text/html; charset=utf-8", ...noIndexHeader });
+    res.end(renderBlogPostPage(req, post));
+    return;
+  }
+
+  if (pathname.startsWith("/blog/")) {
+    const slug = stripTrailingSlash(pathname).split("/").filter(Boolean)[1] || "";
+    const db = await readDbAsync();
+    const post = getBlogPostBySlug(db, slug);
+
+    if (!post) {
+      res.writeHead(404, { "Content-Type": "text/plain; charset=utf-8", ...noIndexHeader });
+      res.end("Not found");
+      return;
+    }
+
+    res.writeHead(200, { "Content-Type": "text/html; charset=utf-8", ...noIndexHeader });
+    res.end(renderBlogPostPage(req, post));
     return;
   }
 
@@ -3627,6 +4318,10 @@ expressApp.get("/admin/orders", (req, res) => {
 
 expressApp.get("/admin/categories", (req, res) => {
   res.sendFile(path.join(root, "admin-categories.html"));
+});
+
+expressApp.get("/admin/blog", (req, res) => {
+  res.sendFile(path.join(root, "admin-blog.html"));
 });
 
 expressApp.get("/admin/chat", (req, res) => {

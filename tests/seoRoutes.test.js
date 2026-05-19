@@ -79,6 +79,8 @@ test("blog page renders Valeska-style single post functionality", async () => {
     const html = await response.text();
     const script = await fetch(`${baseUrl}/blog.js`);
     const scriptText = await script.text();
+    const cssResponse = await fetch(`${baseUrl}/styles.css`);
+    const css = await cssResponse.text();
 
     assert.equal(response.status, 200);
     assert.match(response.headers.get("x-robots-tag") || "", /noindex/);
@@ -86,9 +88,86 @@ test("blog page renders Valeska-style single post functionality", async () => {
     assert.match(html, /data-blog-gallery/);
     assert.match(html, /blog-newsletter/);
     assert.match(html, /data-blog-comment-form/);
+    assert.match(html, /<ol>\s*<li class="blog-comment">/);
     assert.match(html, /href="\/blog\/">Blog/);
     assert.match(scriptText, /data-blog-newsletter/);
     assert.match(scriptText, /Slide \$\{activeIndex \+ 1\} of \$\{slides\.length\}/);
+    assert.match(css, /\.blog-comment > ol/);
+    assert.match(css, /overflow-wrap: anywhere/);
+  } finally {
+    server.close();
+  }
+});
+
+test("owner can create blog posts and upload blog photos", async () => {
+  const { server, baseUrl } = await startServer();
+  try {
+    const login = await fetch(`${baseUrl}/api/login`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        login: "owner@nitka.local",
+        password: "owner123"
+      })
+    });
+    const cookie = login.headers.get("set-cookie") || "";
+    assert.equal(login.status, 200);
+    assert.match(cookie, /nitka_session=/);
+
+    const adminPage = await fetch(`${baseUrl}/admin-blog.html`);
+    const adminHtml = await adminPage.text();
+    assert.equal(adminPage.status, 200);
+    assert.match(adminHtml, /Create blog posts/);
+    assert.match(adminHtml, /admin-blog\.js/);
+
+    const postsResponse = await fetch(`${baseUrl}/api/admin/blog/posts`, {
+      headers: { Cookie: cookie }
+    });
+    const postsJson = await postsResponse.json();
+    assert.equal(postsResponse.status, 200);
+    assert.ok(postsJson.posts.some((post) => post.slug === "fashion-is-our-passion"));
+
+    const createResponse = await fetch(`${baseUrl}/api/admin/blog/posts`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Cookie: cookie },
+      body: JSON.stringify({
+        title: "Studio Notes",
+        slug: "studio-notes",
+        category: "Studio",
+        author: "HOODYBOODY Studio",
+        date: "2026-05-19",
+        status: "published",
+        tags: "Embroidery, Studio",
+        excerpt: "Short studio note about custom embroidery.",
+        body: "First paragraph for the studio note.\n\n## Process\n\nMore text for the blog page."
+      })
+    });
+    const createdJson = await createResponse.json();
+    assert.equal(createResponse.status, 201);
+    assert.equal(createdJson.post.status, "published");
+    assert.match(createdJson.post.slug, /^studio-notes/);
+
+    const tinyPng =
+      "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+/p9sAAAAASUVORK5CYII=";
+    const photoResponse = await fetch(`${baseUrl}/api/admin/blog/posts/photo`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Cookie: cookie },
+      body: JSON.stringify({
+        postId: createdJson.post.id,
+        fileName: "studio-note.png",
+        dataUrl: tinyPng
+      })
+    });
+    const photoJson = await photoResponse.json();
+    assert.equal(photoResponse.status, 200);
+    assert.match(photoJson.post.gallery[photoJson.post.gallery.length - 1].image, /^\/api\/blog-images\//);
+
+    const publicPost = await fetch(`${baseUrl}/blog/${createdJson.post.slug}/`);
+    const publicHtml = await publicPost.text();
+    assert.equal(publicPost.status, 200);
+    assert.match(publicHtml, /Studio Notes \| HOODYBOODY Blog/);
+    assert.match(publicHtml, /First paragraph for the studio note/);
+    assert.match(publicHtml, /\/api\/blog-images\//);
   } finally {
     server.close();
   }
