@@ -111,6 +111,8 @@ test("shop navigation exposes Rubi-style mega menu markup", async () => {
     assert.match(css, /shop-mega-menu::after/);
     assert.match(css, /shop-mega-menu\.is-closing \.shop-mega-panel/);
     assert.match(css, /pointer-events: none/);
+    assert.match(css, /checkout-topbar \.nav-links > a/);
+    assert.match(css, /checkout-topbar \.shop-mega-column li a/);
   } finally {
     server.close();
   }
