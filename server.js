@@ -1368,18 +1368,58 @@ function normalizeBlogGallery(value) {
     .slice(0, 12);
 }
 
-function normalizeBlogComments(value) {
+function normalizeBlogCommentStatus(value, fallback = "published") {
+  const status = String(value || fallback).toLowerCase();
+  return ["pending", "published", "rejected"].includes(status) ? status : fallback;
+}
+
+function normalizeBlogComments(value, options = {}) {
   const comments = Array.isArray(value) ? value : [];
+  const defaultStatus = normalizeBlogCommentStatus(options.defaultStatus, "published");
+
   return comments
     .map((comment, index) => ({
       id: String(comment?.id || `comment-${index + 1}`).trim().slice(0, 80),
       name: String(comment?.name || "Reader").trim().slice(0, 80),
+      email: String(comment?.email || "").trim().slice(0, 160),
+      website: String(comment?.website || "").trim().slice(0, 240),
       text: String(comment?.text || "").trim().slice(0, 800),
+      status: normalizeBlogCommentStatus(comment?.status, defaultStatus),
       alt: comment?.alt === true,
-      replies: normalizeBlogComments(comment?.replies || [])
+      createdAt: String(comment?.createdAt || new Date().toISOString()).trim().slice(0, 40),
+      updatedAt: String(comment?.updatedAt || comment?.createdAt || new Date().toISOString()).trim().slice(0, 40),
+      approvedAt: String(comment?.approvedAt || "").trim().slice(0, 40),
+      moderatedBy: String(comment?.moderatedBy || "").trim().slice(0, 80),
+      replies: normalizeBlogComments(comment?.replies || [], options)
     }))
     .filter((comment) => comment.text)
     .slice(0, 20);
+}
+
+function publicBlogComments(comments = [], options = {}) {
+  return normalizeBlogComments(comments)
+    .filter((comment) => options.includeAllComments || comment.status === "published")
+    .map((comment) => {
+      const next = {
+        id: comment.id,
+        name: comment.name,
+        text: comment.text,
+        status: comment.status,
+        alt: comment.alt,
+        createdAt: comment.createdAt,
+        replies: publicBlogComments(comment.replies, options)
+      };
+
+      if (options.includePrivateCommentFields) {
+        next.email = comment.email;
+        next.website = comment.website;
+        next.updatedAt = comment.updatedAt;
+        next.approvedAt = comment.approvedAt;
+        next.moderatedBy = comment.moderatedBy;
+      }
+
+      return next;
+    });
 }
 
 function sanitizeBlogPost(body = {}, currentPost = {}) {
@@ -1420,14 +1460,22 @@ function sanitizeBlogPost(body = {}, currentPost = {}) {
   };
 }
 
-function publicBlogPost(post) {
-  return sanitizeBlogPost(post, post).post;
+function publicBlogPost(post, options = {}) {
+  const sanitized = sanitizeBlogPost(post, post).post;
+  if (!sanitized) return null;
+  sanitized.comments = publicBlogComments(sanitized.comments, options);
+  return sanitized;
 }
 
 function publicBlogPosts(db, options = {}) {
   const posts = Array.isArray(db.blogPosts) && db.blogPosts.length ? db.blogPosts : defaultBlogPosts;
   return posts
-    .map(publicBlogPost)
+    .map((post) =>
+      publicBlogPost(post, {
+        includeAllComments: options.includeAllComments || options.includeDrafts,
+        includePrivateCommentFields: options.includePrivateCommentFields || options.includeDrafts
+      })
+    )
     .filter(Boolean)
     .filter((post) => options.includeDrafts || post.status === "published")
     .sort((a, b) => new Date(b.date || b.createdAt || 0) - new Date(a.date || a.createdAt || 0));
@@ -1449,6 +1497,96 @@ function getUniqueBlogSlug(db, value, currentPostId = "") {
   }
 
   return slug;
+}
+
+function findBlogComment(comments = [], commentId, parent = null) {
+  const targetId = String(commentId || "").trim();
+  if (!targetId) return null;
+
+  for (let index = 0; index < comments.length; index += 1) {
+    const comment = comments[index];
+    if (comment.id === targetId) {
+      return { comment, parent, comments, index };
+    }
+
+    const replyResult = findBlogComment(comment.replies || [], targetId, comment);
+    if (replyResult) return replyResult;
+  }
+
+  return null;
+}
+
+function removeBlogComment(comments = [], commentId) {
+  const found = findBlogComment(comments, commentId);
+  if (!found) return null;
+  const [removed] = found.comments.splice(found.index, 1);
+  return removed || null;
+}
+
+function flattenBlogComments(db) {
+  const posts = publicBlogPosts(db, { includeDrafts: true, includeAllComments: true, includePrivateCommentFields: true });
+  const rows = [];
+
+  function walk(post, comments = [], parentId = "", depth = 0) {
+    comments.forEach((comment) => {
+      rows.push({
+        postId: post.id,
+        postSlug: post.slug,
+        postTitle: post.title,
+        commentId: comment.id,
+        parentId,
+        depth,
+        name: comment.name,
+        email: comment.email || "",
+        website: comment.website || "",
+        text: comment.text,
+        status: comment.status,
+        alt: comment.alt === true,
+        createdAt: comment.createdAt || "",
+        updatedAt: comment.updatedAt || "",
+        approvedAt: comment.approvedAt || "",
+        moderatedBy: comment.moderatedBy || ""
+      });
+      walk(post, comment.replies || [], comment.id, depth + 1);
+    });
+  }
+
+  posts.forEach((post) => walk(post, post.comments || []));
+  return rows.sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0));
+}
+
+function sanitizeBlogCommentInput(body = {}, options = {}) {
+  const name = String(body.name || options.name || "Reader").trim().slice(0, 80);
+  const email = normalizeEmail(String(body.email || ""));
+  const website = String(body.website || "").trim().slice(0, 240);
+  const text = String(body.comment || body.text || body.message || "").trim().slice(0, 800);
+  const status = normalizeBlogCommentStatus(body.status, options.status || "pending");
+
+  if (!name || !text || (!options.allowMissingEmail && !email)) {
+    return { comment: null, message: "Fill name, email and comment text." };
+  }
+
+  if (!options.allowMissingEmail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    return { comment: null, message: "Enter a valid email address." };
+  }
+
+  const now = new Date().toISOString();
+  return {
+    comment: {
+      id: crypto.randomUUID(),
+      name,
+      email,
+      website,
+      text,
+      status,
+      alt: options.alt === true,
+      createdAt: now,
+      updatedAt: now,
+      approvedAt: status === "published" ? now : "",
+      moderatedBy: options.moderatedBy || "",
+      replies: []
+    }
+  };
 }
 
 function getProduct(productId, db) {
@@ -2017,11 +2155,11 @@ function renderBlogComments(comments = []) {
     items
       .map(
         (comment) => `
-            <li class="blog-comment">
+            <li class="blog-comment" data-blog-comment-id="${escapeHtmlAttribute(comment.id)}">
               <span class="blog-comment-avatar ${comment.alt ? "alt" : ""}"></span>
               <div class="blog-comment-body">
                 <h6>${escapeHtml(comment.name)}</h6>
-                <button class="blog-reply-link" type="button" data-reply-to="${escapeHtmlAttribute(comment.name)}">Reply</button>
+                <button class="blog-reply-link" type="button" data-reply-to="${escapeHtmlAttribute(comment.name)}" data-reply-comment-id="${escapeHtmlAttribute(comment.id)}">Reply</button>
                 <p>${escapeHtml(comment.text)}</p>
               </div>
               ${comment.replies?.length ? `<ol>${renderItems(comment.replies)}</ol>` : ""}
@@ -2132,6 +2270,9 @@ function renderBlogPostPage(req, post) {
               <h4 id="blog-reply-title">Leave a Reply</h4>
               <p>Your email address will not be published. Required fields are marked *</p>
               <form class="blog-reply-form" data-blog-comment-form>
+                <input type="hidden" name="postSlug" value="${escapeHtmlAttribute(post.slug)}" />
+                <input type="hidden" name="parentId" value="" data-blog-reply-parent />
+                <p class="blog-reply-target" data-blog-reply-target hidden></p>
                 <textarea name="comment" rows="7" placeholder="Your Comment *" required></textarea>
                 <div class="blog-reply-grid">
                   <input type="text" name="name" placeholder="Your Name *" autocomplete="name" required />
@@ -3004,6 +3145,55 @@ async function handleApi(req, res) {
       return;
     }
 
+    if (url.pathname === "/api/blog/comments" && method === "POST") {
+      const body = await readJson(req);
+      const slug = slugifyBlogSlug(body.postSlug || body.slug || "");
+      const postIndex = db.blogPosts.findIndex((post) => post.slug === slug && post.status === "published");
+
+      if (postIndex === -1) {
+        sendJson(res, 404, { message: "Blog post not found." });
+        return;
+      }
+
+      const commentPatch = sanitizeBlogCommentInput(body, { status: "pending" });
+      const nextComment = commentPatch.comment;
+
+      if (!nextComment) {
+        sendJson(res, 400, { message: commentPatch.message || "Fill comment fields correctly." });
+        return;
+      }
+
+      const parentId = String(body.parentId || "").trim();
+      const post = db.blogPosts[postIndex];
+      post.comments = normalizeBlogComments(post.comments || []);
+
+      if (parentId) {
+        const parent = findBlogComment(post.comments, parentId);
+        if (!parent || parent.comment.status !== "published") {
+          sendJson(res, 404, { message: "Published comment not found." });
+          return;
+        }
+        parent.comment.replies ||= [];
+        parent.comment.replies.push(nextComment);
+      } else {
+        post.comments.push(nextComment);
+      }
+
+      post.updatedAt = new Date().toISOString();
+      await writeDbAsync(db);
+      sendJson(res, 201, {
+        message: "Thank you. Your comment is awaiting review.",
+        comment: {
+          id: nextComment.id,
+          name: nextComment.name,
+          text: nextComment.text,
+          status: nextComment.status,
+          parentId
+        }
+      });
+      return;
+    }
+
     if (url.pathname.startsWith("/api/blog-images/") && method === "GET") {
       const imageId = decodeURIComponent(url.pathname.slice("/api/blog-images/".length));
       const image = db.blogImages?.[imageId];
@@ -3451,6 +3641,156 @@ async function handleApi(req, res) {
       }
 
       sendJson(res, 200, { posts: publicBlogPosts(db, { includeDrafts: true }) });
+      return;
+    }
+
+    if (url.pathname === "/api/admin/blog/comments" && method === "GET") {
+      const user = getSessionUser(req, db);
+      if (!user) {
+        sendJson(res, 401, { message: "You must be logged in as the store owner." });
+        return;
+      }
+
+      if (!isAdmin(user)) {
+        sendJson(res, 403, { message: "Only the store owner can moderate blog comments." });
+        return;
+      }
+
+      sendJson(res, 200, { comments: flattenBlogComments(db) });
+      return;
+    }
+
+    if (url.pathname === "/api/admin/blog/comments" && method === "PATCH") {
+      const user = getSessionUser(req, db);
+      if (!user) {
+        sendJson(res, 401, { message: "You must be logged in as the store owner." });
+        return;
+      }
+
+      if (!isAdmin(user)) {
+        sendJson(res, 403, { message: "Only the store owner can moderate blog comments." });
+        return;
+      }
+
+      const body = await readJson(req);
+      const postId = String(body.postId || "").trim();
+      const commentId = String(body.commentId || body.id || "").trim();
+      const status = normalizeBlogCommentStatus(body.status, "");
+      const post = db.blogPosts.find((item) => item.id === postId);
+
+      if (!["pending", "published", "rejected"].includes(status)) {
+        sendJson(res, 400, { message: "Choose pending, published or rejected status." });
+        return;
+      }
+
+      if (!post) {
+        sendJson(res, 404, { message: "Blog post not found." });
+        return;
+      }
+
+      post.comments = normalizeBlogComments(post.comments || []);
+      const found = findBlogComment(post.comments, commentId);
+      if (!found) {
+        sendJson(res, 404, { message: "Blog comment not found." });
+        return;
+      }
+
+      found.comment.status = status;
+      found.comment.updatedAt = new Date().toISOString();
+      found.comment.moderatedBy = user.id;
+      found.comment.approvedAt = status === "published" ? new Date().toISOString() : found.comment.approvedAt || "";
+      post.updatedAt = new Date().toISOString();
+
+      await writeDbAsync(db);
+      sendJson(res, 200, { comment: found.comment, comments: flattenBlogComments(db) });
+      return;
+    }
+
+    if (url.pathname === "/api/admin/blog/comments" && method === "DELETE") {
+      const user = getSessionUser(req, db);
+      if (!user) {
+        sendJson(res, 401, { message: "You must be logged in as the store owner." });
+        return;
+      }
+
+      if (!isAdmin(user)) {
+        sendJson(res, 403, { message: "Only the store owner can delete blog comments." });
+        return;
+      }
+
+      const body = await readJson(req);
+      const postId = String(body.postId || "").trim();
+      const commentId = String(body.commentId || body.id || "").trim();
+      const post = db.blogPosts.find((item) => item.id === postId);
+
+      if (!post) {
+        sendJson(res, 404, { message: "Blog post not found." });
+        return;
+      }
+
+      post.comments = normalizeBlogComments(post.comments || []);
+      const removed = removeBlogComment(post.comments, commentId);
+      if (!removed) {
+        sendJson(res, 404, { message: "Blog comment not found." });
+        return;
+      }
+
+      post.updatedAt = new Date().toISOString();
+      await writeDbAsync(db);
+      sendJson(res, 200, { comments: flattenBlogComments(db) });
+      return;
+    }
+
+    if (url.pathname === "/api/admin/blog/comments/reply" && method === "POST") {
+      const user = getSessionUser(req, db);
+      if (!user) {
+        sendJson(res, 401, { message: "You must be logged in as the store owner." });
+        return;
+      }
+
+      if (!isAdmin(user)) {
+        sendJson(res, 403, { message: "Only the store owner can reply to blog comments." });
+        return;
+      }
+
+      const body = await readJson(req);
+      const postId = String(body.postId || "").trim();
+      const commentId = String(body.commentId || body.id || "").trim();
+      const post = db.blogPosts.find((item) => item.id === postId);
+
+      if (!post) {
+        sendJson(res, 404, { message: "Blog post not found." });
+        return;
+      }
+
+      post.comments = normalizeBlogComments(post.comments || []);
+      const found = findBlogComment(post.comments, commentId);
+      if (!found) {
+        sendJson(res, 404, { message: "Blog comment not found." });
+        return;
+      }
+
+      const replyPatch = sanitizeBlogCommentInput(body, {
+        name: user.name || "HOODYBOODY Studio",
+        status: "published",
+        alt: true,
+        allowMissingEmail: true,
+        moderatedBy: user.id
+      });
+      const reply = replyPatch.comment;
+
+      if (!reply) {
+        sendJson(res, 400, { message: replyPatch.message || "Write a reply before sending." });
+        return;
+      }
+
+      found.comment.replies ||= [];
+      found.comment.replies.push(reply);
+      found.comment.updatedAt = new Date().toISOString();
+      post.updatedAt = new Date().toISOString();
+
+      await writeDbAsync(db);
+      sendJson(res, 201, { reply, comments: flattenBlogComments(db) });
       return;
     }
 

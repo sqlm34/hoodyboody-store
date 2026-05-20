@@ -3316,6 +3316,92 @@ textarea:focus {
   min-height: 112px;
 }
 
+.admin-blog-comments-list {
+  display: grid;
+  gap: 14px;
+}
+
+.admin-comment-summary {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.admin-comment-summary span,
+.admin-comment-status {
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  padding: 7px 11px;
+  color: var(--muted);
+  background: #f8faf8;
+  font-size: 0.78rem;
+  font-weight: 850;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.admin-comment-card {
+  display: grid;
+  gap: 14px;
+  margin-left: calc(var(--comment-depth, 0) * 24px);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 16px;
+  background: #fff;
+}
+
+.admin-comment-card.status-pending {
+  border-color: rgba(181, 155, 82, 0.55);
+  background: #fffdf5;
+}
+
+.admin-comment-card.status-rejected {
+  border-color: rgba(166, 78, 61, 0.34);
+  background: #fff8f6;
+}
+
+.admin-comment-card > p {
+  margin: 0;
+  color: var(--ink);
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+
+.admin-comment-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  align-items: flex-start;
+}
+
+.admin-comment-head > div,
+.admin-comment-post {
+  display: grid;
+  gap: 5px;
+  min-width: 0;
+}
+
+.admin-comment-head small,
+.admin-comment-post small {
+  color: var(--muted);
+  font-size: 0.82rem;
+  font-weight: 650;
+  overflow-wrap: anywhere;
+}
+
+.admin-comment-actions,
+.admin-comment-reply {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: flex-start;
+}
+
+.admin-comment-reply textarea {
+  flex: 1 1 260px;
+  min-height: 76px;
+}
+
 .admin-product-fields {
   display: grid;
   gap: 12px;
@@ -6351,6 +6437,33 @@ body.preloader-active {
   margin-top: 30px;
 }
 
+.blog-reply-target {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: center;
+  margin: 0;
+  color: #050505;
+  font-size: 0.78rem;
+  font-weight: 500;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+}
+
+.blog-reply-target[hidden] {
+  display: none;
+}
+
+.blog-reply-target button {
+  border: 0;
+  border-bottom: 1px solid currentColor;
+  padding: 0;
+  color: inherit;
+  background: transparent;
+  font: inherit;
+  cursor: pointer;
+}
+
 .blog-reply-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -6405,6 +6518,11 @@ body.preloader-active {
 .blog-submit:focus-visible {
   background: #050505;
   color: #ffffff;
+}
+
+.blog-submit:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
 }
 
 .blog-sidebar {

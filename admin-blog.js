@@ -8,13 +8,19 @@ const adminBlogLockedText = document.querySelector("#adminBlogLockedText");
 const adminBlogDashboard = document.querySelector("#adminBlogDashboard");
 const adminBlogList = document.querySelector("#adminBlogList");
 const adminBlogNote = document.querySelector("#adminBlogNote");
+const adminBlogCommentsPanel = document.querySelector("#adminBlogCommentsPanel");
+const adminBlogCommentsList = document.querySelector("#adminBlogCommentsList");
+const adminBlogCommentsNote = document.querySelector("#adminBlogCommentsNote");
 const reloadBlogPosts = document.querySelector("#reloadBlogPosts");
 const createBlogPost = document.querySelector("#createBlogPost");
+const reloadBlogComments = document.querySelector("#reloadBlogComments");
 
 let blogPosts = [];
+let blogComments = [];
 let selectedPostId = "";
 let editorMode = "grid";
 let statusTimer = 0;
+let commentsStatusTimer = 0;
 
 async function api(path, options = {}) {
   const response = await fetch(path, {
@@ -62,8 +68,23 @@ function setBlogStatus(message, isError = false, options = {}) {
   }
 }
 
+function setBlogCommentsStatus(message, isError = false, options = {}) {
+  clearTimeout(commentsStatusTimer);
+  adminBlogCommentsNote.textContent = message;
+  adminBlogCommentsNote.classList.toggle("error", isError);
+  adminBlogCommentsNote.classList.toggle("success", Boolean(message) && !isError);
+
+  if (message && !options.persist) {
+    commentsStatusTimer = setTimeout(() => {
+      adminBlogCommentsNote.textContent = "";
+      adminBlogCommentsNote.classList.remove("error", "success");
+    }, 2800);
+  }
+}
+
 function showLocked(message) {
   adminBlogDashboard.hidden = true;
+  adminBlogCommentsPanel.hidden = true;
   adminBlogLocked.hidden = false;
   adminBlogLockedText.textContent = message;
 }
@@ -71,6 +92,7 @@ function showLocked(message) {
 function showDashboard() {
   adminBlogLocked.hidden = true;
   adminBlogDashboard.hidden = false;
+  adminBlogCommentsPanel.hidden = false;
 }
 
 function slugify(value) {
@@ -276,6 +298,65 @@ function renderBlogEditor() {
   adminBlogList.innerHTML = renderPostGrid() + (selectedPost ? renderPostForm(selectedPost, editorMode === "create" ? "create" : "edit") : "");
 }
 
+function formatCommentDate(value) {
+  const date = value ? new Date(value) : null;
+  if (!date || Number.isNaN(date.getTime())) return "";
+  return new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric", year: "numeric", hour: "2-digit", minute: "2-digit" }).format(date);
+}
+
+function renderCommentModerationCard(comment) {
+  const isPending = comment.status === "pending";
+  const isPublished = comment.status === "published";
+  const isRejected = comment.status === "rejected";
+  const indent = Math.min(Number(comment.depth) || 0, 3);
+
+  return `
+    <article class="admin-comment-card status-${escapeHtml(comment.status)}" style="--comment-depth: ${indent}">
+      <div class="admin-comment-head">
+        <div>
+          <span class="admin-comment-status">${escapeHtml(comment.status)}</span>
+          <strong>${escapeHtml(comment.name)}</strong>
+          <small>${escapeHtml(comment.email || "No email")} ${comment.website ? ` / ${escapeHtml(comment.website)}` : ""}</small>
+        </div>
+        <div class="admin-comment-post">
+          <a href="/blog/${escapeHtml(comment.postSlug)}/" target="_blank" rel="noreferrer">${escapeHtml(comment.postTitle)}</a>
+          <small>${escapeHtml(formatCommentDate(comment.createdAt))}${comment.parentId ? " / reply" : ""}</small>
+        </div>
+      </div>
+      <p>${escapeHtml(comment.text)}</p>
+      <div class="admin-comment-actions">
+        <button class="button ghost dark" type="button" data-comment-status="published" data-post-id="${escapeHtml(comment.postId)}" data-comment-id="${escapeHtml(comment.commentId)}" ${isPublished ? "disabled" : ""}>Approve</button>
+        <button class="button ghost dark" type="button" data-comment-status="pending" data-post-id="${escapeHtml(comment.postId)}" data-comment-id="${escapeHtml(comment.commentId)}" ${isPending ? "disabled" : ""}>Pending</button>
+        <button class="button ghost dark" type="button" data-comment-status="rejected" data-post-id="${escapeHtml(comment.postId)}" data-comment-id="${escapeHtml(comment.commentId)}" ${isRejected ? "disabled" : ""}>Reject</button>
+        <button class="button ghost dark danger-button" type="button" data-delete-comment data-post-id="${escapeHtml(comment.postId)}" data-comment-id="${escapeHtml(comment.commentId)}">Delete</button>
+      </div>
+      <div class="admin-comment-reply">
+        <textarea rows="2" placeholder="Reply as HOODYBOODY Studio" data-comment-reply-text></textarea>
+        <button class="button primary" type="button" data-send-comment-reply data-post-id="${escapeHtml(comment.postId)}" data-comment-id="${escapeHtml(comment.commentId)}">Reply</button>
+      </div>
+    </article>
+  `;
+}
+
+function renderBlogCommentsModeration() {
+  const pendingCount = blogComments.filter((comment) => comment.status === "pending").length;
+  const publishedCount = blogComments.filter((comment) => comment.status === "published").length;
+
+  if (!blogComments.length) {
+    adminBlogCommentsList.innerHTML = `<div class="admin-empty-state">No blog comments yet.</div>`;
+    return;
+  }
+
+  adminBlogCommentsList.innerHTML = `
+    <div class="admin-comment-summary">
+      <span><strong>${pendingCount}</strong> pending</span>
+      <span><strong>${publishedCount}</strong> published</span>
+      <span><strong>${blogComments.length}</strong> total</span>
+    </div>
+    ${blogComments.map(renderCommentModerationCard).join("")}
+  `;
+}
+
 function readFileAsDataUrl(file) {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
@@ -374,10 +455,12 @@ async function uploadBlogPhotos(form, files) {
 
 async function loadBlogPosts(options = {}) {
   try {
-    const data = await api("/api/admin/blog/posts");
-    blogPosts = data.posts || [];
+    const [postsData, commentsData] = await Promise.all([api("/api/admin/blog/posts"), api("/api/admin/blog/comments")]);
+    blogPosts = postsData.posts || [];
+    blogComments = commentsData.comments || [];
     showDashboard();
     renderBlogEditor();
+    renderBlogCommentsModeration();
     if (!options.silent) setBlogStatus("Blog posts refreshed successfully.");
   } catch (error) {
     if (error.status === 401) {
@@ -385,6 +468,21 @@ async function loadBlogPosts(options = {}) {
       return;
     }
     showLocked(error.message);
+  }
+}
+
+async function loadBlogComments(options = {}) {
+  try {
+    const data = await api("/api/admin/blog/comments");
+    blogComments = data.comments || [];
+    renderBlogCommentsModeration();
+    if (!options.silent) setBlogCommentsStatus("Blog comments refreshed successfully.");
+  } catch (error) {
+    if (error.status === 401) {
+      window.location.href = "/auth.html?next=/admin-blog.html";
+      return;
+    }
+    setBlogCommentsStatus(error.message, true);
   }
 }
 
@@ -498,6 +596,88 @@ adminBlogList.addEventListener("click", (event) => {
   }
 });
 
+adminBlogCommentsList.addEventListener("click", (event) => {
+  const statusButton = event.target.closest("[data-comment-status]");
+  if (statusButton) {
+    statusButton.disabled = true;
+    setBlogCommentsStatus("Updating comment status...", false, { persist: true });
+    api("/api/admin/blog/comments", {
+      method: "PATCH",
+      body: JSON.stringify({
+        postId: statusButton.dataset.postId,
+        commentId: statusButton.dataset.commentId,
+        status: statusButton.dataset.commentStatus
+      })
+    })
+      .then((response) => {
+        blogComments = response.comments || blogComments;
+        renderBlogCommentsModeration();
+        setBlogCommentsStatus("Comment moderation status saved.");
+      })
+      .catch((error) => {
+        statusButton.disabled = false;
+        setBlogCommentsStatus(error.message, true);
+      });
+    return;
+  }
+
+  const deleteButton = event.target.closest("[data-delete-comment]");
+  if (deleteButton) {
+    if (!window.confirm("Delete this blog comment?")) return;
+    deleteButton.disabled = true;
+    setBlogCommentsStatus("Deleting comment...", false, { persist: true });
+    api("/api/admin/blog/comments", {
+      method: "DELETE",
+      body: JSON.stringify({
+        postId: deleteButton.dataset.postId,
+        commentId: deleteButton.dataset.commentId
+      })
+    })
+      .then((response) => {
+        blogComments = response.comments || blogComments;
+        renderBlogCommentsModeration();
+        setBlogCommentsStatus("Comment deleted.");
+      })
+      .catch((error) => {
+        deleteButton.disabled = false;
+        setBlogCommentsStatus(error.message, true);
+      });
+    return;
+  }
+
+  const replyButton = event.target.closest("[data-send-comment-reply]");
+  if (replyButton) {
+    const card = replyButton.closest(".admin-comment-card");
+    const textarea = card.querySelector("[data-comment-reply-text]");
+    const text = textarea.value.trim();
+
+    if (!text) {
+      setBlogCommentsStatus("Write a reply before sending.", true);
+      return;
+    }
+
+    replyButton.disabled = true;
+    setBlogCommentsStatus("Publishing reply...", false, { persist: true });
+    api("/api/admin/blog/comments/reply", {
+      method: "POST",
+      body: JSON.stringify({
+        postId: replyButton.dataset.postId,
+        commentId: replyButton.dataset.commentId,
+        text
+      })
+    })
+      .then((response) => {
+        blogComments = response.comments || blogComments;
+        renderBlogCommentsModeration();
+        setBlogCommentsStatus("Reply published.");
+      })
+      .catch((error) => {
+        replyButton.disabled = false;
+        setBlogCommentsStatus(error.message, true);
+      });
+  }
+});
+
 adminBlogList.addEventListener("input", (event) => {
   const titleInput = event.target.closest('input[name="title"]');
   if (!titleInput) return;
@@ -527,6 +707,7 @@ adminBlogList.addEventListener("change", (event) => {
 });
 
 reloadBlogPosts.addEventListener("click", () => loadBlogPosts());
+reloadBlogComments.addEventListener("click", () => loadBlogComments());
 createBlogPost.addEventListener("click", () => {
   selectedPostId = "";
   editorMode = "create";

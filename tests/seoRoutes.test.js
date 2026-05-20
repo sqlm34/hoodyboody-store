@@ -92,7 +92,7 @@ test("blog page renders Valeska-style single post functionality", async () => {
     assert.match(html, /blog-reply-grid/);
     assert.match(html, /blog-newsletter/);
     assert.match(html, /data-blog-comment-form/);
-    assert.match(html, /<ol>\s*<li class="blog-comment">/);
+    assert.match(html, /<ol class="blog-comment-list">[\s\S]*data-blog-comment-id/);
     assert.match(html, /href="\/blog\/">Blog/);
     assert.match(scriptText, /data-blog-newsletter/);
     assert.match(scriptText, /Slide \$\{activeIndex \+ 1\} of \$\{slides\.length\}/);
@@ -125,6 +125,7 @@ test("owner can create blog posts and upload blog photos", async () => {
     const adminHtml = await adminPage.text();
     assert.equal(adminPage.status, 200);
     assert.match(adminHtml, /Create blog posts/);
+    assert.match(adminHtml, /Comment moderation/);
     assert.match(adminHtml, /admin-blog\.js/);
 
     const postsResponse = await fetch(`${baseUrl}/api/admin/blog/posts`, {
@@ -175,6 +176,61 @@ test("owner can create blog posts and upload blog photos", async () => {
     assert.match(publicHtml, /Studio Notes \| HOODYBOODY Blog/);
     assert.match(publicHtml, /First paragraph for the studio note/);
     assert.match(publicHtml, /\/api\/blog-images\//);
+
+    const commentResponse = await fetch(`${baseUrl}/api/blog/comments`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        postSlug: createdJson.post.slug,
+        name: "Comment Tester",
+        email: "comment-tester@example.com",
+        website: "https://example.com",
+        comment: "This pending comment should wait for approval."
+      })
+    });
+    const commentJson = await commentResponse.json();
+    assert.equal(commentResponse.status, 201);
+    assert.equal(commentJson.comment.status, "pending");
+
+    const hiddenPending = await fetch(`${baseUrl}/blog/${createdJson.post.slug}/`);
+    const hiddenPendingHtml = await hiddenPending.text();
+    assert.doesNotMatch(hiddenPendingHtml, /This pending comment should wait for approval/);
+
+    const commentsResponse = await fetch(`${baseUrl}/api/admin/blog/comments`, {
+      headers: { Cookie: cookie }
+    });
+    const commentsJson = await commentsResponse.json();
+    assert.equal(commentsResponse.status, 200);
+    const pendingComment = commentsJson.comments.find((comment) => comment.commentId === commentJson.comment.id);
+    assert.equal(pendingComment.status, "pending");
+    assert.equal(pendingComment.email, "comment-tester@example.com");
+
+    const approveResponse = await fetch(`${baseUrl}/api/admin/blog/comments`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json", Cookie: cookie },
+      body: JSON.stringify({
+        postId: createdJson.post.id,
+        commentId: commentJson.comment.id,
+        status: "published"
+      })
+    });
+    assert.equal(approveResponse.status, 200);
+
+    const replyResponse = await fetch(`${baseUrl}/api/admin/blog/comments/reply`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Cookie: cookie },
+      body: JSON.stringify({
+        postId: createdJson.post.id,
+        commentId: commentJson.comment.id,
+        text: "Published owner reply from moderation."
+      })
+    });
+    assert.equal(replyResponse.status, 201);
+
+    const publicApproved = await fetch(`${baseUrl}/blog/${createdJson.post.slug}/`);
+    const publicApprovedHtml = await publicApproved.text();
+    assert.match(publicApprovedHtml, /This pending comment should wait for approval/);
+    assert.match(publicApprovedHtml, /Published owner reply from moderation/);
   } finally {
     server.close();
   }
