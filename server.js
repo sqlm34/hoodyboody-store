@@ -1889,38 +1889,122 @@ function formatBlogDate(value) {
 
 function renderBlogGallery(post) {
   const gallery = normalizeBlogGallery(post.gallery).length ? normalizeBlogGallery(post.gallery) : normalizeBlogGallery(defaultBlogPosts[0].gallery);
+  const image = gallery[0];
 
   return `
-        <section class="blog-gallery" data-blog-gallery aria-label="Editorial image gallery">
+        <section class="blog-gallery qodef-e-media" data-blog-gallery aria-label="Editorial image">
           <div class="blog-gallery-track">
-            ${gallery
+            <figure class="blog-gallery-slide is-active" aria-hidden="false">
+              <img src="${escapeHtmlAttribute(image.image)}" alt="${escapeHtmlAttribute(image.alt)}" style="object-position: ${escapeHtmlAttribute(image.focus)}" />
+            </figure>
+          </div>
+        </section>`;
+}
+
+function renderBlogImagePair(post) {
+  const gallery = normalizeBlogGallery(post.gallery).length ? normalizeBlogGallery(post.gallery) : normalizeBlogGallery(defaultBlogPosts[0].gallery);
+  const pair = [gallery[1] || gallery[0], gallery[2] || gallery[0]].filter(Boolean);
+  if (pair.length < 2) return "";
+
+  return `
+          <div class="blog-image-pair">
+            ${pair
               .map(
-                (image, index) => `
-            <figure class="blog-gallery-slide ${index === 0 ? "is-active" : ""}" aria-hidden="${index === 0 ? "false" : "true"}">
+                (image) => `
+            <figure>
               <img src="${escapeHtmlAttribute(image.image)}" alt="${escapeHtmlAttribute(image.alt)}" style="object-position: ${escapeHtmlAttribute(image.focus)}" />
             </figure>`
               )
               .join("")}
-          </div>
-          <button class="blog-gallery-arrow blog-gallery-prev" type="button" aria-label="Previous slide"></button>
-          <button class="blog-gallery-arrow blog-gallery-next" type="button" aria-label="Next slide"></button>
-          <p class="visually-hidden" data-blog-gallery-status aria-live="polite">Slide 1 of ${gallery.length}</p>
-        </section>`;
+          </div>`;
 }
 
-function renderBlogBodyHtml(body) {
+function renderBlogBodyHtml(body, post) {
   const blocks = String(body || "")
     .split(/\n{2,}/)
     .map((block) => block.trim())
     .filter(Boolean);
+  let shouldInsertImagePair = false;
+  let imagePairInserted = false;
 
   return blocks
     .map((block) => {
       if (block.startsWith("### ")) return `<h3>${escapeHtml(block.slice(4))}</h3>`;
-      if (block.startsWith("## ")) return `<h2>${escapeHtml(block.slice(3))}</h2>`;
-      return `<p>${escapeHtml(block).replace(/\n/g, "<br />")}</p>`;
+      if (block.startsWith("## ")) {
+        shouldInsertImagePair = true;
+        return `<h2>${escapeHtml(block.slice(3))}</h2>`;
+      }
+
+      const paragraph = `<p>${escapeHtml(block).replace(/\n/g, "<br />")}</p>`;
+      if (post && shouldInsertImagePair && !imagePairInserted) {
+        shouldInsertImagePair = false;
+        imagePairInserted = true;
+        return `${paragraph}${renderBlogImagePair(post)}`;
+      }
+
+      return paragraph;
     })
     .join("\n");
+}
+
+function renderBlogSidebar(post) {
+  const gallery = normalizeBlogGallery(post.gallery).length ? normalizeBlogGallery(post.gallery) : normalizeBlogGallery(defaultBlogPosts[0].gallery);
+  const sidebarImages = Array.from({ length: 6 }, (_, index) => gallery[index % gallery.length]);
+
+  return `
+      <aside id="qodef-page-sidebar" class="blog-sidebar" role="complementary" aria-label="Blog sidebar">
+        <div class="blog-sidebar-widget blog-sidebar-hero">
+          <img src="${escapeHtmlAttribute(gallery[0].image)}" alt="${escapeHtmlAttribute(gallery[0].alt)}" style="object-position: ${escapeHtmlAttribute(gallery[0].focus)}" />
+        </div>
+        <nav class="blog-sidebar-widget blog-sidebar-nav" aria-label="Blog categories">
+          <h5>Categories</h5>
+          <ul>
+            <li><a href="/blog/">Fashion</a></li>
+            <li><a href="/embroidered-hoodies.html">Inspiring Outfit</a></li>
+            <li><a href="/blog/">Lifestyle</a></li>
+            <li><a href="/embroidered-caps.html">Outdoors</a></li>
+            <li><a href="/embroidered-t-shirts.html">Street-Style</a></li>
+          </ul>
+        </nav>
+        <div class="blog-sidebar-widget blog-sidebar-tags" aria-label="Blog tags">
+          <h5>Tags</h5>
+          <div class="tagcloud">
+            <a class="tag-small" href="/blog/">Beauty</a>
+            <a class="tag-small" href="/blog/">Design</a>
+            <a class="tag-large" href="/blog/">Outfit</a>
+            <a class="tag-medium" href="/blog/">Stylish</a>
+          </div>
+        </div>
+        <nav class="blog-sidebar-widget blog-sidebar-social" aria-label="Social links">
+          <h5>Social</h5>
+          <a href="https://twitter.com/" target="_blank" rel="noreferrer">Twitter</a>
+          <a href="https://www.facebook.com/" target="_blank" rel="noreferrer">Facebook</a>
+          <a href="https://www.instagram.com/" target="_blank" rel="noreferrer">Instagram</a>
+          <a href="https://www.pinterest.com/" target="_blank" rel="noreferrer">Pinterest</a>
+        </nav>
+        <div class="blog-sidebar-widget blog-sidebar-gallery">
+          <h5>Gallery</h5>
+          <div class="blog-sidebar-gallery-grid">
+            ${sidebarImages
+              .map(
+                (image) => `
+            <a href="/blog/" aria-label="${escapeHtmlAttribute(image.alt)}">
+              <img src="${escapeHtmlAttribute(image.image)}" alt="${escapeHtmlAttribute(image.alt)}" style="object-position: ${escapeHtmlAttribute(image.focus)}" />
+            </a>`
+              )
+              .join("")}
+          </div>
+        </div>
+        <div class="blog-sidebar-widget blog-sidebar-search">
+          <form role="search" action="/blog/">
+            <label class="visually-hidden" for="blogSidebarSearch">Search for:</label>
+            <input id="blogSidebarSearch" type="search" name="s" placeholder="Search" />
+            <button type="submit" aria-label="Search">
+              <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 512 512" aria-hidden="true"><path d="M221.09 64a157.09 157.09 0 10157.09 157.09A157.1 157.1 0 00221.09 64z" fill="none" stroke="currentColor" stroke-miterlimit="10" stroke-width="32"></path><path d="M338.29 338.29L448 448" fill="none" stroke="currentColor" stroke-linecap="round" stroke-miterlimit="10" stroke-width="32"></path></svg>
+            </button>
+          </form>
+        </div>
+      </aside>`;
 }
 
 function renderBlogComments(comments = []) {
@@ -2000,63 +2084,78 @@ function renderBlogPostPage(req, post) {
       </div>
     </header>
 
-    <main class="blog-single-page" id="qodef-page-content">
-      <article class="blog-article" aria-labelledby="blog-post-title">
-        ${renderBlogGallery(post)}
-        <div class="blog-post-meta">
-          <time datetime="${escapeHtmlAttribute(post.date)}">${escapeHtml(formatBlogDate(post.date))}</time>
-          <span>/</span>
-          <a href="/blog/">${escapeHtml(post.category || "Embroidery Journal")}</a>
+    <main class="blog-single-page qodef-grid qodef-layout--template qodef-gutter--extra" id="qodef-page-content">
+      <div class="blog-layout qodef-grid-inner clear">
+        <div class="blog-content-section qodef-grid-item qodef-page-content-section qodef-col--8 qodef-col-push--4">
+          <div class="blog-single qodef-blog qodef-m qodef--single">
+            <article class="blog-article qodef-blog-item qodef-e" aria-labelledby="blog-post-title">
+              <div class="qodef-e-inner">
+                ${renderBlogGallery(post)}
+                <div class="blog-article-content qodef-e-content">
+                  <div class="blog-post-meta qodef-e-info">
+                    <time datetime="${escapeHtmlAttribute(post.date)}">${escapeHtml(formatBlogDate(post.date))}</time>
+                    <span>/</span>
+                    <a href="/blog/">${escapeHtml(post.category || "Embroidery Journal")}</a>
+                  </div>
+                  <h1 class="blog-title qodef-e-title entry-title" id="blog-post-title">${escapeHtml(post.title)}</h1>
+                  <div class="blog-content qodef-e-text">${renderBlogBodyHtml(post.body, post)}</div>
+                  <footer class="blog-post-footer qodef-e-bottom-holder" aria-label="Post tags and share links">
+                    <div class="blog-tags qodef-e-left qodef-e-info">
+                      ${(post.tags || []).map((tag, index) => `${index ? "<span>,</span>" : ""}<a href="/blog/">${escapeHtml(tag)}</a>`).join("")}
+                    </div>
+                    <ul class="blog-share qodef-e-right qodef-e-info" aria-label="Share">
+                      <li><a href="https://www.facebook.com/sharer/sharer.php" target="_blank" rel="noreferrer">fb</a></li>
+                      <li><a href="https://twitter.com/intent/tweet" target="_blank" rel="noreferrer">tw</a></li>
+                      <li><a href="https://www.pinterest.com/pin/create/button/" target="_blank" rel="noreferrer">pin</a></li>
+                    </ul>
+                  </footer>
+                </div>
+              </div>
+            </article>
+            <section class="blog-author" aria-labelledby="blog-author-title">
+              <a class="blog-author-photo" href="/blog/" aria-label="${escapeHtmlAttribute(post.author || "HOODYBOODY Studio")}"></a>
+              <div>
+                <h4 id="blog-author-title"><a href="/blog/">${escapeHtml(post.author || "HOODYBOODY Studio")}</a></h4>
+                <p>Embroidery notes, product decisions, and quiet wardrobe ideas from the HOODYBOODY worktable.</p>
+                <div class="blog-author-links">
+                  <a href="/#custom">Custom</a>
+                  <a href="/#catalog">Catalog</a>
+                  <a href="/blog/">Journal</a>
+                </div>
+              </div>
+            </section>
+            <section class="blog-comments" aria-labelledby="blog-comments-title">
+              <h4 id="blog-comments-title">Comments</h4>
+              ${renderBlogComments(post.comments)}
+            </section>
+            <section class="blog-reply" aria-labelledby="blog-reply-title">
+              <h4 id="blog-reply-title">Leave a Reply</h4>
+              <p>Your email address will not be published. Required fields are marked *</p>
+              <form class="blog-reply-form" data-blog-comment-form>
+                <textarea name="comment" rows="7" placeholder="Your Comment *" required></textarea>
+                <div class="blog-reply-grid">
+                  <input type="text" name="name" placeholder="Your Name *" autocomplete="name" required />
+                  <input type="email" name="email" placeholder="Your Email *" autocomplete="email" required />
+                </div>
+                <input type="url" name="website" placeholder="Website" autocomplete="url" />
+                <label class="blog-check">
+                  <input type="checkbox" name="remember" />
+                  <span>Save my name, email, and website in this browser for the next time I comment.</span>
+                </label>
+                <button class="blog-submit" type="submit">Post Comment</button>
+                <p class="blog-form-status" role="status" aria-live="polite"></p>
+              </form>
+            </section>
+            <nav class="blog-post-nav" aria-label="Post navigation">
+              <a class="blog-post-nav-card previous" href="/blog/"><span class="blog-post-nav-thumb"></span><span>Previous</span></a>
+              <a class="blog-post-nav-card next" href="/blog/"><span>Next</span><span class="blog-post-nav-thumb"></span></a>
+            </nav>
+          </div>
         </div>
-        <h1 class="blog-title" id="blog-post-title">${escapeHtml(post.title)}</h1>
-        <div class="blog-content">${renderBlogBodyHtml(post.body)}</div>
-        <footer class="blog-post-footer" aria-label="Post tags and share links">
-          <div class="blog-tags">
-            ${(post.tags || []).map((tag, index) => `${index ? "<span>,</span>" : ""}<a href="/blog/">${escapeHtml(tag)}</a>`).join("")}
-          </div>
-          <ul class="blog-share" aria-label="Share">
-            <li><a href="https://www.facebook.com/sharer/sharer.php" target="_blank" rel="noreferrer">fb</a></li>
-            <li><a href="https://twitter.com/intent/tweet" target="_blank" rel="noreferrer">tw</a></li>
-            <li><a href="https://www.pinterest.com/pin/create/button/" target="_blank" rel="noreferrer">pin</a></li>
-          </ul>
-        </footer>
-        <section class="blog-author" aria-labelledby="blog-author-title">
-          <a class="blog-author-photo" href="/blog/" aria-label="${escapeHtmlAttribute(post.author || "HOODYBOODY Studio")}"></a>
-          <div>
-            <h4 id="blog-author-title"><a href="/blog/">${escapeHtml(post.author || "HOODYBOODY Studio")}</a></h4>
-            <p>Embroidery notes, product decisions, and quiet wardrobe ideas from the HOODYBOODY worktable.</p>
-            <div class="blog-author-links">
-              <a href="/#custom">Custom</a>
-              <a href="/#catalog">Catalog</a>
-              <a href="/blog/">Journal</a>
-            </div>
-          </div>
-        </section>
-        <section class="blog-comments" aria-labelledby="blog-comments-title">
-          <h4 id="blog-comments-title">Comments</h4>
-          ${renderBlogComments(post.comments)}
-        </section>
-        <section class="blog-reply" aria-labelledby="blog-reply-title">
-          <h4 id="blog-reply-title">Leave a Reply</h4>
-          <p>Your email address will not be published. Required fields are marked *</p>
-          <form class="blog-reply-form" data-blog-comment-form>
-            <textarea name="comment" rows="7" placeholder="Your Comment *" required></textarea>
-            <input type="text" name="name" placeholder="Your Name *" autocomplete="name" required />
-            <input type="email" name="email" placeholder="Your Email *" autocomplete="email" required />
-            <input type="url" name="website" placeholder="Website" autocomplete="url" />
-            <label class="blog-check">
-              <input type="checkbox" name="remember" />
-              <span>Save my name, email, and website in this browser for the next time I comment.</span>
-            </label>
-            <button class="blog-submit" type="submit">Post Comment</button>
-            <p class="blog-form-status" role="status" aria-live="polite"></p>
-          </form>
-        </section>
-        <nav class="blog-post-nav" aria-label="Post navigation">
-          <a class="blog-post-nav-card previous" href="/blog/"><span class="blog-post-nav-thumb"></span><span>Previous</span></a>
-          <a class="blog-post-nav-card next" href="/blog/"><span>Next</span><span class="blog-post-nav-thumb"></span></a>
-        </nav>
-      </article>
+        <div class="blog-sidebar-section qodef-grid-item qodef-page-sidebar-section qodef-col--4 qodef-col-pull--8">
+          ${renderBlogSidebar(post)}
+        </div>
+      </div>
     </main>
     <aside class="blog-newsletter" data-blog-newsletter aria-label="Newsletter subscription" aria-hidden="true">
       <button class="blog-newsletter-close" type="button" aria-label="Close newsletter" data-blog-newsletter-close></button>

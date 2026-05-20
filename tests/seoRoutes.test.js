@@ -86,12 +86,19 @@ test("blog page renders Valeska-style single post functionality", async () => {
     assert.match(response.headers.get("x-robots-tag") || "", /noindex/);
     assert.match(html, /Fashion Is Our Passion \| HOODYBOODY Blog/);
     assert.match(html, /data-blog-gallery/);
+    assert.match(html, /id="qodef-page-sidebar"/);
+    assert.match(html, /blog-sidebar-nav/);
+    assert.match(html, /blog-sidebar-gallery-grid/);
+    assert.match(html, /blog-reply-grid/);
     assert.match(html, /blog-newsletter/);
     assert.match(html, /data-blog-comment-form/);
     assert.match(html, /<ol>\s*<li class="blog-comment">/);
     assert.match(html, /href="\/blog\/">Blog/);
     assert.match(scriptText, /data-blog-newsletter/);
     assert.match(scriptText, /Slide \$\{activeIndex \+ 1\} of \$\{slides\.length\}/);
+    assert.match(css, /\.blog-layout/);
+    assert.match(css, /\.blog-sidebar-widget/);
+    assert.match(css, /grid-template-columns: minmax\(270px, 31\.6%\) minmax\(0, 1fr\)/);
     assert.match(css, /\.blog-comment > ol/);
     assert.match(css, /overflow-wrap: anywhere/);
   } finally {
