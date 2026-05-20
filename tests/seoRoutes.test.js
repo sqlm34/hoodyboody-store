@@ -99,6 +99,9 @@ test("blog page renders Valeska-style single post functionality", async () => {
     assert.match(css, /\.blog-layout/);
     assert.match(css, /\.blog-sidebar-widget/);
     assert.match(css, /grid-template-columns: minmax\(270px, 31\.6%\) minmax\(0, 1fr\)/);
+    assert.match(css, /\.blog-sidebar-tags a/);
+    assert.match(css, /min-height: 38px/);
+    assert.match(css, /\.blog-tags span\s*{\s*display: none/);
     assert.match(css, /\.blog-comment > ol/);
     assert.match(css, /overflow-wrap: anywhere/);
   } finally {
