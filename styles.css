@@ -6610,14 +6610,14 @@ body.preloader-active {
 }
 
 .blog-sidebar-tags .tagcloud {
-  display: flex;
-  flex-wrap: wrap;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 8px;
-  align-items: center;
 }
 
 .blog-sidebar-tags a {
-  min-width: 82px;
+  width: 100%;
+  min-width: 0;
 }
 
 .blog-sidebar-tags .tag-small {
