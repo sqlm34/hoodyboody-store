@@ -236,9 +236,30 @@ function bodyToBuilderBlocks(body, post = {}) {
   return blocks.length ? blocks : getDefaultBlogBlocks(post);
 }
 
+function ensureBuilderImagePair(blocks = [], post = {}) {
+  if (!Array.isArray(blocks) || blocks.some((block) => block.type === "imagePair")) return blocks;
+
+  const photos = getPostPhotos(post);
+  const imagePair = { type: "imagePair", style: "default", images: [photos[1] || photos[0], photos[2] || photos[0]] };
+  const nextBlocks = [...blocks];
+  const headingIndex = nextBlocks.findIndex((block) => block.type === "heading2");
+  const paragraphAfterHeadingIndex =
+    headingIndex === -1 ? -1 : nextBlocks.findIndex((block, index) => index > headingIndex && block.type === "paragraph");
+  const paragraphIndexes = nextBlocks.reduce((indexes, block, index) => {
+    if (block.type === "paragraph") indexes.push(index);
+    return indexes;
+  }, []);
+  const insertAfterIndex = paragraphAfterHeadingIndex !== -1 ? paragraphAfterHeadingIndex : paragraphIndexes[1] ?? paragraphIndexes[0] ?? -1;
+
+  if (insertAfterIndex === -1) return blocks;
+
+  nextBlocks.splice(insertAfterIndex + 1, 0, imagePair);
+  return nextBlocks;
+}
+
 function getPostBlocks(post) {
   if (Array.isArray(post.blocks) && post.blocks.length) {
-    return post.blocks.map((block) => {
+    const normalizedBlocks = post.blocks.map((block) => {
       const type = normalizeBuilderType(block?.type);
       const style = normalizeBuilderStyle(block?.style);
 
@@ -265,6 +286,8 @@ function getPostBlocks(post) {
         text: String(block?.text || block?.body || block?.content || "").trim()
       };
     });
+
+    return ensureBuilderImagePair(normalizedBlocks, post);
   }
 
   return bodyToBuilderBlocks(post.body, post);

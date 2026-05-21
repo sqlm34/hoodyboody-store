@@ -1492,11 +1492,33 @@ function bodyToBlogBlocks(body, gallery = []) {
   return blocks;
 }
 
+function ensureBlogEditorialImagePair(blocks = [], gallery = []) {
+  if (!Array.isArray(blocks) || blocks.some((block) => block.type === "imagePair")) return blocks;
+
+  const images = getDefaultBlogImagePair(gallery);
+  if (images.length < 2) return blocks;
+
+  const nextBlocks = [...blocks];
+  const headingIndex = nextBlocks.findIndex((block) => block.type === "heading2");
+  const paragraphAfterHeadingIndex =
+    headingIndex === -1 ? -1 : nextBlocks.findIndex((block, index) => index > headingIndex && block.type === "paragraph");
+  const paragraphIndexes = nextBlocks.reduce((indexes, block, index) => {
+    if (block.type === "paragraph") indexes.push(index);
+    return indexes;
+  }, []);
+  const insertAfterIndex = paragraphAfterHeadingIndex !== -1 ? paragraphAfterHeadingIndex : paragraphIndexes[1] ?? paragraphIndexes[0] ?? -1;
+
+  if (insertAfterIndex === -1) return blocks;
+
+  nextBlocks.splice(insertAfterIndex + 1, 0, { type: "imagePair", style: "default", images });
+  return nextBlocks;
+}
+
 function normalizeBlogBlocks(value, body = "", gallery = []) {
   const rawBlocks = parseBlogBlocks(value);
   const blocks = rawBlocks.length ? rawBlocks : bodyToBlogBlocks(body, gallery);
 
-  return blocks
+  const normalizedBlocks = blocks
     .map((block) => {
       const type = normalizeBlogBlockType(block?.type);
       const style = normalizeBlogBlockStyle(block?.style);
@@ -1521,6 +1543,8 @@ function normalizeBlogBlocks(value, body = "", gallery = []) {
     })
     .filter(Boolean)
     .slice(0, 40);
+
+  return ensureBlogEditorialImagePair(normalizedBlocks, gallery).slice(0, 40);
 }
 
 function blogBlocksToBody(blocks = []) {

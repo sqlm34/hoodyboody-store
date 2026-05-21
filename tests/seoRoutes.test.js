@@ -189,6 +189,38 @@ test("owner can create blog posts and upload blog photos", async () => {
       "legacy text-only posts must insert the two-photo block after the second paragraph"
     );
 
+    const textBlocksResponse = await fetch(`${baseUrl}/api/admin/blog/posts`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Cookie: cookie },
+      body: JSON.stringify({
+        title: "Text Blocks Template",
+        slug: "text-blocks-template",
+        category: "Studio",
+        author: "HOODYBOODY Studio",
+        date: "2026-05-19",
+        status: "published",
+        tags: "Embroidery, Studio",
+        excerpt: "Existing block posts without photos should receive the editorial photo pair.",
+        body: "First block paragraph.\n\nSecond block paragraph.\n\nThird block paragraph.",
+        blocks: [
+          { type: "paragraph", style: "default", text: "First block paragraph." },
+          { type: "paragraph", style: "default", text: "Second block paragraph." },
+          { type: "paragraph", style: "default", text: "Third block paragraph." }
+        ]
+      })
+    });
+    const textBlocksJson = await textBlocksResponse.json();
+    assert.equal(textBlocksResponse.status, 201);
+    assert.ok(textBlocksJson.post.blocks.some((block) => block.type === "imagePair"));
+    const textBlocksPublic = await fetch(`${baseUrl}/blog/${textBlocksJson.post.slug}/`);
+    const textBlocksHtml = await textBlocksPublic.text();
+    assert.ok(
+      textBlocksHtml.indexOf("First block paragraph") < textBlocksHtml.indexOf("Second block paragraph") &&
+        textBlocksHtml.indexOf("Second block paragraph") < textBlocksHtml.indexOf("blog-image-pair") &&
+        textBlocksHtml.indexOf("blog-image-pair") < textBlocksHtml.indexOf("Third block paragraph"),
+      "block-only posts must insert the two-photo block after the second paragraph"
+    );
+
     const createResponse = await fetch(`${baseUrl}/api/admin/blog/posts`, {
       method: "POST",
       headers: { "Content-Type": "application/json", Cookie: cookie },
