@@ -342,6 +342,43 @@ The process moves from artwork review to thread direction, stitch sample, produc
       { image: "/assets/embroidered-collection.png", alt: "Close view of botanical embroidery on wardrobe pieces", focus: "50% 55%" },
       { image: "/assets/embroidered-collection.png", alt: "Custom hoodie, jacket and tote with stitch detail", focus: "18% 52%" }
     ],
+    blocks: [
+      {
+        type: "paragraph",
+        style: "default",
+        text: "Custom clothing feels strongest when the stitch work looks intentional, balanced, and quiet enough to live with every day. At HOODYBOODY, each piece begins with a simple wardrobe idea and grows into embroidery that feels personal without becoming loud."
+      },
+      {
+        type: "paragraph",
+        style: "default",
+        text: "The best embroidered garments are not only decorative. They hold a memory, a brand mark, a small drawing, or a seasonal motif in a way that still feels wearable after the first impression passes."
+      },
+      { type: "heading2", style: "default", text: "Authentic Design" },
+      {
+        type: "paragraph",
+        style: "default",
+        text: "We look at fabric weight, placement, thread contrast, and the rhythm of the artwork before a piece goes into production. A hoodie asks for a different scale than a linen shirt, and a tote bag can carry a bolder composition without losing ease."
+      },
+      {
+        type: "imagePair",
+        style: "default",
+        images: [
+          { image: "/assets/embroidered-collection.png", alt: "Close view of botanical embroidery on wardrobe pieces", focus: "50% 55%" },
+          { image: "/assets/embroidered-collection.png", alt: "Custom hoodie, jacket and tote with stitch detail", focus: "18% 52%" }
+        ]
+      },
+      {
+        type: "paragraph",
+        style: "default",
+        text: "Every custom order is reviewed for stitch density, readability, and placement before we confirm the final quote. That slower first step keeps the finished product clean, durable, and close to the original idea."
+      },
+      { type: "heading3", style: "default", text: "Process Of Making Fashion Items" },
+      {
+        type: "paragraph",
+        style: "default",
+        text: "The process moves from artwork review to thread direction, stitch sample, production, and final finishing. The goal is a piece that feels like it belonged in the wardrobe from the beginning, with embroidery that adds identity rather than noise."
+      }
+    ],
     comments: [
       {
         id: "comment-kyle-gentry",
@@ -1368,6 +1405,130 @@ function normalizeBlogGallery(value) {
     .slice(0, 12);
 }
 
+function parseBlogBlocks(value) {
+  if (Array.isArray(value)) return value;
+  if (typeof value !== "string") return [];
+
+  const trimmed = value.trim();
+  if (!trimmed) return [];
+
+  try {
+    const parsed = JSON.parse(trimmed);
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+}
+
+function normalizeBlogBlockType(value) {
+  const type = String(value || "paragraph").trim();
+  return ["paragraph", "heading2", "heading3", "image", "imagePair"].includes(type) ? type : "paragraph";
+}
+
+function normalizeBlogBlockStyle(value) {
+  const style = String(value || "default").trim();
+  return ["default", "large", "quote", "accent", "wide", "inset"].includes(style) ? style : "default";
+}
+
+function getBlogBlockGallery(gallery) {
+  const normalized = normalizeBlogGallery(gallery);
+  return normalized.length ? normalized : normalizeBlogGallery(defaultBlogPosts[0].gallery);
+}
+
+function normalizeBlogBlockImage(value = {}, fallback = {}) {
+  const source = typeof value === "string" ? { image: value } : value || {};
+  const image = String(source.image || source.url || fallback.image || "").trim().slice(0, 600);
+  const alt = String(source.alt || fallback.alt || "HOODYBOODY blog image").trim().slice(0, 160);
+  const focus = String(source.focus || fallback.focus || "50% 50%").trim().slice(0, 40);
+  return image ? { image, alt, focus } : null;
+}
+
+function getDefaultBlogImagePair(gallery) {
+  const safeGallery = getBlogBlockGallery(gallery);
+  return [safeGallery[1] || safeGallery[0], safeGallery[2] || safeGallery[0]].filter(Boolean);
+}
+
+function bodyToBlogBlocks(body, gallery = []) {
+  const textBlocks = String(body || "")
+    .split(/\n{2,}/)
+    .map((block) => block.trim())
+    .filter(Boolean);
+  const blocks = [];
+  let shouldInsertImagePair = false;
+  let imagePairInserted = false;
+
+  textBlocks.forEach((block) => {
+    if (block.startsWith("### ")) {
+      blocks.push({ type: "heading3", style: "default", text: block.slice(4).trim() });
+      return;
+    }
+
+    if (block.startsWith("## ")) {
+      blocks.push({ type: "heading2", style: "default", text: block.slice(3).trim() });
+      shouldInsertImagePair = true;
+      return;
+    }
+
+    blocks.push({ type: "paragraph", style: "default", text: block });
+
+    if (shouldInsertImagePair && !imagePairInserted) {
+      const images = getDefaultBlogImagePair(gallery);
+      if (images.length >= 2) {
+        blocks.push({ type: "imagePair", style: "default", images });
+        imagePairInserted = true;
+      }
+      shouldInsertImagePair = false;
+    }
+  });
+
+  return blocks;
+}
+
+function normalizeBlogBlocks(value, body = "", gallery = []) {
+  const rawBlocks = parseBlogBlocks(value);
+  const blocks = rawBlocks.length ? rawBlocks : bodyToBlogBlocks(body, gallery);
+
+  return blocks
+    .map((block) => {
+      const type = normalizeBlogBlockType(block?.type);
+      const style = normalizeBlogBlockStyle(block?.style);
+
+      if (type === "image") {
+        const fallback = getBlogBlockGallery(gallery)[0] || {};
+        const image = normalizeBlogBlockImage(block?.image || block, fallback);
+        return image ? { type, style, image } : null;
+      }
+
+      if (type === "imagePair") {
+        const fallbackImages = getDefaultBlogImagePair(gallery);
+        const sourceImages = Array.isArray(block?.images) ? block.images : [];
+        const images = [0, 1]
+          .map((index) => normalizeBlogBlockImage(sourceImages[index], fallbackImages[index] || fallbackImages[0] || {}))
+          .filter(Boolean);
+        return images.length >= 2 ? { type, style, images } : null;
+      }
+
+      const text = String(block?.text || block?.body || block?.content || "").trim().slice(0, 2400);
+      return text ? { type, style, text } : null;
+    })
+    .filter(Boolean)
+    .slice(0, 40);
+}
+
+function blogBlocksToBody(blocks = []) {
+  return normalizeBlogBlocks(blocks)
+    .map((block) => {
+      if (block.type === "heading2") return `## ${block.text}`;
+      if (block.type === "heading3") return `### ${block.text}`;
+      if (block.type === "paragraph") return block.text;
+      return "";
+    })
+    .filter(Boolean)
+    .join("\n\n")
+    .trim()
+    .slice(0, 12000);
+}
+
 function normalizeBlogCommentStatus(value, fallback = "published") {
   const status = String(value || fallback).toLowerCase();
   return ["pending", "published", "rejected"].includes(status) ? status : fallback;
@@ -1430,9 +1591,11 @@ function sanitizeBlogPost(body = {}, currentPost = {}) {
   const author = String(body.author ?? currentPost.author ?? "HOODYBOODY Studio").trim().slice(0, 90);
   const date = String(body.date ?? currentPost.date ?? new Date().toISOString().slice(0, 10)).trim().slice(0, 10);
   const status = String(body.status ?? currentPost.status ?? "draft").toLowerCase() === "published" ? "published" : "draft";
-  const blogBody = String(body.body ?? currentPost.body ?? "").trim().slice(0, 12000);
   const tags = parseList(body.tags ?? currentPost.tags, currentPost.tags || ["Embroidery"]).slice(0, 12);
   const gallery = normalizeBlogGallery(body.gallery ?? currentPost.gallery);
+  const rawBlogBody = String(body.body ?? currentPost.body ?? "").trim().slice(0, 12000);
+  const blocks = normalizeBlogBlocks(body.blocks ?? currentPost.blocks, rawBlogBody, gallery);
+  const blogBody = blogBlocksToBody(blocks) || rawBlogBody;
   const comments = normalizeBlogComments(body.comments ?? currentPost.comments);
 
   if (!title || !blogBody) {
@@ -1451,6 +1614,7 @@ function sanitizeBlogPost(body = {}, currentPost = {}) {
       status,
       tags,
       body: blogBody,
+      blocks,
       gallery: gallery.length ? gallery : normalizeBlogGallery(defaultBlogPosts[0].gallery),
       comments,
       createdAt: currentPost.createdAt || new Date().toISOString(),
@@ -2085,6 +2249,54 @@ function renderBlogBodyHtml(body, post) {
     .join("\n");
 }
 
+function renderBlogBlockImagePair(block, post) {
+  const fallbackPair = getDefaultBlogImagePair(post.gallery);
+  const sourceImages = Array.isArray(block.images) ? block.images : [];
+  const pair = [0, 1].map((index) => normalizeBlogBlockImage(sourceImages[index], fallbackPair[index] || fallbackPair[0] || {})).filter(Boolean);
+  if (pair.length < 2) return "";
+
+  return `
+          <div class="blog-image-pair blog-builder-block blog-block-style-${escapeHtmlAttribute(normalizeBlogBlockStyle(block.style))}">
+            ${pair
+              .map(
+                (image) => `
+            <figure>
+              <img src="${escapeHtmlAttribute(image.image)}" alt="${escapeHtmlAttribute(image.alt)}" style="object-position: ${escapeHtmlAttribute(image.focus)}" />
+            </figure>`
+              )
+              .join("")}
+          </div>`;
+}
+
+function renderBlogBlockSingleImage(block, post) {
+  const fallback = getBlogBlockGallery(post.gallery)[0] || {};
+  const image = normalizeBlogBlockImage(block.image || block, fallback);
+  if (!image) return "";
+
+  return `
+          <figure class="blog-image-single blog-builder-block blog-block-style-${escapeHtmlAttribute(normalizeBlogBlockStyle(block.style))}">
+            <img src="${escapeHtmlAttribute(image.image)}" alt="${escapeHtmlAttribute(image.alt)}" style="object-position: ${escapeHtmlAttribute(image.focus)}" />
+          </figure>`;
+}
+
+function renderBlogBlocksHtml(post) {
+  const blocks = normalizeBlogBlocks(post.blocks, post.body, post.gallery);
+  if (!blocks.length) return renderBlogBodyHtml(post.body, post);
+
+  return blocks
+    .map((block) => {
+      const styleClass = `blog-builder-block blog-block-style-${escapeHtmlAttribute(normalizeBlogBlockStyle(block.style))}`;
+
+      if (block.type === "heading2") return `<h2 class="${styleClass}">${escapeHtml(block.text)}</h2>`;
+      if (block.type === "heading3") return `<h3 class="${styleClass}">${escapeHtml(block.text)}</h3>`;
+      if (block.type === "image") return renderBlogBlockSingleImage(block, post);
+      if (block.type === "imagePair") return renderBlogBlockImagePair(block, post);
+
+      return `<p class="${styleClass}">${escapeHtml(block.text).replace(/\n/g, "<br />")}</p>`;
+    })
+    .join("\n");
+}
+
 function renderBlogSidebar(post) {
   const gallery = normalizeBlogGallery(post.gallery).length ? normalizeBlogGallery(post.gallery) : normalizeBlogGallery(defaultBlogPosts[0].gallery);
   const sidebarImages = Array.from({ length: 6 }, (_, index) => gallery[index % gallery.length]);
@@ -2236,7 +2448,7 @@ function renderBlogPostPage(req, post) {
                     <a href="/blog/">${escapeHtml(post.category || "Embroidery Journal")}</a>
                   </div>
                   <h1 class="blog-title qodef-e-title entry-title" id="blog-post-title">${escapeHtml(post.title)}</h1>
-                  <div class="blog-content qodef-e-text">${renderBlogBodyHtml(post.body, post)}</div>
+                  <div class="blog-content qodef-e-text">${renderBlogBlocksHtml(post)}</div>
                   <footer class="blog-post-footer qodef-e-bottom-holder" aria-label="Post tags and share links">
                     <div class="blog-tags qodef-e-left qodef-e-info">
                       ${(post.tags || []).map((tag, index) => `${index ? "<span>,</span>" : ""}<a href="/blog/">${escapeHtml(tag)}</a>`).join("")}

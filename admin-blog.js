@@ -1,5 +1,20 @@
 const DEFAULT_BLOG_IMAGE = "/assets/embroidered-collection.png";
 const BLOG_STATUS_OPTIONS = ["draft", "published"];
+const BLOG_BLOCK_TYPES = [
+  ["paragraph", "Paragraph"],
+  ["heading2", "Heading"],
+  ["heading3", "Subheading"],
+  ["image", "Single photo"],
+  ["imagePair", "Two photos"]
+];
+const BLOG_BLOCK_STYLES = [
+  ["default", "Default"],
+  ["large", "Large text"],
+  ["quote", "Quote"],
+  ["accent", "Accent panel"],
+  ["wide", "Wide image"],
+  ["inset", "Inset image"]
+];
 const maxUploadSourceBytes = 12 * 1024 * 1024;
 const maxImageEdge = 1800;
 
@@ -118,7 +133,8 @@ function getBlankPost() {
     status: "draft",
     tags: ["Embroidery"],
     body: "Write the opening paragraph here.\n\n## Section heading\n\nAdd the next block of blog text here.",
-    gallery: [{ image: DEFAULT_BLOG_IMAGE, alt: "HOODYBOODY embroidered clothing", focus: "50% 50%" }]
+    gallery: [{ image: DEFAULT_BLOG_IMAGE, alt: "HOODYBOODY embroidered clothing", focus: "50% 50%" }],
+    blocks: getDefaultBlogBlocks()
   };
 }
 
@@ -140,6 +156,298 @@ function getPostPhotos(post) {
 
 function getCoverPhoto(post) {
   return getPostPhotos(post)[0] || { image: DEFAULT_BLOG_IMAGE, focus: "50% 50%" };
+}
+
+function normalizeBuilderType(value) {
+  return BLOG_BLOCK_TYPES.some(([type]) => type === value) ? value : "paragraph";
+}
+
+function normalizeBuilderStyle(value) {
+  return BLOG_BLOCK_STYLES.some(([style]) => style === value) ? value : "default";
+}
+
+function normalizeBuilderImage(value = {}, fallback = {}) {
+  const source = typeof value === "string" ? { image: value } : value || {};
+  const image = String(source.image || source.url || fallback.image || DEFAULT_BLOG_IMAGE).trim();
+  return {
+    image,
+    alt: String(source.alt || fallback.alt || "HOODYBOODY embroidered clothing").trim(),
+    focus: String(source.focus || fallback.focus || "50% 50%").trim()
+  };
+}
+
+function getDefaultBlogBlocks(post = {}) {
+  const photos = getPostPhotos(post);
+  const first = photos[0] || { image: DEFAULT_BLOG_IMAGE, alt: "HOODYBOODY embroidered clothing", focus: "50% 50%" };
+  const second = photos[1] || first;
+
+  return [
+    { type: "paragraph", style: "default", text: "Write the opening paragraph here." },
+    { type: "paragraph", style: "default", text: "Add the second paragraph with context, story, and value for the reader." },
+    { type: "heading2", style: "default", text: "Section Heading" },
+    { type: "paragraph", style: "default", text: "Add the next block of blog text here." },
+    { type: "imagePair", style: "default", images: [first, second] },
+    { type: "paragraph", style: "default", text: "Continue the article with another detailed paragraph." },
+    { type: "heading3", style: "default", text: "Process Of Making Fashion Items" },
+    { type: "paragraph", style: "default", text: "Close this section with a final paragraph." }
+  ];
+}
+
+function bodyToBuilderBlocks(body, post = {}) {
+  const rawBlocks = String(body || "")
+    .split(/\n{2,}/)
+    .map((block) => block.trim())
+    .filter(Boolean);
+  const blocks = [];
+  let insertPhotoPair = false;
+  let photoPairInserted = false;
+
+  rawBlocks.forEach((block) => {
+    if (block.startsWith("### ")) {
+      blocks.push({ type: "heading3", style: "default", text: block.slice(4).trim() });
+      return;
+    }
+
+    if (block.startsWith("## ")) {
+      blocks.push({ type: "heading2", style: "default", text: block.slice(3).trim() });
+      insertPhotoPair = true;
+      return;
+    }
+
+    blocks.push({ type: "paragraph", style: "default", text: block });
+
+    if (insertPhotoPair && !photoPairInserted) {
+      const photos = getPostPhotos(post);
+      blocks.push({ type: "imagePair", style: "default", images: [photos[1] || photos[0], photos[2] || photos[0]] });
+      photoPairInserted = true;
+      insertPhotoPair = false;
+    }
+  });
+
+  return blocks.length ? blocks : getDefaultBlogBlocks(post);
+}
+
+function getPostBlocks(post) {
+  if (Array.isArray(post.blocks) && post.blocks.length) {
+    return post.blocks.map((block) => {
+      const type = normalizeBuilderType(block?.type);
+      const style = normalizeBuilderStyle(block?.style);
+
+      if (type === "image") {
+        return { type, style, image: normalizeBuilderImage(block?.image || block, getCoverPhoto(post)) };
+      }
+
+      if (type === "imagePair") {
+        const photos = getPostPhotos(post);
+        const images = Array.isArray(block?.images) ? block.images : [];
+        return {
+          type,
+          style,
+          images: [
+            normalizeBuilderImage(images[0], photos[1] || photos[0]),
+            normalizeBuilderImage(images[1], photos[2] || photos[0])
+          ]
+        };
+      }
+
+      return {
+        type,
+        style,
+        text: String(block?.text || block?.body || block?.content || "").trim()
+      };
+    });
+  }
+
+  return bodyToBuilderBlocks(post.body, post);
+}
+
+function builderBlocksToBody(blocks = []) {
+  return blocks
+    .map((block) => {
+      if (block.type === "heading2") return `## ${block.text || ""}`.trim();
+      if (block.type === "heading3") return `### ${block.text || ""}`.trim();
+      if (block.type === "paragraph") return String(block.text || "").trim();
+      return "";
+    })
+    .filter(Boolean)
+    .join("\n\n");
+}
+
+function renderBuilderOptions(options, activeValue) {
+  return options.map(([value, label]) => `<option value="${escapeHtml(value)}" ${value === activeValue ? "selected" : ""}>${escapeHtml(label)}</option>`).join("");
+}
+
+function renderBuilderPhotoSelect(slot, photos, currentImage) {
+  return `
+    <select data-block-photo-select data-block-image-slot="${slot}">
+      <option value="">Choose uploaded photo</option>
+      ${photos
+        .map(
+          (photo, index) => `
+            <option
+              value="${escapeHtml(photo.image)}"
+              data-alt="${escapeHtml(photo.alt)}"
+              data-focus="${escapeHtml(photo.focus)}"
+              ${photo.image === currentImage ? "selected" : ""}
+            >${escapeHtml(index === 0 ? "Cover photo" : photo.alt)}</option>`
+        )
+        .join("")}
+    </select>`;
+}
+
+function renderBuilderImageFields(block, post) {
+  const photos = getPostPhotos(post);
+  const images =
+    block.type === "imagePair"
+      ? [
+          normalizeBuilderImage(block.images?.[0], photos[1] || photos[0]),
+          normalizeBuilderImage(block.images?.[1], photos[2] || photos[0])
+        ]
+      : [normalizeBuilderImage(block.image || block.images?.[0], photos[0])];
+
+  return `
+    <div class="admin-builder-images">
+      ${[0, 1]
+        .map((slot) => {
+          const image = images[slot] || normalizeBuilderImage({}, photos[slot] || photos[0]);
+          return `
+            <div class="admin-builder-image-field admin-builder-image-slot-${slot}">
+              <label>
+                Photo ${slot + 1}
+                ${renderBuilderPhotoSelect(slot, photos, image.image)}
+              </label>
+              <label>
+                Image URL
+                <input data-block-image-url="${slot}" value="${escapeHtml(image.image)}" />
+              </label>
+              <label>
+                Alt text
+                <input data-block-image-alt="${slot}" value="${escapeHtml(image.alt)}" />
+              </label>
+              <label>
+                Focus
+                <input data-block-image-focus="${slot}" value="${escapeHtml(image.focus)}" placeholder="50% 50%" />
+              </label>
+            </div>`;
+        })
+        .join("")}
+    </div>`;
+}
+
+function renderBlogBuilderBlock(block, index, post) {
+  const type = normalizeBuilderType(block?.type);
+  const style = normalizeBuilderStyle(block?.style);
+  const text = String(block?.text || "").trim();
+
+  return `
+    <article class="admin-builder-block" data-blog-block data-block-type="${escapeHtml(type)}">
+      <div class="admin-builder-block-head">
+        <span class="admin-builder-order" data-block-order>${index + 1}</span>
+        <label>
+          Block
+          <select data-block-type-select>
+            ${renderBuilderOptions(BLOG_BLOCK_TYPES, type)}
+          </select>
+        </label>
+        <label>
+          Design
+          <select data-block-style-select>
+            ${renderBuilderOptions(BLOG_BLOCK_STYLES, style)}
+          </select>
+        </label>
+        <div class="admin-builder-actions">
+          <button class="icon-button" type="button" data-move-blog-block="up" aria-label="Move block up"><i class="fa-solid fa-arrow-up"></i></button>
+          <button class="icon-button" type="button" data-move-blog-block="down" aria-label="Move block down"><i class="fa-solid fa-arrow-down"></i></button>
+          <button class="icon-button danger-button" type="button" data-delete-blog-block aria-label="Delete block"><i class="fa-solid fa-xmark"></i></button>
+        </div>
+      </div>
+      <label class="admin-builder-text">
+        Text
+        <textarea data-block-text rows="${type === "paragraph" ? "4" : "2"}">${escapeHtml(text)}</textarea>
+      </label>
+      ${renderBuilderImageFields({ ...block, type }, post)}
+    </article>`;
+}
+
+function renderBlogBuilder(post) {
+  const blocks = getPostBlocks(post);
+
+  return `
+    <div class="admin-blog-builder full-span" data-blog-builder>
+      <input type="hidden" name="blocks" data-blog-blocks-field value="${escapeHtml(JSON.stringify(blocks))}" />
+      <textarea name="body" data-blog-body-fallback hidden>${escapeHtml(builderBlocksToBody(blocks))}</textarea>
+      <div class="admin-blog-builder-head">
+        <div>
+          <strong>Blog page builder</strong>
+          <small>Move blocks, change type, choose design style, and attach article photos.</small>
+        </div>
+        <div class="admin-builder-adds" aria-label="Add blog block">
+          <button class="button ghost dark" type="button" data-add-blog-block="paragraph">Paragraph</button>
+          <button class="button ghost dark" type="button" data-add-blog-block="heading2">Heading</button>
+          <button class="button ghost dark" type="button" data-add-blog-block="heading3">Subheading</button>
+          <button class="button ghost dark" type="button" data-add-blog-block="image">Photo</button>
+          <button class="button ghost dark" type="button" data-add-blog-block="imagePair">Two photos</button>
+        </div>
+      </div>
+      <div class="admin-builder-list" data-blog-builder-list>
+        ${blocks.map((block, index) => renderBlogBuilderBlock(block, index, post)).join("")}
+      </div>
+    </div>`;
+}
+
+function collectBlogBlocks(form) {
+  return Array.from(form.querySelectorAll("[data-blog-block]"))
+    .map((card) => {
+      const type = normalizeBuilderType(card.dataset.blockType);
+      const style = normalizeBuilderStyle(card.querySelector("[data-block-style-select]")?.value);
+
+      if (type === "image") {
+        return {
+          type,
+          style,
+          image: {
+            image: card.querySelector('[data-block-image-url="0"]')?.value.trim() || DEFAULT_BLOG_IMAGE,
+            alt: card.querySelector('[data-block-image-alt="0"]')?.value.trim() || "HOODYBOODY blog image",
+            focus: card.querySelector('[data-block-image-focus="0"]')?.value.trim() || "50% 50%"
+          }
+        };
+      }
+
+      if (type === "imagePair") {
+        return {
+          type,
+          style,
+          images: [0, 1].map((slot) => ({
+            image: card.querySelector(`[data-block-image-url="${slot}"]`)?.value.trim() || DEFAULT_BLOG_IMAGE,
+            alt: card.querySelector(`[data-block-image-alt="${slot}"]`)?.value.trim() || "HOODYBOODY blog image",
+            focus: card.querySelector(`[data-block-image-focus="${slot}"]`)?.value.trim() || "50% 50%"
+          }))
+        };
+      }
+
+      return {
+        type,
+        style,
+        text: card.querySelector("[data-block-text]")?.value.trim() || ""
+      };
+    })
+    .filter((block) => block.type === "image" || block.type === "imagePair" || block.text);
+}
+
+function syncBlogBuilderFields(form) {
+  const blocks = collectBlogBlocks(form);
+  const body = builderBlocksToBody(blocks);
+  const blocksField = form.querySelector("[data-blog-blocks-field]");
+  const bodyField = form.querySelector("[data-blog-body-fallback]");
+  if (blocksField) blocksField.value = JSON.stringify(blocks);
+  if (bodyField) bodyField.value = body;
+  return { blocks, body };
+}
+
+function updateBuilderOrder(form) {
+  form.querySelectorAll("[data-block-order]").forEach((item, index) => {
+    item.textContent = String(index + 1);
+  });
 }
 
 function renderStatusSelect(post) {
@@ -268,10 +576,7 @@ function renderPostForm(post, mode = "edit") {
             Meta excerpt
             <textarea name="excerpt" rows="3" required>${escapeHtml(post.excerpt || "")}</textarea>
           </label>
-          <label class="full-span">
-            Blog text
-            <textarea name="body" rows="12" required>${escapeHtml(post.body || "")}</textarea>
-          </label>
+          ${renderBlogBuilder(post)}
         </div>
         <div class="admin-editor-actions">
           <button class="button ghost dark" type="button" data-close-editor>Back to posts</button>
@@ -491,9 +796,19 @@ adminBlogList.addEventListener("submit", (event) => {
 
   const form = event.target.closest("[data-post-id]");
   const submitButton = form.querySelector('button[type="submit"]');
+  const builderData = syncBlogBuilderFields(form);
+  const hasTextContent = builderData.blocks.some((block) => ["paragraph", "heading2", "heading3"].includes(block.type) && block.text);
+
+  if (!hasTextContent) {
+    setBlogStatus("Add at least one heading or paragraph before saving.", true);
+    return;
+  }
+
   const data = Object.fromEntries(new FormData(form));
   const isCreate = form.dataset.editorMode === "create";
   data.postId = form.dataset.postId;
+  data.blocks = builderData.blocks;
+  data.body = builderData.body;
 
   submitButton.disabled = true;
   submitButton.textContent = isCreate ? "Creating..." : "Saving...";
@@ -534,6 +849,61 @@ adminBlogList.addEventListener("click", (event) => {
     selectedPostId = "";
     editorMode = "grid";
     renderBlogEditor();
+    return;
+  }
+
+  const addBlockButton = event.target.closest("[data-add-blog-block]");
+  if (addBlockButton) {
+    const form = addBlockButton.closest("[data-post-id]");
+    const list = form.querySelector("[data-blog-builder-list]");
+    const post = getSelectedPost() || getBlankPost();
+    const photos = getPostPhotos(post);
+    const type = normalizeBuilderType(addBlockButton.dataset.addBlogBlock);
+    const block =
+      type === "image"
+        ? { type, style: "default", image: photos[0] }
+        : type === "imagePair"
+          ? { type, style: "default", images: [photos[1] || photos[0], photos[2] || photos[0]] }
+          : { type, style: "default", text: type === "paragraph" ? "New paragraph text." : "New heading" };
+
+    list.insertAdjacentHTML("beforeend", renderBlogBuilderBlock(block, list.children.length, post));
+    updateBuilderOrder(form);
+    syncBlogBuilderFields(form);
+    return;
+  }
+
+  const moveBlockButton = event.target.closest("[data-move-blog-block]");
+  if (moveBlockButton) {
+    const form = moveBlockButton.closest("[data-post-id]");
+    const card = moveBlockButton.closest("[data-blog-block]");
+    const direction = moveBlockButton.dataset.moveBlogBlock;
+
+    if (direction === "up" && card.previousElementSibling) {
+      card.parentElement.insertBefore(card, card.previousElementSibling);
+    }
+
+    if (direction === "down" && card.nextElementSibling) {
+      card.parentElement.insertBefore(card.nextElementSibling, card);
+    }
+
+    updateBuilderOrder(form);
+    syncBlogBuilderFields(form);
+    return;
+  }
+
+  const deleteBlockButton = event.target.closest("[data-delete-blog-block]");
+  if (deleteBlockButton) {
+    const form = deleteBlockButton.closest("[data-post-id]");
+    const card = deleteBlockButton.closest("[data-blog-block]");
+    const remainingBlocks = form.querySelectorAll("[data-blog-block]").length;
+    if (remainingBlocks <= 1) {
+      setBlogStatus("Keep at least one builder block.", true);
+      return;
+    }
+
+    card.remove();
+    updateBuilderOrder(form);
+    syncBlogBuilderFields(form);
     return;
   }
 
@@ -679,6 +1049,12 @@ adminBlogCommentsList.addEventListener("click", (event) => {
 });
 
 adminBlogList.addEventListener("input", (event) => {
+  const builderField = event.target.closest("[data-blog-builder]");
+  if (builderField) {
+    const form = event.target.closest("[data-post-id]");
+    syncBlogBuilderFields(form);
+  }
+
   const titleInput = event.target.closest('input[name="title"]');
   if (!titleInput) return;
 
@@ -690,6 +1066,41 @@ adminBlogList.addEventListener("input", (event) => {
 });
 
 adminBlogList.addEventListener("change", (event) => {
+  const blockTypeSelect = event.target.closest("[data-block-type-select]");
+  if (blockTypeSelect) {
+    const form = blockTypeSelect.closest("[data-post-id]");
+    const card = blockTypeSelect.closest("[data-blog-block]");
+    card.dataset.blockType = normalizeBuilderType(blockTypeSelect.value);
+    syncBlogBuilderFields(form);
+    return;
+  }
+
+  const blockStyleSelect = event.target.closest("[data-block-style-select]");
+  if (blockStyleSelect) {
+    const form = blockStyleSelect.closest("[data-post-id]");
+    syncBlogBuilderFields(form);
+    return;
+  }
+
+  const blockPhotoSelect = event.target.closest("[data-block-photo-select]");
+  if (blockPhotoSelect) {
+    const form = blockPhotoSelect.closest("[data-post-id]");
+    const slot = blockPhotoSelect.dataset.blockImageSlot;
+    const option = blockPhotoSelect.selectedOptions[0];
+    const card = blockPhotoSelect.closest("[data-blog-block]");
+    const imageInput = card.querySelector(`[data-block-image-url="${slot}"]`);
+    const altInput = card.querySelector(`[data-block-image-alt="${slot}"]`);
+    const focusInput = card.querySelector(`[data-block-image-focus="${slot}"]`);
+
+    if (option?.value) {
+      if (imageInput) imageInput.value = option.value;
+      if (altInput) altInput.value = option.dataset.alt || altInput.value;
+      if (focusInput) focusInput.value = option.dataset.focus || focusInput.value;
+      syncBlogBuilderFields(form);
+    }
+    return;
+  }
+
   const input = event.target.closest("[data-photo-input]");
   if (!input || !input.files.length) return;
 

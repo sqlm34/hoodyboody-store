@@ -86,6 +86,9 @@ test("blog page renders Valeska-style single post functionality", async () => {
     assert.match(response.headers.get("x-robots-tag") || "", /noindex/);
     assert.match(html, /Fashion Is Our Passion \| HOODYBOODY Blog/);
     assert.match(html, /data-blog-gallery/);
+    assert.match(html, /blog-builder-block/);
+    assert.match(html, /blog-image-pair/);
+    assert.match(html, /Process Of Making Fashion Items/);
     assert.match(html, /id="qodef-page-sidebar"/);
     assert.match(html, /blog-sidebar-nav/);
     assert.match(html, /blog-sidebar-gallery-grid/);
@@ -103,6 +106,8 @@ test("blog page renders Valeska-style single post functionality", async () => {
     assert.match(css, /\.blog-sidebar-tags \.tagcloud\s*{\s*display: grid/);
     assert.match(css, /grid-template-columns: repeat\(2, minmax\(0, 1fr\)\)/);
     assert.match(css, /min-height: 38px/);
+    assert.match(css, /blog-block-style-accent/);
+    assert.match(css, /blog-image-single/);
     assert.match(css, /\.blog-tags span\s*{\s*display: none/);
     assert.match(css, /\.blog-comment > ol/);
     assert.match(css, /overflow-wrap: anywhere/);
@@ -133,6 +138,17 @@ test("owner can create blog posts and upload blog photos", async () => {
     assert.match(adminHtml, /Comment moderation/);
     assert.match(adminHtml, /admin-blog\.js/);
 
+    const adminScriptResponse = await fetch(`${baseUrl}/admin-blog.js`);
+    const adminScript = await adminScriptResponse.text();
+    const cssResponse = await fetch(`${baseUrl}/styles.css`);
+    const css = await cssResponse.text();
+    assert.match(adminScript, /data-blog-builder/);
+    assert.match(adminScript, /data-add-blog-block/);
+    assert.match(adminScript, /data-move-blog-block/);
+    assert.match(adminScript, /data-block-style-select/);
+    assert.match(css, /admin-blog-builder/);
+    assert.match(css, /admin-builder-block/);
+
     const postsResponse = await fetch(`${baseUrl}/api/admin/blog/posts`, {
       headers: { Cookie: cookie }
     });
@@ -152,13 +168,27 @@ test("owner can create blog posts and upload blog photos", async () => {
         status: "published",
         tags: "Embroidery, Studio",
         excerpt: "Short studio note about custom embroidery.",
-        body: "First paragraph for the studio note.\n\n## Process\n\nMore text for the blog page."
+        body: "First paragraph for the studio note.\n\n## Process\n\nMore text for the blog page.",
+        blocks: [
+          { type: "paragraph", style: "large", text: "First paragraph for the studio note." },
+          { type: "heading2", style: "default", text: "Process" },
+          { type: "paragraph", style: "accent", text: "More text for the blog page." },
+          {
+            type: "imagePair",
+            style: "inset",
+            images: [
+              { image: "/assets/embroidered-collection.png", alt: "Studio detail one", focus: "50% 50%" },
+              { image: "/assets/embroidered-collection.png", alt: "Studio detail two", focus: "50% 50%" }
+            ]
+          }
+        ]
       })
     });
     const createdJson = await createResponse.json();
     assert.equal(createResponse.status, 201);
     assert.equal(createdJson.post.status, "published");
     assert.match(createdJson.post.slug, /^studio-notes/);
+    assert.equal(createdJson.post.blocks.length, 4);
 
     const tinyPng =
       "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+/p9sAAAAASUVORK5CYII=";
@@ -180,6 +210,8 @@ test("owner can create blog posts and upload blog photos", async () => {
     assert.equal(publicPost.status, 200);
     assert.match(publicHtml, /Studio Notes \| HOODYBOODY Blog/);
     assert.match(publicHtml, /First paragraph for the studio note/);
+    assert.match(publicHtml, /blog-block-style-accent/);
+    assert.match(publicHtml, /blog-image-pair/);
     assert.match(publicHtml, /\/api\/blog-images\//);
 
     const commentResponse = await fetch(`${baseUrl}/api/blog/comments`, {
