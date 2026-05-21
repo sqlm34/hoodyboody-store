@@ -163,6 +163,32 @@ test("owner can create blog posts and upload blog photos", async () => {
     assert.equal(postsResponse.status, 200);
     assert.ok(postsJson.posts.some((post) => post.slug === "fashion-is-our-passion"));
 
+    const legacyCreateResponse = await fetch(`${baseUrl}/api/admin/blog/posts`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Cookie: cookie },
+      body: JSON.stringify({
+        title: "Legacy Body Template",
+        slug: "legacy-body-template",
+        category: "Studio",
+        author: "HOODYBOODY Studio",
+        date: "2026-05-19",
+        status: "published",
+        tags: "Embroidery, Studio",
+        excerpt: "Plain text post should still receive the editorial photo pair.",
+        body: "First legacy paragraph.\n\nSecond legacy paragraph.\n\nThird legacy paragraph."
+      })
+    });
+    const legacyCreateJson = await legacyCreateResponse.json();
+    assert.equal(legacyCreateResponse.status, 201);
+    const legacyPublic = await fetch(`${baseUrl}/blog/${legacyCreateJson.post.slug}/`);
+    const legacyHtml = await legacyPublic.text();
+    assert.ok(
+      legacyHtml.indexOf("First legacy paragraph") < legacyHtml.indexOf("Second legacy paragraph") &&
+        legacyHtml.indexOf("Second legacy paragraph") < legacyHtml.indexOf("blog-image-pair") &&
+        legacyHtml.indexOf("blog-image-pair") < legacyHtml.indexOf("Third legacy paragraph"),
+      "legacy text-only posts must insert the two-photo block after the second paragraph"
+    );
+
     const createResponse = await fetch(`${baseUrl}/api/admin/blog/posts`, {
       method: "POST",
       headers: { "Content-Type": "application/json", Cookie: cookie },

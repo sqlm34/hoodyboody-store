@@ -1456,6 +1456,14 @@ function bodyToBlogBlocks(body, gallery = []) {
   const blocks = [];
   let shouldInsertImagePair = false;
   let imagePairInserted = false;
+  let paragraphCount = 0;
+  const hasHeading2 = textBlocks.some((block) => block.startsWith("## "));
+  const insertImagePair = () => {
+    const images = getDefaultBlogImagePair(gallery);
+    if (images.length < 2) return;
+    blocks.push({ type: "imagePair", style: "default", images });
+    imagePairInserted = true;
+  };
 
   textBlocks.forEach((block) => {
     if (block.startsWith("### ")) {
@@ -1470,15 +1478,15 @@ function bodyToBlogBlocks(body, gallery = []) {
     }
 
     blocks.push({ type: "paragraph", style: "default", text: block });
+    paragraphCount += 1;
 
     if (shouldInsertImagePair && !imagePairInserted) {
-      const images = getDefaultBlogImagePair(gallery);
-      if (images.length >= 2) {
-        blocks.push({ type: "imagePair", style: "default", images });
-        imagePairInserted = true;
-      }
+      insertImagePair();
       shouldInsertImagePair = false;
+      return;
     }
+
+    if (!hasHeading2 && paragraphCount === 2 && !imagePairInserted) insertImagePair();
   });
 
   return blocks;

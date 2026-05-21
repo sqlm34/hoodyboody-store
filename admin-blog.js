@@ -201,6 +201,13 @@ function bodyToBuilderBlocks(body, post = {}) {
   const blocks = [];
   let insertPhotoPair = false;
   let photoPairInserted = false;
+  let paragraphCount = 0;
+  const hasHeading2 = rawBlocks.some((block) => block.startsWith("## "));
+  const insertBuilderPhotoPair = () => {
+    const photos = getPostPhotos(post);
+    blocks.push({ type: "imagePair", style: "default", images: [photos[1] || photos[0], photos[2] || photos[0]] });
+    photoPairInserted = true;
+  };
 
   rawBlocks.forEach((block) => {
     if (block.startsWith("### ")) {
@@ -215,13 +222,15 @@ function bodyToBuilderBlocks(body, post = {}) {
     }
 
     blocks.push({ type: "paragraph", style: "default", text: block });
+    paragraphCount += 1;
 
     if (insertPhotoPair && !photoPairInserted) {
-      const photos = getPostPhotos(post);
-      blocks.push({ type: "imagePair", style: "default", images: [photos[1] || photos[0], photos[2] || photos[0]] });
-      photoPairInserted = true;
+      insertBuilderPhotoPair();
       insertPhotoPair = false;
+      return;
     }
+
+    if (!hasHeading2 && paragraphCount === 2 && !photoPairInserted) insertBuilderPhotoPair();
   });
 
   return blocks.length ? blocks : getDefaultBlogBlocks(post);
