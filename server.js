@@ -2542,23 +2542,6 @@ function renderBlogPostPage(req, post) {
         </div>
       </div>
     </main>
-    <aside class="blog-newsletter" data-blog-newsletter aria-label="Newsletter subscription" aria-hidden="true">
-      <button class="blog-newsletter-close" type="button" aria-label="Close newsletter" data-blog-newsletter-close></button>
-      <div class="blog-newsletter-inner">
-        <h3>Keep In Touch</h3>
-        <p>Get notes about new embroidery drops and custom order openings.</p>
-        <form class="blog-newsletter-form" data-blog-newsletter-form>
-          <label class="visually-hidden" for="blogNewsletterEmail">Your e-mail</label>
-          <input id="blogNewsletterEmail" type="email" name="email" placeholder="Your e-mail" autocomplete="email" required />
-          <button type="submit">Subscribe</button>
-        </form>
-        <label class="blog-newsletter-disable">
-          <input type="checkbox" data-blog-newsletter-disable />
-          <span>Do not show again</span>
-        </label>
-        <p class="blog-newsletter-status" role="status" aria-live="polite"></p>
-      </div>
-    </aside>
     <button class="blog-back-top" type="button" aria-label="Back to top" data-blog-back-top></button>
     <script src="/session-nav.js"></script>
     <script src="/blog.js"></script>

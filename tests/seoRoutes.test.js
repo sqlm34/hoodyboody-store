@@ -23,6 +23,8 @@ test("homepage removes featured categories, service coverage, and thread palette
     const html = await response.text();
     const cssResponse = await fetch(`${baseUrl}/styles.css`);
     const css = await cssResponse.text();
+    const scriptResponse = await fetch(`${baseUrl}/script.js`);
+    const script = await scriptResponse.text();
     const capImage = await fetch(`${baseUrl}/assets/custom-order-cap.png`);
 
     assert.equal(response.status, 200);
@@ -30,6 +32,10 @@ test("homepage removes featured categories, service coverage, and thread palette
     assert.match(html, /<meta name="robots" content="noindex, nofollow, noarchive" \/>/);
     assert.match(css, /custom-order-cap\.png/);
     assert.match(css, /width: min\(400px, 100%\)/);
+    assert.match(css, /grid-template-columns: 25\.25% 74\.75%/);
+    assert.match(css, /aspect-ratio: 254 \/ 296/);
+    assert.match(css, /gap: 30px 0/);
+    assert.doesNotMatch(script, /catalog-section-all/);
     assert.equal(capImage.status, 200);
     assert.doesNotMatch(html, /featured categories/i);
     assert.doesNotMatch(html, /service coverage/i);
@@ -100,11 +106,12 @@ test("blog page renders Valeska-style single post functionality", async () => {
     assert.match(html, /blog-sidebar-nav/);
     assert.match(html, /blog-sidebar-gallery-grid/);
     assert.match(html, /blog-reply-grid/);
-    assert.match(html, /blog-newsletter/);
+    assert.doesNotMatch(html, /blog-newsletter/);
+    assert.doesNotMatch(html, /Keep In Touch|Subscribe To Our Newsletter/i);
     assert.match(html, /data-blog-comment-form/);
     assert.match(html, /<ol class="blog-comment-list">[\s\S]*data-blog-comment-id/);
     assert.match(html, /href="\/blog\/">Blog/);
-    assert.match(scriptText, /data-blog-newsletter/);
+    assert.doesNotMatch(scriptText, /data-blog-newsletter/);
     assert.match(scriptText, /Slide \$\{activeIndex \+ 1\} of \$\{slides\.length\}/);
     assert.match(css, /\.blog-layout/);
     assert.match(css, /\.blog-sidebar-widget/);
@@ -115,6 +122,7 @@ test("blog page renders Valeska-style single post functionality", async () => {
     assert.match(css, /min-height: 38px/);
     assert.match(css, /blog-block-style-accent/);
     assert.match(css, /blog-image-single/);
+    assert.doesNotMatch(css, /blog-newsletter/);
     assert.match(css, /\.blog-tags span\s*{\s*display: none/);
     assert.match(css, /\.blog-comment > ol/);
     assert.match(css, /overflow-wrap: anywhere/);

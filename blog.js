@@ -28,52 +28,6 @@
     showSlide(0);
   }
 
-  const newsletter = document.querySelector("[data-blog-newsletter]");
-  const newsletterForm = document.querySelector("[data-blog-newsletter-form]");
-  const newsletterClose = document.querySelector("[data-blog-newsletter-close]");
-  const newsletterDisable = document.querySelector("[data-blog-newsletter-disable]");
-  const newsletterStatus = document.querySelector(".blog-newsletter-status");
-  const newsletterKey = "hoodyboody-blog-newsletter-disabled";
-
-  function hideNewsletter(disable = false) {
-    if (!newsletter) return;
-    newsletter.classList.remove("is-visible");
-    newsletter.setAttribute("aria-hidden", "true");
-    if (disable) {
-      try {
-        window.localStorage.setItem(newsletterKey, "true");
-      } catch {
-        return;
-      }
-    }
-  }
-
-  if (newsletter) {
-    let disabled = false;
-    try {
-      disabled = window.localStorage.getItem(newsletterKey) === "true";
-    } catch {
-      disabled = false;
-    }
-
-    if (!disabled) {
-      window.setTimeout(() => {
-        newsletter.classList.add("is-visible");
-        newsletter.setAttribute("aria-hidden", "false");
-      }, 850);
-    }
-  }
-
-  newsletterClose?.addEventListener("click", () => hideNewsletter(Boolean(newsletterDisable?.checked)));
-  newsletterDisable?.addEventListener("change", () => {
-    if (newsletterDisable.checked) hideNewsletter(true);
-  });
-  newsletterForm?.addEventListener("submit", (event) => {
-    event.preventDefault();
-    if (newsletterStatus) newsletterStatus.textContent = "Thank you. Your first quote code is ready.";
-    window.setTimeout(() => hideNewsletter(false), 1200);
-  });
-
   document.querySelectorAll(".blog-reply-link").forEach((button) => {
     button.addEventListener("click", () => {
       const form = document.querySelector("[data-blog-comment-form]");

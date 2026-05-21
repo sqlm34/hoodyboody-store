@@ -486,11 +486,9 @@ function setCatalogFilter(filter, options = {}) {
 function renderCatalogSections() {
   if (!catalogSections) return;
 
-  const allCount = products.filter(productMatchesPageKeywords).length;
   const categoryLinks = getCatalogTypes()
     .map((type) => {
       const meta = getCategoryMeta(type);
-      const count = getCategoryProducts(type).length;
       const sampleProducts = getCategoryProducts(type)
         .slice(0, 5)
         .map((product) => `<span>${escapeHtml(product.title)}</span>`)
@@ -506,7 +504,6 @@ function renderCatalogSections() {
         >
           <span class="catalog-section-content">
             <span class="catalog-section-title">${escapeHtml(meta.title)}</span>
-            <span class="catalog-section-kicker">${count} ${count === 1 ? "piece" : "pieces"}</span>
             <span class="catalog-section-copy">${sampleProducts}</span>
           </span>
         </a>
@@ -514,15 +511,7 @@ function renderCatalogSections() {
     })
     .join("");
 
-  catalogSections.innerHTML = `
-    <a class="catalog-section-card catalog-section-all${state.filter === "all" ? " active" : ""}" href="#catalog" data-category="all">
-      <span class="catalog-section-content">
-        <span class="catalog-section-title">New</span>
-        <span class="catalog-section-kicker">${allCount} ${allCount === 1 ? "piece" : "pieces"}</span>
-      </span>
-    </a>
-    ${categoryLinks}
-  `;
+  catalogSections.innerHTML = categoryLinks;
 }
 
 function updateCatalogViewHead(visibleCount) {
