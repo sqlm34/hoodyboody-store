@@ -89,6 +89,13 @@ test("blog page renders Valeska-style single post functionality", async () => {
     assert.match(html, /blog-builder-block/);
     assert.match(html, /blog-image-pair/);
     assert.match(html, /Process Of Making Fashion Items/);
+    assert.ok(
+      html.indexOf("The best embroidered garments") < html.indexOf("Authentic Design") &&
+        html.indexOf("Authentic Design") < html.indexOf("We look at fabric weight") &&
+        html.indexOf("We look at fabric weight") < html.indexOf("blog-image-pair") &&
+        html.indexOf("blog-image-pair") < html.indexOf("Every custom order"),
+      "blog article must match the Valeska paragraph, heading, image-pair sequence"
+    );
     assert.match(html, /id="qodef-page-sidebar"/);
     assert.match(html, /blog-sidebar-nav/);
     assert.match(html, /blog-sidebar-gallery-grid/);
