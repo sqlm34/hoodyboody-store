@@ -333,6 +333,7 @@ function renderBuilderPhotoSelect(slot, photos, currentImage) {
 
 function renderBuilderImageFields(block, post) {
   const photos = getPostPhotos(post);
+  const isSavedPost = Boolean(post?.id);
   const images =
     block.type === "imagePair"
       ? [
@@ -348,14 +349,17 @@ function renderBuilderImageFields(block, post) {
           const image = images[slot] || normalizeBuilderImage({}, photos[slot] || photos[0]);
           return `
             <div class="admin-builder-image-field admin-builder-image-slot-${slot}">
+              <span
+                class="admin-builder-image-preview"
+                style="--product-image: url('${escapeHtml(image.image)}'); --focus: ${escapeHtml(image.focus)}"
+                aria-label="${escapeHtml(image.alt)}"
+              ></span>
               <label>
                 Photo ${slot + 1}
                 ${renderBuilderPhotoSelect(slot, photos, image.image)}
               </label>
-              <label>
-                Image URL
-                <input data-block-image-url="${slot}" value="${escapeHtml(image.image)}" />
-              </label>
+              <input type="hidden" data-block-image-url="${slot}" value="${escapeHtml(image.image)}" />
+              <button class="button ghost dark admin-builder-upload" type="button" data-upload-block-photo data-block-image-slot="${slot}" ${isSavedPost ? "" : "disabled"}>Upload</button>
               <label>
                 Alt text
                 <input data-block-image-alt="${slot}" value="${escapeHtml(image.alt)}" />
@@ -491,6 +495,7 @@ function renderEditorBlock(block, index, post) {
         </label>
         <button class="icon-button" type="button" data-move-blog-block="up" aria-label="Move block up"><i class="fa-solid fa-arrow-up"></i></button>
         <button class="icon-button" type="button" data-move-blog-block="down" aria-label="Move block down"><i class="fa-solid fa-arrow-down"></i></button>
+        <button class="icon-button" type="button" data-copy-blog-block aria-label="Copy block"><i class="fa-regular fa-copy"></i></button>
         <button class="icon-button danger-button" type="button" data-delete-blog-block aria-label="Delete block"><i class="fa-solid fa-xmark"></i></button>
       </div>
       <div class="admin-page-block-content">${content}</div>
@@ -699,6 +704,98 @@ function getBlockFromCard(card, nextType = card?.dataset.blockType) {
   return { type, style, text };
 }
 
+function cloneBlogBlock(block) {
+  return JSON.parse(JSON.stringify(block || {}));
+}
+
+function tagsFromInput(value) {
+  return String(value || "")
+    .split(",")
+    .map((tag) => tag.trim())
+    .filter(Boolean);
+}
+
+function getEditorPostSnapshot(form, patch = {}) {
+  const currentPost = getSelectedPost() || getBlankPost();
+  const data = Object.fromEntries(new FormData(form));
+  const builderData = syncBlogBuilderFields(form);
+
+  return {
+    ...currentPost,
+    ...patch,
+    id: form.dataset.postId || currentPost.id,
+    slug: String(data.slug || currentPost.slug || slugify(data.title || currentPost.title)).trim(),
+    title: String(data.title || currentPost.title || "New blog post").trim(),
+    excerpt: String(data.excerpt || currentPost.excerpt || "").trim(),
+    category: String(data.category || currentPost.category || "Embroidery Journal").trim(),
+    author: String(data.author || currentPost.author || "HOODYBOODY Studio").trim(),
+    date: String(data.date || currentPost.date || new Date().toISOString().slice(0, 10)).trim(),
+    status: String(data.status || currentPost.status || "draft").trim(),
+    tags: tagsFromInput(data.tags).length ? tagsFromInput(data.tags) : currentPost.tags || ["Embroidery"],
+    blocks: builderData.blocks.map(cloneBlogBlock),
+    body: builderData.body
+  };
+}
+
+function replacePostInState(post) {
+  if (!post?.id) return;
+  const postIndex = blogPosts.findIndex((item) => item.id === post.id);
+  if (postIndex === -1) {
+    blogPosts = [post, ...blogPosts];
+    return;
+  }
+
+  blogPosts = blogPosts.map((item, index) => (index === postIndex ? post : item));
+}
+
+function setBlockImageAt(blocks, blockIndex, slot, image) {
+  const nextBlocks = blocks.map(cloneBlogBlock);
+  const target = nextBlocks[blockIndex];
+  if (!target || !image) return nextBlocks;
+  const normalizedImage = normalizeBuilderImage(image, image);
+
+  if (target.type === "imagePair") {
+    target.images = Array.isArray(target.images) ? target.images : [];
+    target.images[slot] = normalizedImage;
+    if (!target.images[slot === 0 ? 1 : 0]) target.images[slot === 0 ? 1 : 0] = normalizedImage;
+    return nextBlocks;
+  }
+
+  target.type = "image";
+  target.image = normalizedImage;
+  return nextBlocks;
+}
+
+function replaceImageReferences(blocks, oldImage, nextImage) {
+  if (!oldImage || !nextImage) return blocks.map(cloneBlogBlock);
+  return blocks.map((block) => {
+    const nextBlock = cloneBlogBlock(block);
+    if (nextBlock.type === "image" && nextBlock.image?.image === oldImage) {
+      nextBlock.image = normalizeBuilderImage(nextImage, nextBlock.image);
+    }
+
+    if (nextBlock.type === "imagePair" && Array.isArray(nextBlock.images)) {
+      nextBlock.images = nextBlock.images.map((image) => (image?.image === oldImage ? normalizeBuilderImage(nextImage, image) : image));
+    }
+
+    return nextBlock;
+  });
+}
+
+function getUploadButtonForMode(form, options = {}) {
+  if (options.mode === "block") {
+    return form
+      .querySelectorAll("[data-blog-block]")
+      [options.blockIndex]?.querySelector(`[data-upload-block-photo][data-block-image-slot="${options.slot}"]`);
+  }
+
+  if (options.mode === "replace-photo") {
+    return form.querySelector(`[data-replace-photo-index="${options.photoIndex}"]`);
+  }
+
+  return form.querySelector("[data-upload-photo]");
+}
+
 function getDragAfterBlock(container, y) {
   return Array.from(container.querySelectorAll("[data-blog-block]:not(.is-dragging)")).reduce(
     (closest, child) => {
@@ -741,6 +838,7 @@ function renderStatusSelect(post) {
 
 function renderPhotoTiles(post, isCreate = false) {
   const photos = getPostPhotos(post);
+  const canEditPhotos = !isCreate && Boolean(post.id);
 
   return `
     <div class="admin-photo-grid">
@@ -754,11 +852,10 @@ function renderPhotoTiles(post, isCreate = false) {
                 aria-label="${escapeHtml(photo.alt)}"
               ></span>
               <small>${escapeHtml(index === 0 ? "Cover photo" : photo.alt)}</small>
-              ${
-                photo.canDelete && !isCreate
-                  ? `<button class="icon-button admin-photo-delete" type="button" data-delete-photo="${escapeHtml(photo.image)}" aria-label="Delete photo"><i class="fa-solid fa-xmark"></i></button>`
-                  : ""
-              }
+              <div class="admin-photo-tile-actions">
+                <button class="button ghost dark" type="button" data-replace-photo-index="${index}" ${canEditPhotos ? "" : "disabled"}>Upload</button>
+                <button class="icon-button admin-photo-delete" type="button" data-delete-photo="${escapeHtml(photo.image)}" data-delete-photo-index="${index}" aria-label="Delete photo" ${canEditPhotos && photos.length > 1 ? "" : "disabled"}><i class="fa-solid fa-xmark"></i></button>
+              </div>
             </div>
           `
         )
@@ -990,36 +1087,67 @@ async function prepareBlogImage(file) {
   };
 }
 
-async function uploadBlogPhotos(form, files) {
+async function uploadBlogPhotos(form, files, options = {}) {
   const postId = form.dataset.postId;
-  const selectedFiles = Array.from(files || []);
+  const selectedFiles = Array.from(files || []).slice(0, options.mode === "gallery" || !options.mode ? Number.POSITIVE_INFINITY : 1);
   const note = form.querySelector(".admin-photo-actions small");
-  const uploadButton = form.querySelector("[data-upload-photo]");
+  const uploadButton = getUploadButtonForMode(form, options);
+  const snapshot = getEditorPostSnapshot(form);
   let latestResponse = null;
+  const uploadedPhotos = [];
 
   if (!selectedFiles.length) return;
 
-  uploadButton.disabled = true;
-  note.textContent = `Uploading ${selectedFiles.length} photo${selectedFiles.length === 1 ? "" : "s"}...`;
+  if (uploadButton) uploadButton.disabled = true;
+  if (note) note.textContent = `Uploading ${selectedFiles.length} photo${selectedFiles.length === 1 ? "" : "s"}...`;
 
   for (const [index, file] of selectedFiles.entries()) {
-    note.textContent = `Uploading ${index + 1} of ${selectedFiles.length}: ${file.name}`;
+    if (note) note.textContent = `Uploading ${index + 1} of ${selectedFiles.length}: ${file.name}`;
     const prepared = await prepareBlogImage(file);
+    const body = {
+      postId,
+      fileName: prepared.fileName,
+      dataUrl: prepared.dataUrl
+    };
+
+    if (options.mode === "replace-photo" && Number.isInteger(options.photoIndex)) {
+      body.replaceIndex = options.photoIndex;
+    }
+
     latestResponse = await api("/api/admin/blog/posts/photo", {
       method: "POST",
-      body: JSON.stringify({
-        postId,
-        fileName: prepared.fileName,
-        dataUrl: prepared.dataUrl
-      })
+      body: JSON.stringify(body)
     });
     blogPosts = latestResponse.posts || blogPosts;
+    const nextGallery = latestResponse.post?.gallery || [];
+    uploadedPhotos.push(options.mode === "replace-photo" && Number.isInteger(options.photoIndex) ? nextGallery[options.photoIndex] : nextGallery[nextGallery.length - 1]);
   }
 
-  uploadButton.disabled = false;
-  blogPosts = latestResponse?.posts || blogPosts;
+  const serverPost = latestResponse?.post || {};
+  const nextGallery = serverPost.gallery || snapshot.gallery || [];
+  let nextBlocks = snapshot.blocks.map(cloneBlogBlock);
+
+  if (options.mode === "block" && uploadedPhotos[0]) {
+    nextBlocks = setBlockImageAt(nextBlocks, options.blockIndex, options.slot || 0, uploadedPhotos[0]);
+  }
+
+  if (options.mode === "replace-photo" && uploadedPhotos[0]) {
+    const oldPhoto = snapshot.gallery?.[options.photoIndex];
+    nextBlocks = replaceImageReferences(nextBlocks, oldPhoto?.image, uploadedPhotos[0]);
+  }
+
+  const mergedPost = {
+    ...serverPost,
+    ...snapshot,
+    gallery: nextGallery,
+    blocks: nextBlocks,
+    body: builderBlocksToBody(nextBlocks),
+    updatedAt: serverPost.updatedAt || snapshot.updatedAt
+  };
+
+  replacePostInState(mergedPost);
   renderBlogEditor();
-  setBlogStatus("Blog photo uploaded successfully.");
+  setBlogStatus(options.mode === "replace-photo" ? "Blog photo replaced successfully." : "Blog photo uploaded successfully.");
 }
 
 async function loadBlogPosts(options = {}) {
@@ -1151,6 +1279,21 @@ adminBlogList.addEventListener("click", (event) => {
     return;
   }
 
+  const copyBlockButton = event.target.closest("[data-copy-blog-block]");
+  if (copyBlockButton) {
+    const form = copyBlockButton.closest("[data-post-id]");
+    const card = copyBlockButton.closest("[data-blog-block]");
+    const post = getSelectedPost() || getBlankPost();
+    const block = createEditorBlock(card.dataset.blockType, post, getBlockFromCard(card));
+    const index = getEditorBlockIndex(card) + 1;
+
+    card.insertAdjacentHTML("afterend", renderEditorBlock(block, index, post));
+    updateBuilderOrder(form);
+    syncBlogBuilderFields(form);
+    card.nextElementSibling?.scrollIntoView({ behavior: "smooth", block: "center" });
+    return;
+  }
+
   const deleteBlockButton = event.target.closest("[data-delete-blog-block]");
   if (deleteBlockButton) {
     const form = deleteBlockButton.closest("[data-post-id]");
@@ -1167,11 +1310,45 @@ adminBlogList.addEventListener("click", (event) => {
     return;
   }
 
+  const blockUploadButton = event.target.closest("[data-upload-block-photo]");
+  if (blockUploadButton) {
+    const form = blockUploadButton.closest("[data-post-id]");
+    const card = blockUploadButton.closest("[data-blog-block]");
+    const input = form.querySelector("[data-photo-input]");
+    input.dataset.uploadMode = "block";
+    input.dataset.blockIndex = String(getEditorBlockIndex(card));
+    input.dataset.blockImageSlot = String(Number(blockUploadButton.dataset.blockImageSlot) || 0);
+    input.multiple = false;
+    form.querySelector(".admin-photo-actions small").textContent = "Choose a photo for this block.";
+    input.click();
+    return;
+  }
+
   const uploadButton = event.target.closest("[data-upload-photo]");
   if (uploadButton) {
     const form = uploadButton.closest("[data-post-id]");
+    const input = form.querySelector("[data-photo-input]");
+    input.dataset.uploadMode = "gallery";
+    input.dataset.blockIndex = "";
+    input.dataset.blockImageSlot = "";
+    input.dataset.photoIndex = "";
+    input.multiple = true;
     form.querySelector(".admin-photo-actions small").textContent = "Choose blog photos from your computer.";
-    form.querySelector("[data-photo-input]").click();
+    input.click();
+    return;
+  }
+
+  const replacePhotoButton = event.target.closest("[data-replace-photo-index]");
+  if (replacePhotoButton) {
+    const form = replacePhotoButton.closest("[data-post-id]");
+    const input = form.querySelector("[data-photo-input]");
+    input.dataset.uploadMode = "replace-photo";
+    input.dataset.photoIndex = String(Number(replacePhotoButton.dataset.replacePhotoIndex) || 0);
+    input.dataset.blockIndex = "";
+    input.dataset.blockImageSlot = "";
+    input.multiple = false;
+    form.querySelector(".admin-photo-actions small").textContent = "Choose a replacement photo.";
+    input.click();
     return;
   }
 
@@ -1181,16 +1358,31 @@ adminBlogList.addEventListener("click", (event) => {
     const note = form.querySelector(".admin-photo-actions small");
     const postId = form.dataset.postId;
     const image = deletePhotoButton.dataset.deletePhoto;
+    const photoIndex = Number(deletePhotoButton.dataset.deletePhotoIndex);
+    const snapshot = getEditorPostSnapshot(form);
+    const oldPhoto = snapshot.gallery?.[photoIndex] || { image };
     if (!window.confirm("Delete this blog photo?")) return;
 
     deletePhotoButton.disabled = true;
     note.textContent = "Deleting photo...";
     api("/api/admin/blog/posts/photo", {
       method: "DELETE",
-      body: JSON.stringify({ postId, image })
+      body: JSON.stringify({ postId, image, photoIndex })
     })
       .then((response) => {
         blogPosts = response.posts || blogPosts;
+        const serverPost = response.post || {};
+        const nextGallery = serverPost.gallery || snapshot.gallery || [];
+        const fallbackPhoto = nextGallery[photoIndex] || nextGallery[0] || getCoverPhoto(snapshot);
+        const nextBlocks = replaceImageReferences(snapshot.blocks, oldPhoto.image, fallbackPhoto);
+        replacePostInState({
+          ...serverPost,
+          ...snapshot,
+          gallery: nextGallery,
+          blocks: nextBlocks,
+          body: builderBlocksToBody(nextBlocks),
+          updatedAt: serverPost.updatedAt || snapshot.updatedAt
+        });
         renderBlogEditor();
         setBlogStatus("Blog photo deleted successfully.");
       })
@@ -1383,15 +1575,27 @@ adminBlogList.addEventListener("change", (event) => {
   if (!input || !input.files.length) return;
 
   const form = input.closest("[data-post-id]");
-  uploadBlogPhotos(form, input.files)
+  const options = {
+    mode: input.dataset.uploadMode || "gallery",
+    blockIndex: Number(input.dataset.blockIndex),
+    slot: Number(input.dataset.blockImageSlot) || 0,
+    photoIndex: Number(input.dataset.photoIndex)
+  };
+
+  uploadBlogPhotos(form, input.files, options)
     .catch((error) => {
-      const uploadButton = form.querySelector("[data-upload-photo]");
+      const uploadButton = getUploadButtonForMode(form, options);
       const note = form.querySelector(".admin-photo-actions small");
-      uploadButton.disabled = false;
-      note.textContent = error.message;
+      if (uploadButton) uploadButton.disabled = false;
+      if (note) note.textContent = error.message;
     })
     .finally(() => {
       input.value = "";
+      input.dataset.uploadMode = "gallery";
+      input.dataset.blockIndex = "";
+      input.dataset.blockImageSlot = "";
+      input.dataset.photoIndex = "";
+      input.multiple = true;
     });
 });
 

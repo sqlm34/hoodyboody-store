@@ -4218,14 +4218,16 @@ async function handleApi(req, res) {
       const imageId = `${post.slug || post.id}-${Date.now().toString(36)}-${hash}.${extension}`;
       const fileName = safeFileName(body.fileName, extension, "blog-photo");
       const imageUrl = `/api/blog-images/${encodeURIComponent(imageId)}`;
-      const nextGallery = [
-        ...normalizeBlogGallery(post.gallery),
-        {
-          image: imageUrl,
-          alt: String(body.alt || fileName.replace(/\.[^.]+$/, "") || post.title).trim().slice(0, 160),
-          focus: String(body.focus || "50% 50%").trim().slice(0, 40)
-        }
-      ].slice(0, 12);
+      const nextPhoto = {
+        image: imageUrl,
+        alt: String(body.alt || fileName.replace(/\.[^.]+$/, "") || post.title).trim().slice(0, 160),
+        focus: String(body.focus || "50% 50%").trim().slice(0, 40)
+      };
+      const currentGallery = normalizeBlogGallery(post.gallery);
+      const replaceIndex = Number(body.replaceIndex ?? body.photoIndex ?? -1);
+      const canReplace = Number.isInteger(replaceIndex) && replaceIndex >= 0 && replaceIndex < currentGallery.length;
+      const nextGallery = canReplace ? currentGallery.map((item, index) => (index === replaceIndex ? nextPhoto : item)) : [...currentGallery, nextPhoto].slice(0, 12);
+      const replacedImageId = canReplace ? getBlogImageIdFromUrl(currentGallery[replaceIndex]?.image) : "";
 
       db.blogImages[imageId] = {
         id: imageId,
@@ -4237,6 +4239,10 @@ async function handleApi(req, res) {
         createdAt: new Date().toISOString(),
         updatedBy: user.id
       };
+
+      if (replacedImageId && db.blogImages?.[replacedImageId] && !nextGallery.some((item) => getBlogImageIdFromUrl(item.image) === replacedImageId)) {
+        delete db.blogImages[replacedImageId];
+      }
 
       db.blogPosts[postIndex] = {
         ...post,
@@ -4265,7 +4271,7 @@ async function handleApi(req, res) {
       const body = await readJson(req);
       const postId = String(body.postId || body.id || "").trim();
       const imageUrl = String(body.image || body.imageUrl || "").trim();
-      const imageId = getBlogImageIdFromUrl(imageUrl);
+      const requestedIndex = Number(body.photoIndex ?? body.index ?? -1);
       const postIndex = db.blogPosts.findIndex((post) => post.id === postId);
 
       if (postIndex === -1) {
@@ -4273,16 +4279,31 @@ async function handleApi(req, res) {
         return;
       }
 
-      if (!imageId || !db.blogImages?.[imageId]) {
+      const post = db.blogPosts[postIndex];
+      const fallbackGallery = normalizeBlogGallery(defaultBlogPosts[0].gallery);
+      const currentGallery = normalizeBlogGallery(post.gallery);
+      let removedPhoto = null;
+      let nextGallery = currentGallery;
+
+      if (Number.isInteger(requestedIndex) && requestedIndex >= 0 && requestedIndex < currentGallery.length) {
+        nextGallery = currentGallery.filter((_, index) => index !== requestedIndex);
+        removedPhoto = currentGallery[requestedIndex];
+      } else if (imageUrl) {
+        removedPhoto = currentGallery.find((image) => image.image === imageUrl) || null;
+        nextGallery = currentGallery.filter((image) => image.image !== imageUrl);
+      }
+
+      if (!removedPhoto) {
         sendJson(res, 404, { message: "Blog photo not found." });
         return;
       }
 
-      delete db.blogImages[imageId];
-      const post = db.blogPosts[postIndex];
-      const fallbackGallery = normalizeBlogGallery(defaultBlogPosts[0].gallery);
-      let nextGallery = normalizeBlogGallery(post.gallery).filter((image) => image.image !== imageUrl);
       if (!nextGallery.length) nextGallery = fallbackGallery;
+      const imageId = getBlogImageIdFromUrl(removedPhoto.image);
+      if (imageId && db.blogImages?.[imageId] && !nextGallery.some((item) => getBlogImageIdFromUrl(item.image) === imageId)) {
+        delete db.blogImages[imageId];
+      }
+
       db.blogPosts[postIndex] = {
         ...post,
         gallery: nextGallery,

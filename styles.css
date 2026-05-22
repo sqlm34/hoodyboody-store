@@ -3449,6 +3449,24 @@ textarea:focus {
   background: #fbfcfb;
 }
 
+.admin-builder-image-preview {
+  display: block;
+  width: 100%;
+  aspect-ratio: 16 / 11;
+  border-radius: 6px;
+  background-color: #e9e5d7;
+  background-image: var(--product-image, url("assets/embroidered-collection.png"));
+  background-position: var(--focus, center);
+  background-repeat: no-repeat;
+  background-size: cover;
+}
+
+.admin-builder-upload {
+  width: 100%;
+  min-height: 36px;
+  padding: 0 12px;
+}
+
 .admin-builder-block[data-block-type="paragraph"] .admin-builder-images,
 .admin-builder-block[data-block-type="heading2"] .admin-builder-images,
 .admin-builder-block[data-block-type="heading3"] .admin-builder-images,
@@ -3831,10 +3849,20 @@ textarea:focus {
   white-space: nowrap;
 }
 
+.admin-photo-tile-actions {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 30px;
+  gap: 6px;
+  align-items: center;
+}
+
+.admin-photo-tile-actions .button {
+  min-height: 30px;
+  padding: 0 8px;
+  font-size: 0.66rem;
+}
+
 .admin-photo-delete {
-  position: absolute;
-  top: 6px;
-  right: 6px;
   width: 30px;
   height: 30px;
   min-height: 30px;

@@ -170,7 +170,12 @@ test("owner can create blog posts and upload blog photos", async () => {
     assert.match(adminScript, /data-add-blog-block/);
     assert.match(adminScript, /data-add-blog-block="divider"/);
     assert.match(adminScript, /data-move-blog-block/);
+    assert.match(adminScript, /data-copy-blog-block/);
+    assert.match(adminScript, /data-upload-block-photo/);
+    assert.match(adminScript, /data-replace-photo-index/);
     assert.match(adminScript, /data-block-style-select/);
+    assert.match(adminScript, /type="hidden" data-block-image-url/);
+    assert.doesNotMatch(adminScript, /Image URL/);
     assert.match(adminScript, /draggable="true"/);
     assert.match(adminScript, /dragstart/);
     assert.match(adminScript, /pointerdown/);
@@ -178,6 +183,8 @@ test("owner can create blog posts and upload blog photos", async () => {
     assert.match(css, /admin-blog-live-page/);
     assert.match(css, /admin-page-block/);
     assert.match(css, /admin-drag-handle/);
+    assert.match(css, /admin-builder-image-preview/);
+    assert.match(css, /admin-photo-tile-actions/);
 
     const postsResponse = await fetch(`${baseUrl}/api/admin/blog/posts`, {
       headers: { Cookie: cookie }
@@ -293,6 +300,33 @@ test("owner can create blog posts and upload blog photos", async () => {
     const photoJson = await photoResponse.json();
     assert.equal(photoResponse.status, 200);
     assert.match(photoJson.post.gallery[photoJson.post.gallery.length - 1].image, /^\/api\/blog-images\//);
+
+    const replacePhotoResponse = await fetch(`${baseUrl}/api/admin/blog/posts/photo`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Cookie: cookie },
+      body: JSON.stringify({
+        postId: createdJson.post.id,
+        fileName: "studio-cover.png",
+        dataUrl: tinyPng,
+        replaceIndex: 0
+      })
+    });
+    const replacePhotoJson = await replacePhotoResponse.json();
+    assert.equal(replacePhotoResponse.status, 200);
+    assert.match(replacePhotoJson.post.gallery[0].image, /^\/api\/blog-images\//);
+
+    const deletePhotoResponse = await fetch(`${baseUrl}/api/admin/blog/posts/photo`, {
+      method: "DELETE",
+      headers: { "Content-Type": "application/json", Cookie: cookie },
+      body: JSON.stringify({
+        postId: createdJson.post.id,
+        photoIndex: 0,
+        image: replacePhotoJson.post.gallery[0].image
+      })
+    });
+    const deletePhotoJson = await deletePhotoResponse.json();
+    assert.equal(deletePhotoResponse.status, 200);
+    assert.notEqual(deletePhotoJson.post.gallery[0].image, replacePhotoJson.post.gallery[0].image);
 
     const publicPost = await fetch(`${baseUrl}/blog/${createdJson.post.slug}/`);
     const publicHtml = await publicPost.text();
