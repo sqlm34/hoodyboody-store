@@ -409,12 +409,12 @@ The process moves from artwork review to thread direction, stitch sample, produc
   {
     id: "machine-embroidery-for-clothes",
     slug: "machine-embroidery-for-clothes",
-    title: "Machine Embroidery for Clothes: The Ultimate Guide | 2024",
+    title: "Machine Embroidery for Clothes: The Ultimate Guide | 2026",
     excerpt:
       "Discover everything about machine embroidery for clothes, from choosing the right fabrics and threads to digitizing designs and professional finishing.",
     category: "Embroidery Journal",
     author: "HOODYBOODY Studio",
-    date: "2024-01-01",
+    date: "2026-05-22",
     status: "published",
     tags: ["Machine Embroidery", "Clothing", "Guide"],
     body:
@@ -434,8 +434,8 @@ The process moves from artwork review to thread direction, stitch sample, produc
       }
     ],
     comments: [],
-    createdAt: "2024-01-01T00:00:00.000Z",
-    updatedAt: "2024-01-01T00:00:00.000Z"
+    createdAt: "2026-05-22T00:00:00.000Z",
+    updatedAt: "2026-05-22T00:00:00.000Z"
   }
 ];
 const emptyDb = {
@@ -2322,6 +2322,14 @@ async function tryRenderSeoRoute(req, res, pathname) {
 }
 
 function formatBlogDate(value) {
+  const dateOnlyMatch = String(value || "").match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (dateOnlyMatch) {
+    const [, year, month, day] = dateOnlyMatch;
+    return new Intl.DateTimeFormat("en-US", { month: "long", day: "numeric", year: "numeric" }).format(
+      new Date(Number(year), Number(month) - 1, Number(day))
+    );
+  }
+
   const date = value ? new Date(value) : new Date();
   if (Number.isNaN(date.getTime())) return "";
   return new Intl.DateTimeFormat("en-US", { month: "long", day: "numeric", year: "numeric" }).format(date);

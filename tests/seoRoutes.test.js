@@ -81,7 +81,7 @@ test("location pages and automatic geo targeting remain removed", async () => {
 test("blog page renders Valeska-style single post functionality", async () => {
   const { server, baseUrl } = await startServer();
   try {
-    const response = await fetch(`${baseUrl}/blog/`);
+    const response = await fetch(`${baseUrl}/blog/fashion-is-our-passion/`);
     const html = await response.text();
     const script = await fetch(`${baseUrl}/blog.js`);
     const scriptText = await script.text();
@@ -112,8 +112,8 @@ test("blog page renders Valeska-style single post functionality", async () => {
     assert.match(html, /data-blog-comment-form/);
     assert.match(html, /<ol class="blog-comment-list">[\s\S]*data-blog-comment-id/);
     assert.match(html, /href="\/blog\/">Blog/);
-    assert.match(html, /blog-post-nav-card previous is-disabled/);
-    assert.match(html, /blog-post-nav-card next" href="\/blog\/machine-embroidery-for-clothes\//);
+    assert.match(html, /blog-post-nav-card previous" href="\/blog\/machine-embroidery-for-clothes\//);
+    assert.match(html, /blog-post-nav-card next is-disabled/);
     assert.doesNotMatch(scriptText, /data-blog-newsletter/);
     assert.match(scriptText, /Slide \$\{activeIndex \+ 1\} of \$\{slides\.length\}/);
     assert.match(scriptText, /data-blog-lightbox/);
@@ -150,7 +150,9 @@ test("machine embroidery guide renders imported blog content with tables and no 
     const css = await cssResponse.text();
 
     assert.equal(response.status, 200);
-    assert.match(html, /Machine Embroidery for Clothes: The Ultimate Guide \| 2024 \| HOODYBOODY Blog/);
+    assert.match(html, /Machine Embroidery for Clothes: The Ultimate Guide \| 2026 \| HOODYBOODY Blog/);
+    assert.match(html, /<time datetime="2026-05-22">May 22, 2026<\/time>/);
+    assert.match(html, /Updated May 22, 2026/);
     assert.match(html, /blog-rich-html/);
     assert.match(html, /Table of Contents/);
     assert.match(html, /What Is Machine Embroidery for Clothes/);
@@ -167,8 +169,8 @@ test("machine embroidery guide renders imported blog content with tables and no 
     assert.equal((html.match(/<table>/g) || []).length, 3);
     assert.equal((html.match(/class="card"/g) || []).length, 11);
     assert.equal((html.match(/class="card-icon"/g) || []).length, 0);
-    assert.match(html, /blog-post-nav-card previous" href="\/blog\/fashion-is-our-passion\//);
-    assert.match(html, /blog-post-nav-card next is-disabled/);
+    assert.match(html, /blog-post-nav-card previous is-disabled/);
+    assert.match(html, /blog-post-nav-card next" href="\/blog\/fashion-is-our-passion\//);
     assert.match(css, /blog-rich-html \.card-grid/);
     assert.match(css, /blog-rich-html \.table-wrap/);
     assert.match(css, /blog-rich-html \.step-num/);
