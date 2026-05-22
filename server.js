@@ -634,9 +634,26 @@ function ensureDbDefaults(db) {
         return;
       }
 
-      Object.entries(defaultPost).forEach(([key, value]) => {
-        if (post[key] === undefined) {
-          post[key] = JSON.parse(JSON.stringify(value));
+      const managedPostFields = [
+        "slug",
+        "title",
+        "excerpt",
+        "category",
+        "author",
+        "date",
+        "status",
+        "tags",
+        "body",
+        "gallery",
+        "blocks",
+        "createdAt",
+        "updatedAt"
+      ];
+
+      managedPostFields.forEach((key) => {
+        const nextValue = JSON.parse(JSON.stringify(defaultPost[key]));
+        if (JSON.stringify(post[key]) !== JSON.stringify(nextValue)) {
+          post[key] = nextValue;
           changed = true;
         }
       });
@@ -3993,19 +4010,8 @@ async function handleApi(req, res) {
       return;
     }
 
-    if (url.pathname === "/api/admin/blog/posts" && method === "GET") {
-      const user = getSessionUser(req, db);
-      if (!user) {
-        sendJson(res, 401, { message: "You must be logged in as the store owner." });
-        return;
-      }
-
-      if (!isAdmin(user)) {
-        sendJson(res, 403, { message: "Only the store owner can manage blog posts." });
-        return;
-      }
-
-      sendJson(res, 200, { posts: publicBlogPosts(db, { includeDrafts: true }) });
+    if (url.pathname === "/api/admin/blog/posts" || url.pathname === "/api/admin/blog/posts/photo") {
+      sendJson(res, 410, { message: "Blog editing is disabled. Blog articles are managed in code." });
       return;
     }
 
@@ -4156,249 +4162,6 @@ async function handleApi(req, res) {
 
       await writeDbAsync(db);
       sendJson(res, 201, { reply, comments: flattenBlogComments(db) });
-      return;
-    }
-
-    if (url.pathname === "/api/admin/blog/posts" && method === "POST") {
-      const user = getSessionUser(req, db);
-      if (!user) {
-        sendJson(res, 401, { message: "You must be logged in as the store owner." });
-        return;
-      }
-
-      if (!isAdmin(user)) {
-        sendJson(res, 403, { message: "Only the store owner can create blog posts." });
-        return;
-      }
-
-      const body = await readJson(req);
-      const postPatch = sanitizeBlogPost(body, {
-        author: "HOODYBOODY Studio",
-        category: "Embroidery Journal",
-        status: "draft",
-        tags: ["Embroidery"],
-        comments: []
-      });
-      const nextPost = postPatch.post;
-
-      if (!nextPost) {
-        sendJson(res, 400, { message: postPatch.message || "Fill blog title and text." });
-        return;
-      }
-
-      nextPost.id = crypto.randomUUID();
-      nextPost.slug = getUniqueBlogSlug(db, nextPost.slug || nextPost.title);
-      nextPost.createdAt = new Date().toISOString();
-      nextPost.updatedAt = nextPost.createdAt;
-      nextPost.updatedBy = user.id;
-      db.blogPosts.push(nextPost);
-
-      await writeDbAsync(db);
-      sendJson(res, 201, { post: publicBlogPost(nextPost), posts: publicBlogPosts(db, { includeDrafts: true }) });
-      return;
-    }
-
-    if (url.pathname === "/api/admin/blog/posts" && method === "PATCH") {
-      const user = getSessionUser(req, db);
-      if (!user) {
-        sendJson(res, 401, { message: "You must be logged in as the store owner." });
-        return;
-      }
-
-      if (!isAdmin(user)) {
-        sendJson(res, 403, { message: "Only the store owner can edit blog posts." });
-        return;
-      }
-
-      const body = await readJson(req);
-      const postId = String(body.postId || body.id || "").trim();
-      const postIndex = db.blogPosts.findIndex((post) => post.id === postId);
-
-      if (postIndex === -1) {
-        sendJson(res, 404, { message: "Blog post not found." });
-        return;
-      }
-
-      const postPatch = sanitizeBlogPost(body, db.blogPosts[postIndex]);
-      const nextPost = postPatch.post;
-
-      if (!nextPost) {
-        sendJson(res, 400, { message: postPatch.message || "Fill blog title and text." });
-        return;
-      }
-
-      nextPost.id = db.blogPosts[postIndex].id;
-      nextPost.slug = getUniqueBlogSlug(db, nextPost.slug || nextPost.title, nextPost.id);
-      nextPost.createdAt = db.blogPosts[postIndex].createdAt || new Date().toISOString();
-      nextPost.updatedAt = new Date().toISOString();
-      nextPost.updatedBy = user.id;
-      db.blogPosts[postIndex] = nextPost;
-
-      await writeDbAsync(db);
-      sendJson(res, 200, { post: publicBlogPost(nextPost), posts: publicBlogPosts(db, { includeDrafts: true }) });
-      return;
-    }
-
-    if (url.pathname === "/api/admin/blog/posts" && method === "DELETE") {
-      const user = getSessionUser(req, db);
-      if (!user) {
-        sendJson(res, 401, { message: "You must be logged in as the store owner." });
-        return;
-      }
-
-      if (!isAdmin(user)) {
-        sendJson(res, 403, { message: "Only the store owner can delete blog posts." });
-        return;
-      }
-
-      const body = await readJson(req);
-      const postId = String(body.postId || body.id || "").trim();
-      const postIndex = db.blogPosts.findIndex((post) => post.id === postId);
-
-      if (postIndex === -1) {
-        sendJson(res, 404, { message: "Blog post not found." });
-        return;
-      }
-
-      const [removedPost] = db.blogPosts.splice(postIndex, 1);
-      normalizeBlogGallery(removedPost.gallery).forEach((image) => {
-        const imageId = getBlogImageIdFromUrl(image.image);
-        if (imageId) delete db.blogImages[imageId];
-      });
-
-      await writeDbAsync(db);
-      sendJson(res, 200, { posts: publicBlogPosts(db, { includeDrafts: true }) });
-      return;
-    }
-
-    if (url.pathname === "/api/admin/blog/posts/photo" && method === "POST") {
-      const user = getSessionUser(req, db);
-      if (!user) {
-        sendJson(res, 401, { message: "You must be logged in as the store owner." });
-        return;
-      }
-
-      if (!isAdmin(user)) {
-        sendJson(res, 403, { message: "Only the store owner can upload blog photos." });
-        return;
-      }
-
-      const body = await readJson(req, maxJsonBodyBytes);
-      const postId = String(body.postId || body.id || "").trim();
-      const postIndex = db.blogPosts.findIndex((post) => post.id === postId);
-
-      if (postIndex === -1) {
-        sendJson(res, 404, { message: "Blog post not found." });
-        return;
-      }
-
-      const parsed = parseBlogImageDataUrl(body.dataUrl);
-      if (!parsed) {
-        sendJson(res, 400, { message: "Upload JPG, PNG, or WEBP up to 3.5 MB after compression." });
-        return;
-      }
-
-      const post = db.blogPosts[postIndex];
-      const hash = crypto.createHash("sha256").update(parsed.buffer).digest("hex").slice(0, 16);
-      const extension = getImageExtension(parsed.mimeType);
-      const imageId = `${post.slug || post.id}-${Date.now().toString(36)}-${hash}.${extension}`;
-      const fileName = safeFileName(body.fileName, extension, "blog-photo");
-      const imageUrl = `/api/blog-images/${encodeURIComponent(imageId)}`;
-      const nextPhoto = {
-        image: imageUrl,
-        alt: String(body.alt || fileName.replace(/\.[^.]+$/, "") || post.title).trim().slice(0, 160),
-        focus: String(body.focus || "50% 50%").trim().slice(0, 40)
-      };
-      const currentGallery = normalizeBlogGallery(post.gallery);
-      const replaceIndex = Number(body.replaceIndex ?? body.photoIndex ?? -1);
-      const canReplace = Number.isInteger(replaceIndex) && replaceIndex >= 0 && replaceIndex < currentGallery.length;
-      const nextGallery = canReplace ? currentGallery.map((item, index) => (index === replaceIndex ? nextPhoto : item)) : [...currentGallery, nextPhoto].slice(0, 12);
-      const replacedImageId = canReplace ? getBlogImageIdFromUrl(currentGallery[replaceIndex]?.image) : "";
-
-      db.blogImages[imageId] = {
-        id: imageId,
-        postId,
-        fileName,
-        mimeType: parsed.mimeType,
-        data: parsed.buffer.toString("base64"),
-        size: parsed.buffer.length,
-        createdAt: new Date().toISOString(),
-        updatedBy: user.id
-      };
-
-      if (replacedImageId && db.blogImages?.[replacedImageId] && !nextGallery.some((item) => getBlogImageIdFromUrl(item.image) === replacedImageId)) {
-        delete db.blogImages[replacedImageId];
-      }
-
-      db.blogPosts[postIndex] = {
-        ...post,
-        gallery: nextGallery,
-        updatedAt: new Date().toISOString(),
-        updatedBy: user.id
-      };
-
-      await writeDbAsync(db);
-      sendJson(res, 200, { post: publicBlogPost(db.blogPosts[postIndex]), posts: publicBlogPosts(db, { includeDrafts: true }) });
-      return;
-    }
-
-    if (url.pathname === "/api/admin/blog/posts/photo" && method === "DELETE") {
-      const user = getSessionUser(req, db);
-      if (!user) {
-        sendJson(res, 401, { message: "You must be logged in as the store owner." });
-        return;
-      }
-
-      if (!isAdmin(user)) {
-        sendJson(res, 403, { message: "Only the store owner can delete blog photos." });
-        return;
-      }
-
-      const body = await readJson(req);
-      const postId = String(body.postId || body.id || "").trim();
-      const imageUrl = String(body.image || body.imageUrl || "").trim();
-      const requestedIndex = Number(body.photoIndex ?? body.index ?? -1);
-      const postIndex = db.blogPosts.findIndex((post) => post.id === postId);
-
-      if (postIndex === -1) {
-        sendJson(res, 404, { message: "Blog post not found." });
-        return;
-      }
-
-      const post = db.blogPosts[postIndex];
-      const fallbackGallery = normalizeBlogGallery(defaultBlogPosts[0].gallery);
-      const currentGallery = normalizeBlogGallery(post.gallery);
-      let removedPhoto = null;
-      let nextGallery = currentGallery;
-
-      if (Number.isInteger(requestedIndex) && requestedIndex >= 0 && requestedIndex < currentGallery.length) {
-        nextGallery = currentGallery.filter((_, index) => index !== requestedIndex);
-        removedPhoto = currentGallery[requestedIndex];
-      } else if (imageUrl) {
-        removedPhoto = currentGallery.find((image) => image.image === imageUrl) || null;
-        nextGallery = currentGallery.filter((image) => image.image !== imageUrl);
-      }
-
-      if (!removedPhoto) {
-        sendJson(res, 404, { message: "Blog photo not found." });
-        return;
-      }
-
-      if (!nextGallery.length) nextGallery = fallbackGallery;
-      const imageId = getBlogImageIdFromUrl(removedPhoto.image);
-      if (imageId && db.blogImages?.[imageId] && !nextGallery.some((item) => getBlogImageIdFromUrl(item.image) === imageId)) {
-        delete db.blogImages[imageId];
-      }
-
-      db.blogPosts[postIndex] = {
-        ...post,
-        gallery: nextGallery,
-        updatedAt: new Date().toISOString(),
-        updatedBy: user.id
-      };
-
-      await writeDbAsync(db);
-      sendJson(res, 200, { post: publicBlogPost(db.blogPosts[postIndex]), posts: publicBlogPosts(db, { includeDrafts: true }) });
       return;
     }
 

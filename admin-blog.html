@@ -4,12 +4,12 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="robots" content="noindex, nofollow, noarchive" />
-    <title>Blog editor | HOODYBOODY</title>
+    <title>Blog comments | HOODYBOODY</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css" />
     <link rel="stylesheet" href="styles.css" />
   </head>
   <body>
-    <header class="topbar checkout-topbar" aria-label="Blog editor navigation">
+    <header class="topbar checkout-topbar" aria-label="Blog moderation navigation">
       <a class="brand" href="index.html" aria-label="HOODYBOODY">
         <span class="brand-mark">HB</span>
         <span>HOODYBOODY</span>
@@ -29,31 +29,15 @@
 
     <main class="checkout-page admin-page">
       <section class="checkout-hero admin-hero" aria-labelledby="admin-blog-title">
-        <p class="eyebrow">journal editor</p>
-        <h1 id="admin-blog-title">Create blog posts</h1>
-        <p>Create, edit and publish blog pages with text, tags and image galleries.</p>
+        <p class="eyebrow">comment moderation</p>
+        <h1 id="admin-blog-title">Moderate blog comments</h1>
+        <p>Review submitted blog comments, approve useful replies, reject spam, or answer as HOODYBOODY Studio.</p>
       </section>
 
       <section class="admin-locked checkout-panel" id="adminBlogLocked" hidden>
         <h2>Access denied</h2>
         <p id="adminBlogLockedText">This page is available only to the store owner.</p>
         <a class="button primary" href="auth.html">Login as owner</a>
-      </section>
-
-      <section class="checkout-panel admin-catalog-panel" id="adminBlogDashboard" hidden>
-        <div class="inventory-head">
-          <div>
-            <h2>Blog posts</h2>
-            <p>Published posts appear on the blog and can be opened by slug.</p>
-          </div>
-          <div class="admin-toolbar">
-            <a class="button ghost dark" href="admin.html">Back to owner cabinet</a>
-            <button class="button primary" type="button" id="createBlogPost">Create blog post</button>
-            <button class="button ghost dark" type="button" id="reloadBlogPosts">Refresh</button>
-          </div>
-        </div>
-        <div class="admin-products-list admin-blog-list" id="adminBlogList"></div>
-        <p class="form-note" id="adminBlogNote" role="status" aria-live="polite"></p>
       </section>
 
       <section class="checkout-panel admin-catalog-panel" id="adminBlogCommentsPanel" hidden>
@@ -63,6 +47,7 @@
             <p>Review new blog comments, approve them for publication, reject spam, or reply as HOODYBOODY Studio.</p>
           </div>
           <div class="admin-toolbar">
+            <a class="button ghost dark" href="admin.html">Back to owner cabinet</a>
             <button class="button ghost dark" type="button" id="reloadBlogComments">Refresh comments</button>
           </div>
         </div>

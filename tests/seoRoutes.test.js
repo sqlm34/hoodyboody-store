@@ -159,8 +159,8 @@ test("machine embroidery guide renders imported blog content with tables and no 
     assert.match(html, /Thread Types & Colors/);
     assert.match(html, /Common Mistakes & How to Avoid Them/);
     assert.match(html, /Frequently Asked Questions/);
-    assert.match(html, /Ready to Start Embroidering/);
-    assert.match(html, /Shop Embroidery Supplies/);
+    assert.doesNotMatch(html, /Ready to Start Embroidering/);
+    assert.doesNotMatch(html, /Shop Embroidery Supplies/);
     assert.match(html, /Cotton \(denim, twill\)/);
     assert.match(html, /Polyester \(40wt\)/);
     assert.match(html, /Fabric puckering/);
@@ -172,12 +172,13 @@ test("machine embroidery guide renders imported blog content with tables and no 
     assert.match(css, /blog-rich-html \.card-grid/);
     assert.match(css, /blog-rich-html \.table-wrap/);
     assert.match(css, /blog-rich-html \.step-num/);
+    assert.match(css, /padding: 28px 30px/);
   } finally {
     server.close();
   }
 });
 
-test("owner can create blog posts and upload blog photos", async () => {
+test("owner can moderate blog comments while blog editing stays disabled", async () => {
   const { server, baseUrl } = await startServer();
   try {
     const login = await fetch(`${baseUrl}/api/login`, {
@@ -195,195 +196,51 @@ test("owner can create blog posts and upload blog photos", async () => {
     const adminPage = await fetch(`${baseUrl}/admin-blog.html`);
     const adminHtml = await adminPage.text();
     assert.equal(adminPage.status, 200);
-    assert.match(adminHtml, /Create blog posts/);
+    assert.match(adminHtml, /Moderate blog comments/);
     assert.match(adminHtml, /Comment moderation/);
     assert.match(adminHtml, /admin-blog\.js/);
+    assert.doesNotMatch(adminHtml, /Create blog post/);
+    assert.doesNotMatch(adminHtml, /adminBlogList/);
 
     const adminScriptResponse = await fetch(`${baseUrl}/admin-blog.js`);
     const adminScript = await adminScriptResponse.text();
     const cssResponse = await fetch(`${baseUrl}/styles.css`);
     const css = await cssResponse.text();
-    assert.match(adminScript, /data-blog-builder/);
-    assert.match(adminScript, /admin-blog-live-page/);
-    assert.match(adminScript, /data-add-blog-block/);
-    assert.match(adminScript, /data-add-blog-block="divider"/);
-    assert.match(adminScript, /HTML section/);
-    assert.match(adminScript, /data-block-html/);
-    assert.match(adminScript, /data-move-blog-block/);
-    assert.match(adminScript, /data-copy-blog-block/);
-    assert.match(adminScript, /data-upload-block-photo/);
-    assert.match(adminScript, /data-replace-photo-index/);
-    assert.match(adminScript, /data-block-style-select/);
-    assert.match(adminScript, /type="hidden" data-block-image-url/);
-    assert.doesNotMatch(adminScript, /Image URL/);
-    assert.match(adminScript, /draggable="true"/);
-    assert.match(adminScript, /dragstart/);
-    assert.match(adminScript, /pointerdown/);
-    assert.match(css, /admin-blog-builder/);
-    assert.match(css, /admin-blog-live-page/);
-    assert.match(css, /admin-page-block/);
-    assert.match(css, /admin-drag-handle/);
-    assert.match(css, /admin-builder-image-preview/);
-    assert.match(css, /admin-photo-tile-actions/);
+    assert.match(adminScript, /api\/admin\/blog\/comments/);
+    assert.match(adminScript, /data-comment-status/);
+    assert.match(adminScript, /data-send-comment-reply/);
+    assert.doesNotMatch(adminScript, /api\/admin\/blog\/posts/);
+    assert.doesNotMatch(adminScript, /data-blog-builder/);
+    assert.doesNotMatch(adminScript, /data-add-blog-block/);
+    assert.doesNotMatch(adminScript, /data-copy-blog-block/);
+    assert.match(css, /admin-blog-comments-list/);
 
-    const postsResponse = await fetch(`${baseUrl}/api/admin/blog/posts`, {
+    const disabledPostsResponse = await fetch(`${baseUrl}/api/admin/blog/posts`, {
       headers: { Cookie: cookie }
     });
-    const postsJson = await postsResponse.json();
-    assert.equal(postsResponse.status, 200);
-    assert.ok(postsJson.posts.some((post) => post.slug === "fashion-is-our-passion"));
-    assert.ok(postsJson.posts.some((post) => post.slug === "machine-embroidery-for-clothes" && post.blocks.some((block) => block.type === "html")));
+    const disabledPostsJson = await disabledPostsResponse.json();
+    assert.equal(disabledPostsResponse.status, 410);
+    assert.match(disabledPostsJson.message, /Blog editing is disabled/);
 
-    const legacyCreateResponse = await fetch(`${baseUrl}/api/admin/blog/posts`, {
+    const disabledPhotoResponse = await fetch(`${baseUrl}/api/admin/blog/posts/photo`, {
       method: "POST",
       headers: { "Content-Type": "application/json", Cookie: cookie },
-      body: JSON.stringify({
-        title: "Legacy Body Template",
-        slug: "legacy-body-template",
-        category: "Studio",
-        author: "HOODYBOODY Studio",
-        date: "2026-05-19",
-        status: "published",
-        tags: "Embroidery, Studio",
-        excerpt: "Plain text post should still receive the editorial photo pair.",
-        body: "First legacy paragraph.\n\nSecond legacy paragraph.\n\nThird legacy paragraph."
-      })
+      body: JSON.stringify({})
     });
-    const legacyCreateJson = await legacyCreateResponse.json();
-    assert.equal(legacyCreateResponse.status, 201);
-    const legacyPublic = await fetch(`${baseUrl}/blog/${legacyCreateJson.post.slug}/`);
-    const legacyHtml = await legacyPublic.text();
-    assert.ok(
-      legacyHtml.indexOf("First legacy paragraph") < legacyHtml.indexOf("Second legacy paragraph") &&
-        legacyHtml.indexOf("Second legacy paragraph") < legacyHtml.indexOf("blog-image-pair") &&
-        legacyHtml.indexOf("blog-image-pair") < legacyHtml.indexOf("Third legacy paragraph"),
-      "legacy text-only posts must insert the two-photo block after the second paragraph"
-    );
+    const disabledPhotoJson = await disabledPhotoResponse.json();
+    assert.equal(disabledPhotoResponse.status, 410);
+    assert.match(disabledPhotoJson.message, /Blog editing is disabled/);
 
-    const textBlocksResponse = await fetch(`${baseUrl}/api/admin/blog/posts`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json", Cookie: cookie },
-      body: JSON.stringify({
-        title: "Text Blocks Template",
-        slug: "text-blocks-template",
-        category: "Studio",
-        author: "HOODYBOODY Studio",
-        date: "2026-05-19",
-        status: "published",
-        tags: "Embroidery, Studio",
-        excerpt: "Existing block posts without photos should receive the editorial photo pair.",
-        body: "First block paragraph.\n\nSecond block paragraph.\n\nThird block paragraph.",
-        blocks: [
-          { type: "paragraph", style: "default", text: "First block paragraph." },
-          { type: "paragraph", style: "default", text: "Second block paragraph." },
-          { type: "paragraph", style: "default", text: "Third block paragraph." }
-        ]
-      })
-    });
-    const textBlocksJson = await textBlocksResponse.json();
-    assert.equal(textBlocksResponse.status, 201);
-    assert.ok(textBlocksJson.post.blocks.some((block) => block.type === "imagePair"));
-    const textBlocksPublic = await fetch(`${baseUrl}/blog/${textBlocksJson.post.slug}/`);
-    const textBlocksHtml = await textBlocksPublic.text();
-    assert.ok(
-      textBlocksHtml.indexOf("First block paragraph") < textBlocksHtml.indexOf("Second block paragraph") &&
-        textBlocksHtml.indexOf("Second block paragraph") < textBlocksHtml.indexOf("blog-image-pair") &&
-        textBlocksHtml.indexOf("blog-image-pair") < textBlocksHtml.indexOf("Third block paragraph"),
-      "block-only posts must insert the two-photo block after the second paragraph"
-    );
-
-    const createResponse = await fetch(`${baseUrl}/api/admin/blog/posts`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json", Cookie: cookie },
-      body: JSON.stringify({
-        title: "Studio Notes",
-        slug: "studio-notes",
-        category: "Studio",
-        author: "HOODYBOODY Studio",
-        date: "2026-05-19",
-        status: "published",
-        tags: "Embroidery, Studio",
-        excerpt: "Short studio note about custom embroidery.",
-        body: "First paragraph for the studio note.\n\n## Process\n\nMore text for the blog page.",
-        blocks: [
-          { type: "paragraph", style: "large", text: "First paragraph for the studio note." },
-          { type: "heading2", style: "default", text: "Process" },
-          { type: "paragraph", style: "accent", text: "More text for the blog page." },
-          { type: "divider", style: "accent" },
-          {
-            type: "imagePair",
-            style: "inset",
-            images: [
-              { image: "/assets/embroidered-collection.png", alt: "Studio detail one", focus: "50% 50%" },
-              { image: "/assets/embroidered-collection.png", alt: "Studio detail two", focus: "50% 50%" }
-            ]
-          }
-        ]
-      })
-    });
-    const createdJson = await createResponse.json();
-    assert.equal(createResponse.status, 201);
-    assert.equal(createdJson.post.status, "published");
-    assert.match(createdJson.post.slug, /^studio-notes/);
-    assert.equal(createdJson.post.blocks.length, 5);
-
-    const tinyPng =
-      "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+/p9sAAAAASUVORK5CYII=";
-    const photoResponse = await fetch(`${baseUrl}/api/admin/blog/posts/photo`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json", Cookie: cookie },
-      body: JSON.stringify({
-        postId: createdJson.post.id,
-        fileName: "studio-note.png",
-        dataUrl: tinyPng
-      })
-    });
-    const photoJson = await photoResponse.json();
-    assert.equal(photoResponse.status, 200);
-    assert.match(photoJson.post.gallery[photoJson.post.gallery.length - 1].image, /^\/api\/blog-images\//);
-
-    const replacePhotoResponse = await fetch(`${baseUrl}/api/admin/blog/posts/photo`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json", Cookie: cookie },
-      body: JSON.stringify({
-        postId: createdJson.post.id,
-        fileName: "studio-cover.png",
-        dataUrl: tinyPng,
-        replaceIndex: 0
-      })
-    });
-    const replacePhotoJson = await replacePhotoResponse.json();
-    assert.equal(replacePhotoResponse.status, 200);
-    assert.match(replacePhotoJson.post.gallery[0].image, /^\/api\/blog-images\//);
-
-    const deletePhotoResponse = await fetch(`${baseUrl}/api/admin/blog/posts/photo`, {
-      method: "DELETE",
-      headers: { "Content-Type": "application/json", Cookie: cookie },
-      body: JSON.stringify({
-        postId: createdJson.post.id,
-        photoIndex: 0,
-        image: replacePhotoJson.post.gallery[0].image
-      })
-    });
-    const deletePhotoJson = await deletePhotoResponse.json();
-    assert.equal(deletePhotoResponse.status, 200);
-    assert.notEqual(deletePhotoJson.post.gallery[0].image, replacePhotoJson.post.gallery[0].image);
-
-    const publicPost = await fetch(`${baseUrl}/blog/${createdJson.post.slug}/`);
-    const publicHtml = await publicPost.text();
-    assert.equal(publicPost.status, 200);
-    assert.match(publicHtml, /Studio Notes \| HOODYBOODY Blog/);
-    assert.match(publicHtml, /First paragraph for the studio note/);
-    assert.match(publicHtml, /blog-block-style-accent/);
-    assert.match(publicHtml, /blog-divider/);
-    assert.match(publicHtml, /blog-image-pair/);
-    assert.match(publicHtml, /\/api\/blog-images\//);
+    const defaultPost = {
+      id: "fashion-is-our-passion",
+      slug: "fashion-is-our-passion"
+    };
 
     const commentResponse = await fetch(`${baseUrl}/api/blog/comments`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        postSlug: createdJson.post.slug,
+        postSlug: defaultPost.slug,
         name: "Comment Tester",
         email: "comment-tester@example.com",
         website: "https://example.com",
@@ -394,7 +251,7 @@ test("owner can create blog posts and upload blog photos", async () => {
     assert.equal(commentResponse.status, 201);
     assert.equal(commentJson.comment.status, "pending");
 
-    const hiddenPending = await fetch(`${baseUrl}/blog/${createdJson.post.slug}/`);
+    const hiddenPending = await fetch(`${baseUrl}/blog/${defaultPost.slug}/`);
     const hiddenPendingHtml = await hiddenPending.text();
     assert.doesNotMatch(hiddenPendingHtml, /This pending comment should wait for approval/);
 
@@ -411,7 +268,7 @@ test("owner can create blog posts and upload blog photos", async () => {
       method: "PATCH",
       headers: { "Content-Type": "application/json", Cookie: cookie },
       body: JSON.stringify({
-        postId: createdJson.post.id,
+        postId: defaultPost.id,
         commentId: commentJson.comment.id,
         status: "published"
       })
@@ -422,14 +279,14 @@ test("owner can create blog posts and upload blog photos", async () => {
       method: "POST",
       headers: { "Content-Type": "application/json", Cookie: cookie },
       body: JSON.stringify({
-        postId: createdJson.post.id,
+        postId: defaultPost.id,
         commentId: commentJson.comment.id,
         text: "Published owner reply from moderation."
       })
     });
     assert.equal(replyResponse.status, 201);
 
-    const publicApproved = await fetch(`${baseUrl}/blog/${createdJson.post.slug}/`);
+    const publicApproved = await fetch(`${baseUrl}/blog/${defaultPost.slug}/`);
     const publicApprovedHtml = await publicApproved.text();
     assert.match(publicApprovedHtml, /This pending comment should wait for approval/);
     assert.match(publicApprovedHtml, /Published owner reply from moderation/);

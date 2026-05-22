@@ -6787,8 +6787,7 @@ body.preloader-active {
 .blog-rich-html .blog-guide-intro,
 .blog-rich-html .toc,
 .blog-rich-html .callout,
-.blog-rich-html .card,
-.blog-rich-html .blog-guide-cta {
+.blog-rich-html .card {
   border: 1px solid #d8d6ca;
   background: #ffffff;
 }
@@ -6998,39 +6997,10 @@ body.preloader-active {
 
 .blog-rich-html .faq-item {
   display: grid;
-  gap: 8px;
-  border-top: 1px solid #d8d6ca;
-  padding: 18px 0;
-}
-
-.blog-rich-html .faq-item:last-child {
-  border-bottom: 1px solid #d8d6ca;
-}
-
-.blog-rich-html .blog-guide-cta {
-  display: grid;
-  gap: 12px;
-  justify-items: start;
-  padding: 30px;
-  background: #050505;
-}
-
-.blog-rich-html .blog-guide-cta h2,
-.blog-rich-html .blog-guide-cta p {
-  color: #ffffff;
-}
-
-.blog-rich-html .blog-guide-cta .btn {
-  display: inline-flex;
-  min-height: 48px;
-  align-items: center;
-  border: 1px solid #b59b52;
-  padding: 0 18px;
-  color: #050505;
-  background: #b59b52;
-  font-size: 0.72rem;
-  letter-spacing: 0.2em;
-  text-transform: uppercase;
+  border: 1px solid #d8d6ca;
+  gap: 14px;
+  padding: 28px 30px;
+  background: #ffffff;
 }
 
 .blog-rich-html .blog-guide-source-note {
@@ -7711,8 +7681,7 @@ body.preloader-active {
   .blog-rich-html .blog-guide-intro,
   .blog-rich-html .toc,
   .blog-rich-html .callout,
-  .blog-rich-html .card,
-  .blog-rich-html .blog-guide-cta {
+  .blog-rich-html .card {
     padding: 22px;
   }
 
