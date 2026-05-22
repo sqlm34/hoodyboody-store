@@ -1,6 +1,41 @@
 (function () {
   const gallery = document.querySelector("[data-blog-gallery]");
 
+  function getBlogLightbox() {
+    let lightbox = document.querySelector("[data-blog-lightbox]");
+    if (lightbox) return lightbox;
+
+    lightbox = document.createElement("div");
+    lightbox.className = "blog-lightbox";
+    lightbox.dataset.blogLightbox = "";
+    lightbox.innerHTML = `
+      <button class="blog-lightbox-close" type="button" aria-label="Close image"></button>
+      <img alt="" />
+    `;
+    document.body.append(lightbox);
+    lightbox.addEventListener("click", (event) => {
+      if (event.target === lightbox || event.target.closest(".blog-lightbox-close")) closeBlogLightbox();
+    });
+    return lightbox;
+  }
+
+  function openBlogLightbox(image) {
+    const lightbox = getBlogLightbox();
+    const lightboxImage = lightbox.querySelector("img");
+    lightboxImage.src = image.currentSrc || image.src;
+    lightboxImage.alt = image.alt || "Blog gallery image";
+    lightbox.classList.add("is-visible");
+    document.body.classList.add("blog-lightbox-open");
+    lightbox.querySelector(".blog-lightbox-close")?.focus({ preventScroll: true });
+  }
+
+  function closeBlogLightbox() {
+    const lightbox = document.querySelector("[data-blog-lightbox]");
+    if (!lightbox) return;
+    lightbox.classList.remove("is-visible");
+    document.body.classList.remove("blog-lightbox-open");
+  }
+
   if (gallery) {
     const slides = Array.from(gallery.querySelectorAll(".blog-gallery-slide"));
     const previous = gallery.querySelector(".blog-gallery-prev");
@@ -27,6 +62,17 @@
 
     showSlide(0);
   }
+
+  document.addEventListener("click", (event) => {
+    const image = event.target.closest(".blog-gallery img, .blog-image-pair img, .blog-image-single img, .blog-sidebar-gallery-grid img");
+    if (!image) return;
+    event.preventDefault();
+    openBlogLightbox(image);
+  });
+
+  document.addEventListener("keydown", (event) => {
+    if (event.key === "Escape") closeBlogLightbox();
+  });
 
   document.querySelectorAll(".blog-reply-link").forEach((button) => {
     button.addEventListener("click", () => {

@@ -1422,7 +1422,7 @@ function parseBlogBlocks(value) {
 
 function normalizeBlogBlockType(value) {
   const type = String(value || "paragraph").trim();
-  return ["paragraph", "heading2", "heading3", "image", "imagePair"].includes(type) ? type : "paragraph";
+  return ["paragraph", "heading2", "heading3", "image", "imagePair", "divider"].includes(type) ? type : "paragraph";
 }
 
 function normalizeBlogBlockStyle(value) {
@@ -1522,6 +1522,10 @@ function normalizeBlogBlocks(value, body = "", gallery = []) {
     .map((block) => {
       const type = normalizeBlogBlockType(block?.type);
       const style = normalizeBlogBlockStyle(block?.style);
+
+      if (type === "divider") {
+        return { type, style };
+      }
 
       if (type === "image") {
         const fallback = getBlogBlockGallery(gallery)[0] || {};
@@ -2223,15 +2227,27 @@ function formatBlogDate(value) {
 
 function renderBlogGallery(post) {
   const gallery = normalizeBlogGallery(post.gallery).length ? normalizeBlogGallery(post.gallery) : normalizeBlogGallery(defaultBlogPosts[0].gallery);
-  const image = gallery[0];
+  const hasMultipleSlides = gallery.length > 1;
 
   return `
-        <section class="blog-gallery qodef-e-media" data-blog-gallery aria-label="Editorial image">
+        <section class="blog-gallery qodef-e-media" data-blog-gallery aria-label="Editorial image" tabindex="0">
           <div class="blog-gallery-track">
-            <figure class="blog-gallery-slide is-active" aria-hidden="false">
+            ${gallery
+              .map(
+                (image, index) => `
+            <figure class="blog-gallery-slide ${index === 0 ? "is-active" : ""}" aria-hidden="${index === 0 ? "false" : "true"}">
               <img src="${escapeHtmlAttribute(image.image)}" alt="${escapeHtmlAttribute(image.alt)}" style="object-position: ${escapeHtmlAttribute(image.focus)}" />
-            </figure>
+            </figure>`
+              )
+              .join("")}
           </div>
+          ${
+            hasMultipleSlides
+              ? `<button class="blog-gallery-arrow blog-gallery-prev" type="button" aria-label="Previous image"></button>
+          <button class="blog-gallery-arrow blog-gallery-next" type="button" aria-label="Next image"></button>
+          <span class="blog-gallery-status" data-blog-gallery-status>Slide 1 of ${gallery.length}</span>`
+              : ""
+          }
         </section>`;
 }
 
@@ -2323,10 +2339,49 @@ function renderBlogBlocksHtml(post) {
       if (block.type === "heading3") return `<h3 class="${styleClass}">${escapeHtml(block.text)}</h3>`;
       if (block.type === "image") return renderBlogBlockSingleImage(block, post);
       if (block.type === "imagePair") return renderBlogBlockImagePair(block, post);
+      if (block.type === "divider") return `<div class="blog-divider ${styleClass}" aria-hidden="true"></div>`;
 
       return `<p class="${styleClass}">${escapeHtml(block.text).replace(/\n/g, "<br />")}</p>`;
     })
     .join("\n");
+}
+
+function getBlogPostNavigation(posts = [], post = {}) {
+  const visiblePosts = Array.isArray(posts) && posts.length ? posts : [post].filter(Boolean);
+  const activeIndex = visiblePosts.findIndex((item) => item.slug === post.slug);
+  if (visiblePosts.length <= 1 || activeIndex === -1) {
+    return { previous: null, next: null };
+  }
+
+  return {
+    previous: visiblePosts[activeIndex - 1] || null,
+    next: visiblePosts[activeIndex + 1] || null
+  };
+}
+
+function renderBlogPostNavCard(direction, post) {
+  const isNext = direction === "next";
+  const label = isNext ? "Next" : "Previous";
+  if (!post) {
+    const thumb = `<span class="blog-post-nav-thumb"></span>`;
+    const text = `<span>${label}</span>`;
+    return `<span class="blog-post-nav-card ${direction} is-disabled" aria-disabled="true">${isNext ? `${text}${thumb}` : `${thumb}${text}`}</span>`;
+  }
+
+  const cover = getBlogBlockGallery(post.gallery)[0] || normalizeBlogGallery(defaultBlogPosts[0].gallery)[0];
+  const thumb = `<span class="blog-post-nav-thumb" style="background-image: url('${escapeHtmlAttribute(cover.image)}'); background-position: ${escapeHtmlAttribute(cover.focus)}"></span>`;
+  const text = `<span>${label}</span>`;
+  return `<a class="blog-post-nav-card ${direction}" href="/blog/${escapeHtmlAttribute(post.slug)}/">${isNext ? `${text}${thumb}` : `${thumb}${text}`}</a>`;
+}
+
+function renderBlogPostNavigation(posts, post) {
+  const navigation = getBlogPostNavigation(posts, post);
+
+  return `
+            <nav class="blog-post-nav" aria-label="Post navigation">
+              ${renderBlogPostNavCard("previous", navigation.previous)}
+              ${renderBlogPostNavCard("next", navigation.next)}
+            </nav>`;
 }
 
 function renderBlogSidebar(post) {
@@ -2414,7 +2469,7 @@ function renderBlogComments(comments = []) {
   return `<ol class="blog-comment-list">${renderItems(safeComments)}</ol>`;
 }
 
-function renderBlogPostPage(req, post) {
+function renderBlogPostPage(req, post, posts = []) {
   const canonicalPath = `/blog/${post.slug}/`;
   const title = `${post.title} | HOODYBOODY Blog`;
   const description = post.excerpt || "HOODYBOODY blog post about custom embroidered clothing and design.";
@@ -2531,10 +2586,7 @@ function renderBlogPostPage(req, post) {
                 <p class="blog-form-status" role="status" aria-live="polite"></p>
               </form>
             </section>
-            <nav class="blog-post-nav" aria-label="Post navigation">
-              <a class="blog-post-nav-card previous" href="/blog/"><span class="blog-post-nav-thumb"></span><span>Previous</span></a>
-              <a class="blog-post-nav-card next" href="/blog/"><span>Next</span><span class="blog-post-nav-thumb"></span></a>
-            </nav>
+            ${renderBlogPostNavigation(posts, post)}
           </div>
         </div>
         <div class="blog-sidebar-section qodef-grid-item qodef-page-sidebar-section qodef-col--4 qodef-col-pull--8">
@@ -4752,16 +4804,18 @@ async function appHandler(req, res) {
 
   if (stripTrailingSlash(pathname) === "/blog") {
     const db = await readDbAsync();
-    const post = publicBlogPosts(db)[0] || publicBlogPost(defaultBlogPosts[0]);
+    const posts = publicBlogPosts(db);
+    const post = posts[0] || publicBlogPost(defaultBlogPosts[0]);
     res.writeHead(200, { "Content-Type": "text/html; charset=utf-8", ...noIndexHeader });
-    res.end(renderBlogPostPage(req, post));
+    res.end(renderBlogPostPage(req, post, posts.length ? posts : [post]));
     return;
   }
 
   if (pathname.startsWith("/blog/")) {
     const slug = stripTrailingSlash(pathname).split("/").filter(Boolean)[1] || "";
     const db = await readDbAsync();
-    const post = getBlogPostBySlug(db, slug);
+    const posts = publicBlogPosts(db);
+    const post = posts.find((item) => item.slug === slugifyBlogSlug(slug)) || null;
 
     if (!post) {
       res.writeHead(404, { "Content-Type": "text/plain; charset=utf-8", ...noIndexHeader });
@@ -4770,7 +4824,7 @@ async function appHandler(req, res) {
     }
 
     res.writeHead(200, { "Content-Type": "text/html; charset=utf-8", ...noIndexHeader });
-    res.end(renderBlogPostPage(req, post));
+    res.end(renderBlogPostPage(req, post, posts));
     return;
   }
 

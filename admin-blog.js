@@ -5,7 +5,8 @@ const BLOG_BLOCK_TYPES = [
   ["heading2", "Heading"],
   ["heading3", "Subheading"],
   ["image", "Single photo"],
-  ["imagePair", "Two photos"]
+  ["imagePair", "Two photos"],
+  ["divider", "Divider"]
 ];
 const BLOG_BLOCK_STYLES = [
   ["default", "Default"],
@@ -36,6 +37,9 @@ let selectedPostId = "";
 let editorMode = "grid";
 let statusTimer = 0;
 let commentsStatusTimer = 0;
+let draggedBlogBlock = null;
+let pointerDragList = null;
+let pointerDragForm = null;
 
 async function api(path, options = {}) {
   const response = await fetch(path, {
@@ -366,52 +370,145 @@ function renderBuilderImageFields(block, post) {
     </div>`;
 }
 
-function renderBlogBuilderBlock(block, index, post) {
+function renderEditorGallery(post) {
+  const photos = getPostPhotos(post);
+  const cover = photos[0];
+
+  return `
+    <section class="blog-gallery qodef-e-media admin-editor-gallery" data-editor-gallery aria-label="Editorial image">
+      <div class="blog-gallery-track">
+        <figure class="blog-gallery-slide is-active" aria-hidden="false">
+          <img src="${escapeHtml(cover.image)}" alt="${escapeHtml(cover.alt)}" style="object-position: ${escapeHtml(cover.focus)}" />
+        </figure>
+      </div>
+      <span class="admin-editor-gallery-note">Cover photo</span>
+    </section>`;
+}
+
+function createEditorBlock(type, post = {}, seed = {}) {
+  const normalizedType = normalizeBuilderType(type);
+  const photos = getPostPhotos(post);
+  const style = normalizeBuilderStyle(seed.style);
+  const text = String(seed.text || "").trim();
+
+  if (normalizedType === "image") {
+    return {
+      type: normalizedType,
+      style,
+      image: normalizeBuilderImage(seed.image || seed.images?.[0], photos[0])
+    };
+  }
+
+  if (normalizedType === "imagePair") {
+    return {
+      type: normalizedType,
+      style,
+      images: [
+        normalizeBuilderImage(seed.images?.[0] || seed.image, photos[1] || photos[0]),
+        normalizeBuilderImage(seed.images?.[1], photos[2] || photos[0])
+      ]
+    };
+  }
+
+  if (normalizedType === "divider") {
+    return { type: normalizedType, style };
+  }
+
+  return {
+    type: normalizedType,
+    style,
+    text: text || (normalizedType === "paragraph" ? "New paragraph text." : normalizedType === "heading3" ? "New subheading" : "New heading")
+  };
+}
+
+function renderEditorImageBlock(block, post) {
+  const image = normalizeBuilderImage(block.image, getCoverPhoto(post));
+
+  return `
+    <figure class="blog-image-single blog-builder-block blog-block-style-${escapeHtml(normalizeBuilderStyle(block.style))}">
+      <img src="${escapeHtml(image.image)}" alt="${escapeHtml(image.alt)}" style="object-position: ${escapeHtml(image.focus)}" />
+    </figure>
+    ${renderBuilderImageFields({ ...block, type: "image" }, post)}`;
+}
+
+function renderEditorImagePairBlock(block, post) {
+  const photos = getPostPhotos(post);
+  const images = [
+    normalizeBuilderImage(block.images?.[0], photos[1] || photos[0]),
+    normalizeBuilderImage(block.images?.[1], photos[2] || photos[0])
+  ];
+
+  return `
+    <div class="blog-image-pair blog-builder-block blog-block-style-${escapeHtml(normalizeBuilderStyle(block.style))}">
+      ${images
+        .map(
+          (image) => `
+        <figure>
+          <img src="${escapeHtml(image.image)}" alt="${escapeHtml(image.alt)}" style="object-position: ${escapeHtml(image.focus)}" />
+        </figure>`
+        )
+        .join("")}
+    </div>
+    ${renderBuilderImageFields({ ...block, type: "imagePair" }, post)}`;
+}
+
+function renderEditorBlock(block, index, post) {
   const type = normalizeBuilderType(block?.type);
   const style = normalizeBuilderStyle(block?.style);
   const text = String(block?.text || "").trim();
+  let content = "";
+
+  if (type === "heading2") {
+    content = `<h2 class="blog-builder-block blog-block-style-${escapeHtml(style)}" contenteditable="true" data-block-text>${escapeHtml(text || "New heading")}</h2>`;
+  } else if (type === "heading3") {
+    content = `<h3 class="blog-builder-block blog-block-style-${escapeHtml(style)}" contenteditable="true" data-block-text>${escapeHtml(text || "New subheading")}</h3>`;
+  } else if (type === "image") {
+    content = renderEditorImageBlock(block, post);
+  } else if (type === "imagePair") {
+    content = renderEditorImagePairBlock(block, post);
+  } else if (type === "divider") {
+    content = `<div class="blog-divider blog-builder-block blog-block-style-${escapeHtml(style)}" aria-hidden="true"></div>`;
+  } else {
+    content = `<p class="blog-builder-block blog-block-style-${escapeHtml(style)}" contenteditable="true" data-block-text>${escapeHtml(text || "New paragraph text.")}</p>`;
+  }
 
   return `
-    <article class="admin-builder-block" data-blog-block data-block-type="${escapeHtml(type)}">
-      <div class="admin-builder-block-head">
+    <article class="admin-page-block" data-blog-block data-block-type="${escapeHtml(type)}" draggable="true">
+      <div class="admin-page-block-toolbar">
+        <button class="admin-drag-handle" type="button" aria-label="Drag block" title="Drag block"><i class="fa-solid fa-grip-lines"></i></button>
         <span class="admin-builder-order" data-block-order>${index + 1}</span>
         <label>
-          Block
+          <span>Block</span>
           <select data-block-type-select>
             ${renderBuilderOptions(BLOG_BLOCK_TYPES, type)}
           </select>
         </label>
         <label>
-          Design
+          <span>Design</span>
           <select data-block-style-select>
             ${renderBuilderOptions(BLOG_BLOCK_STYLES, style)}
           </select>
         </label>
-        <div class="admin-builder-actions">
-          <button class="icon-button" type="button" data-move-blog-block="up" aria-label="Move block up"><i class="fa-solid fa-arrow-up"></i></button>
-          <button class="icon-button" type="button" data-move-blog-block="down" aria-label="Move block down"><i class="fa-solid fa-arrow-down"></i></button>
-          <button class="icon-button danger-button" type="button" data-delete-blog-block aria-label="Delete block"><i class="fa-solid fa-xmark"></i></button>
-        </div>
+        <button class="icon-button" type="button" data-move-blog-block="up" aria-label="Move block up"><i class="fa-solid fa-arrow-up"></i></button>
+        <button class="icon-button" type="button" data-move-blog-block="down" aria-label="Move block down"><i class="fa-solid fa-arrow-down"></i></button>
+        <button class="icon-button danger-button" type="button" data-delete-blog-block aria-label="Delete block"><i class="fa-solid fa-xmark"></i></button>
       </div>
-      <label class="admin-builder-text">
-        Text
-        <textarea data-block-text rows="${type === "paragraph" ? "4" : "2"}">${escapeHtml(text)}</textarea>
-      </label>
-      ${renderBuilderImageFields({ ...block, type }, post)}
+      <div class="admin-page-block-content">${content}</div>
     </article>`;
 }
 
 function renderBlogBuilder(post) {
   const blocks = getPostBlocks(post);
+  const photos = getPostPhotos(post);
 
   return `
-    <div class="admin-blog-builder full-span" data-blog-builder>
+    <div class="admin-blog-builder admin-blog-page-builder" data-blog-builder>
       <input type="hidden" name="blocks" data-blog-blocks-field value="${escapeHtml(JSON.stringify(blocks))}" />
       <textarea name="body" data-blog-body-fallback hidden>${escapeHtml(builderBlocksToBody(blocks))}</textarea>
       <div class="admin-blog-builder-head">
         <div>
-          <strong>Blog page builder</strong>
-          <small>Move blocks, change type, choose design style, and attach article photos.</small>
+          <strong>Live blog page editor</strong>
+          <small>Edit the article as it appears to visitors. Drag blocks to reorder them.</small>
         </div>
         <div class="admin-builder-adds" aria-label="Add blog block">
           <button class="button ghost dark" type="button" data-add-blog-block="paragraph">Paragraph</button>
@@ -419,28 +516,119 @@ function renderBlogBuilder(post) {
           <button class="button ghost dark" type="button" data-add-blog-block="heading3">Subheading</button>
           <button class="button ghost dark" type="button" data-add-blog-block="image">Photo</button>
           <button class="button ghost dark" type="button" data-add-blog-block="imagePair">Two photos</button>
+          <button class="button ghost dark" type="button" data-add-blog-block="divider">Divider</button>
         </div>
       </div>
-      <div class="admin-builder-list" data-blog-builder-list>
-        ${blocks.map((block, index) => renderBlogBuilderBlock(block, index, post)).join("")}
+
+      <div class="admin-blog-live-page blog-page-body">
+        <div class="blog-single-page qodef-grid qodef-layout--template qodef-gutter--extra">
+          <div class="blog-layout qodef-grid-inner clear">
+            <div class="blog-content-section qodef-grid-item qodef-page-content-section qodef-col--8 qodef-col-push--4">
+              <div class="blog-single qodef-blog qodef-m qodef--single">
+                <article class="blog-article qodef-blog-item qodef-e" aria-labelledby="admin-blog-page-title">
+                  <div class="qodef-e-inner">
+                    ${renderEditorGallery(post)}
+                    <div class="blog-article-content qodef-e-content">
+                      <div class="blog-post-meta qodef-e-info admin-page-meta">
+                        <input name="date" type="date" value="${escapeHtml(post.date || new Date().toISOString().slice(0, 10))}" required />
+                        <span>/</span>
+                        <input name="category" value="${escapeHtml(post.category || "Embroidery Journal")}" required />
+                      </div>
+                      <textarea class="blog-title admin-page-title-input" id="admin-blog-page-title" name="title" rows="2" required>${escapeHtml(post.title)}</textarea>
+                      <div class="blog-content qodef-e-text admin-builder-list" data-blog-builder-list>
+                        ${blocks.map((block, index) => renderEditorBlock(block, index, post)).join("")}
+                      </div>
+                      <footer class="blog-post-footer qodef-e-bottom-holder" aria-label="Post tags and share links">
+                        <div class="blog-tags qodef-e-left qodef-e-info">
+                          ${(post.tags || []).map((tag) => `<a href="/blog/" tabindex="-1">${escapeHtml(tag)}</a>`).join("")}
+                        </div>
+                        <ul class="blog-share qodef-e-right qodef-e-info" aria-label="Share">
+                          <li><span>fb</span></li>
+                          <li><span>tw</span></li>
+                          <li><span>pin</span></li>
+                        </ul>
+                      </footer>
+                    </div>
+                  </div>
+                </article>
+                <section class="blog-author" aria-labelledby="admin-blog-author-title">
+                  <span class="blog-author-photo" aria-label="${escapeHtml(post.author || "HOODYBOODY Studio")}"></span>
+                  <div>
+                    <h4 id="admin-blog-author-title"><span>${escapeHtml(post.author || "HOODYBOODY Studio")}</span></h4>
+                    <p>Embroidery notes, product decisions, and quiet wardrobe ideas from the HOODYBOODY worktable.</p>
+                    <div class="blog-author-links">
+                      <span>Custom</span>
+                      <span>Catalog</span>
+                      <span>Journal</span>
+                    </div>
+                  </div>
+                </section>
+                <nav class="blog-post-nav" aria-label="Post navigation">
+                  <span class="blog-post-nav-card previous is-disabled" aria-disabled="true"><span class="blog-post-nav-thumb"></span><span>Previous</span></span>
+                  <span class="blog-post-nav-card next is-disabled" aria-disabled="true"><span>Next</span><span class="blog-post-nav-thumb"></span></span>
+                </nav>
+              </div>
+            </div>
+            <div class="blog-sidebar-section qodef-grid-item qodef-page-sidebar-section qodef-col--4 qodef-col-pull--8">
+              <aside id="qodef-page-sidebar" class="blog-sidebar" role="complementary" aria-label="Blog sidebar preview">
+                <div class="blog-sidebar-widget blog-sidebar-hero">
+                  <img src="${escapeHtml(photos[0].image)}" alt="${escapeHtml(photos[0].alt)}" style="object-position: ${escapeHtml(photos[0].focus)}" />
+                </div>
+                <nav class="blog-sidebar-widget blog-sidebar-nav" aria-label="Blog categories">
+                  <h5>Categories</h5>
+                  <ul>
+                    <li><span>Fashion</span></li>
+                    <li><span>Inspiring Outfit</span></li>
+                    <li><span>Lifestyle</span></li>
+                    <li><span>Outdoors</span></li>
+                    <li><span>Street-Style</span></li>
+                  </ul>
+                </nav>
+                <div class="blog-sidebar-widget blog-sidebar-tags">
+                  <h5>Tags</h5>
+                  <div class="tagcloud">
+                    <span class="tag-small">Beauty</span>
+                    <span class="tag-small">Design</span>
+                    <span class="tag-large">Outfit</span>
+                    <span class="tag-medium">Stylish</span>
+                  </div>
+                </div>
+                <div class="blog-sidebar-widget blog-sidebar-gallery">
+                  <h5>Gallery</h5>
+                  <div class="blog-sidebar-gallery-grid">
+                    ${Array.from({ length: 6 }, (_, index) => photos[index % photos.length])
+                      .map((photo) => `<span><img src="${escapeHtml(photo.image)}" alt="${escapeHtml(photo.alt)}" style="object-position: ${escapeHtml(photo.focus)}" /></span>`)
+                      .join("")}
+                  </div>
+                </div>
+              </aside>
+            </div>
+          </div>
+        </div>
       </div>
     </div>`;
 }
 
 function collectBlogBlocks(form) {
+  const readValue = (field) => String(field?.value ?? field?.textContent ?? "").trim();
+
   return Array.from(form.querySelectorAll("[data-blog-block]"))
     .map((card) => {
       const type = normalizeBuilderType(card.dataset.blockType);
       const style = normalizeBuilderStyle(card.querySelector("[data-block-style-select]")?.value);
+
+      if (type === "divider") {
+        return { type, style };
+      }
 
       if (type === "image") {
         return {
           type,
           style,
           image: {
-            image: card.querySelector('[data-block-image-url="0"]')?.value.trim() || DEFAULT_BLOG_IMAGE,
-            alt: card.querySelector('[data-block-image-alt="0"]')?.value.trim() || "HOODYBOODY blog image",
-            focus: card.querySelector('[data-block-image-focus="0"]')?.value.trim() || "50% 50%"
+            image: readValue(card.querySelector('[data-block-image-url="0"]')) || DEFAULT_BLOG_IMAGE,
+            alt: readValue(card.querySelector('[data-block-image-alt="0"]')) || "HOODYBOODY blog image",
+            focus: readValue(card.querySelector('[data-block-image-focus="0"]')) || "50% 50%"
           }
         };
       }
@@ -450,9 +638,9 @@ function collectBlogBlocks(form) {
           type,
           style,
           images: [0, 1].map((slot) => ({
-            image: card.querySelector(`[data-block-image-url="${slot}"]`)?.value.trim() || DEFAULT_BLOG_IMAGE,
-            alt: card.querySelector(`[data-block-image-alt="${slot}"]`)?.value.trim() || "HOODYBOODY blog image",
-            focus: card.querySelector(`[data-block-image-focus="${slot}"]`)?.value.trim() || "50% 50%"
+            image: readValue(card.querySelector(`[data-block-image-url="${slot}"]`)) || DEFAULT_BLOG_IMAGE,
+            alt: readValue(card.querySelector(`[data-block-image-alt="${slot}"]`)) || "HOODYBOODY blog image",
+            focus: readValue(card.querySelector(`[data-block-image-focus="${slot}"]`)) || "50% 50%"
           }))
         };
       }
@@ -460,10 +648,10 @@ function collectBlogBlocks(form) {
       return {
         type,
         style,
-        text: card.querySelector("[data-block-text]")?.value.trim() || ""
+        text: readValue(card.querySelector("[data-block-text]"))
       };
     })
-    .filter((block) => block.type === "image" || block.type === "imagePair" || block.text);
+    .filter((block) => block.type === "divider" || block.type === "image" || block.type === "imagePair" || block.text);
 }
 
 function syncBlogBuilderFields(form) {
@@ -480,6 +668,67 @@ function updateBuilderOrder(form) {
   form.querySelectorAll("[data-block-order]").forEach((item, index) => {
     item.textContent = String(index + 1);
   });
+}
+
+function getEditorBlockIndex(card) {
+  return Math.max(0, Array.from(card.parentElement?.children || []).indexOf(card));
+}
+
+function replaceEditorBlock(card, block, form) {
+  const post = getSelectedPost() || getBlankPost();
+  const index = getEditorBlockIndex(card);
+  card.insertAdjacentHTML("afterend", renderEditorBlock(block, index, post));
+  card.remove();
+  updateBuilderOrder(form);
+  syncBlogBuilderFields(form);
+}
+
+function getBlockFromCard(card, nextType = card?.dataset.blockType) {
+  const type = normalizeBuilderType(nextType);
+  const style = normalizeBuilderStyle(card?.querySelector("[data-block-style-select]")?.value);
+  const text = String(card?.querySelector("[data-block-text]")?.value ?? card?.querySelector("[data-block-text]")?.textContent ?? "").trim();
+  const images = [0, 1].map((slot) => ({
+    image: String(card?.querySelector(`[data-block-image-url="${slot}"]`)?.value || "").trim(),
+    alt: String(card?.querySelector(`[data-block-image-alt="${slot}"]`)?.value || "").trim(),
+    focus: String(card?.querySelector(`[data-block-image-focus="${slot}"]`)?.value || "").trim()
+  }));
+
+  if (type === "image") return { type, style, image: images[0], text };
+  if (type === "imagePair") return { type, style, images, text };
+  if (type === "divider") return { type, style };
+  return { type, style, text };
+}
+
+function getDragAfterBlock(container, y) {
+  return Array.from(container.querySelectorAll("[data-blog-block]:not(.is-dragging)")).reduce(
+    (closest, child) => {
+      const box = child.getBoundingClientRect();
+      const offset = y - box.top - box.height / 2;
+      if (offset < 0 && offset > closest.offset) return { offset, element: child };
+      return closest;
+    },
+    { offset: Number.NEGATIVE_INFINITY, element: null }
+  ).element;
+}
+
+function moveDraggedBlogBlock(y) {
+  if (!pointerDragList || !draggedBlogBlock) return;
+  const nextBlock = getDragAfterBlock(pointerDragList, y);
+  if (nextBlock) {
+    pointerDragList.insertBefore(draggedBlogBlock, nextBlock);
+  } else {
+    pointerDragList.appendChild(draggedBlogBlock);
+  }
+}
+
+function finishPointerBlogDrag() {
+  if (!draggedBlogBlock || !pointerDragForm) return;
+  draggedBlogBlock.classList.remove("is-dragging");
+  updateBuilderOrder(pointerDragForm);
+  syncBlogBuilderFields(pointerDragForm);
+  draggedBlogBlock = null;
+  pointerDragList = null;
+  pointerDragForm = null;
 }
 
 function renderStatusSelect(post) {
@@ -550,39 +799,22 @@ function renderPostGrid() {
 
 function renderPostForm(post, mode = "edit") {
   const isCreate = mode === "create";
-  const cover = getCoverPhoto(post);
 
   return `
-    <form class="admin-product-form admin-blog-form" data-post-id="${escapeHtml(post.id)}" data-editor-mode="${escapeHtml(mode)}">
-      <div
-        class="admin-product-preview admin-blog-preview"
-        style="--product-image: url('${escapeHtml(cover.image)}'); --focus: ${escapeHtml(cover.focus || "50% 50%")}"
-      ></div>
-      <div class="admin-product-fields admin-blog-fields">
+    <form class="admin-product-form admin-blog-form admin-blog-page-form" data-post-id="${escapeHtml(post.id)}" data-editor-mode="${escapeHtml(mode)}">
+      <div class="admin-product-fields admin-blog-fields admin-blog-editor-panel">
         <div class="admin-product-title">
           <strong>${escapeHtml(isCreate ? "Create new blog post" : post.title)}</strong>
           <span>${escapeHtml(isCreate ? "Draft" : post.slug)}</span>
         </div>
         <div class="form-grid">
           <label>
-            Post title
-            <input name="title" value="${escapeHtml(post.title)}" required />
-          </label>
-          <label>
             Slug
             <input name="slug" value="${escapeHtml(post.slug || slugify(post.title))}" required />
           </label>
           <label>
-            Category
-            <input name="category" value="${escapeHtml(post.category || "Embroidery Journal")}" required />
-          </label>
-          <label>
             Author
             <input name="author" value="${escapeHtml(post.author || "HOODYBOODY Studio")}" required />
-          </label>
-          <label>
-            Publish date
-            <input name="date" type="date" value="${escapeHtml(post.date || new Date().toISOString().slice(0, 10))}" required />
           </label>
           <label>
             Status
@@ -608,7 +840,6 @@ function renderPostForm(post, mode = "edit") {
             Meta excerpt
             <textarea name="excerpt" rows="3" required>${escapeHtml(post.excerpt || "")}</textarea>
           </label>
-          ${renderBlogBuilder(post)}
         </div>
         <div class="admin-editor-actions">
           <button class="button ghost dark" type="button" data-close-editor>Back to posts</button>
@@ -621,6 +852,7 @@ function renderPostForm(post, mode = "edit") {
           <button class="button primary" type="submit">${isCreate ? "Create post" : "Save post"}</button>
         </div>
       </div>
+      ${renderBlogBuilder(post)}
     </form>
   `;
 }
@@ -889,18 +1121,14 @@ adminBlogList.addEventListener("click", (event) => {
     const form = addBlockButton.closest("[data-post-id]");
     const list = form.querySelector("[data-blog-builder-list]");
     const post = getSelectedPost() || getBlankPost();
-    const photos = getPostPhotos(post);
     const type = normalizeBuilderType(addBlockButton.dataset.addBlogBlock);
-    const block =
-      type === "image"
-        ? { type, style: "default", image: photos[0] }
-        : type === "imagePair"
-          ? { type, style: "default", images: [photos[1] || photos[0], photos[2] || photos[0]] }
-          : { type, style: "default", text: type === "paragraph" ? "New paragraph text." : "New heading" };
+    const block = createEditorBlock(type, post);
 
-    list.insertAdjacentHTML("beforeend", renderBlogBuilderBlock(block, list.children.length, post));
+    list.insertAdjacentHTML("beforeend", renderEditorBlock(block, list.children.length, post));
     updateBuilderOrder(form);
     syncBlogBuilderFields(form);
+    list.lastElementChild?.scrollIntoView({ behavior: "smooth", block: "center" });
+    list.lastElementChild?.querySelector("[data-block-text]")?.focus();
     return;
   }
 
@@ -1087,7 +1315,7 @@ adminBlogList.addEventListener("input", (event) => {
     syncBlogBuilderFields(form);
   }
 
-  const titleInput = event.target.closest('input[name="title"]');
+  const titleInput = event.target.closest('[name="title"]');
   if (!titleInput) return;
 
   const form = titleInput.closest("[data-post-id]");
@@ -1102,15 +1330,21 @@ adminBlogList.addEventListener("change", (event) => {
   if (blockTypeSelect) {
     const form = blockTypeSelect.closest("[data-post-id]");
     const card = blockTypeSelect.closest("[data-blog-block]");
-    card.dataset.blockType = normalizeBuilderType(blockTypeSelect.value);
-    syncBlogBuilderFields(form);
+    const post = getSelectedPost() || getBlankPost();
+    const nextType = normalizeBuilderType(blockTypeSelect.value);
+    const seed = getBlockFromCard(card, nextType);
+    const nextBlock = createEditorBlock(nextType, post, seed);
+    replaceEditorBlock(card, nextBlock, form);
     return;
   }
 
   const blockStyleSelect = event.target.closest("[data-block-style-select]");
   if (blockStyleSelect) {
     const form = blockStyleSelect.closest("[data-post-id]");
-    syncBlogBuilderFields(form);
+    const card = blockStyleSelect.closest("[data-blog-block]");
+    const post = getSelectedPost() || getBlankPost();
+    const nextBlock = createEditorBlock(card.dataset.blockType, post, getBlockFromCard(card));
+    replaceEditorBlock(card, nextBlock, form);
     return;
   }
 
@@ -1128,8 +1362,20 @@ adminBlogList.addEventListener("change", (event) => {
       if (imageInput) imageInput.value = option.value;
       if (altInput) altInput.value = option.dataset.alt || altInput.value;
       if (focusInput) focusInput.value = option.dataset.focus || focusInput.value;
-      syncBlogBuilderFields(form);
+      const post = getSelectedPost() || getBlankPost();
+      const nextBlock = createEditorBlock(card.dataset.blockType, post, getBlockFromCard(card));
+      replaceEditorBlock(card, nextBlock, form);
     }
+    return;
+  }
+
+  const imageField = event.target.closest("[data-block-image-url], [data-block-image-alt], [data-block-image-focus]");
+  if (imageField) {
+    const form = imageField.closest("[data-post-id]");
+    const card = imageField.closest("[data-blog-block]");
+    const post = getSelectedPost() || getBlankPost();
+    const nextBlock = createEditorBlock(card.dataset.blockType, post, getBlockFromCard(card));
+    replaceEditorBlock(card, nextBlock, form);
     return;
   }
 
@@ -1147,6 +1393,74 @@ adminBlogList.addEventListener("change", (event) => {
     .finally(() => {
       input.value = "";
     });
+});
+
+adminBlogList.addEventListener("pointerdown", (event) => {
+  const handle = event.target.closest(".admin-drag-handle");
+  if (!handle) return;
+  const card = handle.closest("[data-blog-block]");
+  const list = card?.closest("[data-blog-builder-list]");
+  const form = card?.closest("[data-post-id]");
+  if (!card || !list || !form) return;
+
+  event.preventDefault();
+  draggedBlogBlock = card;
+  pointerDragList = list;
+  pointerDragForm = form;
+  card.classList.add("is-dragging");
+  handle.setPointerCapture?.(event.pointerId);
+});
+
+adminBlogList.addEventListener("pointermove", (event) => {
+  if (!draggedBlogBlock || !pointerDragList) return;
+  event.preventDefault();
+  moveDraggedBlogBlock(event.clientY);
+});
+
+adminBlogList.addEventListener("pointerup", finishPointerBlogDrag);
+adminBlogList.addEventListener("pointercancel", finishPointerBlogDrag);
+
+adminBlogList.addEventListener("dragstart", (event) => {
+  const card = event.target.closest("[data-blog-block]");
+  if (!card) return;
+  draggedBlogBlock = card;
+  card.classList.add("is-dragging");
+  event.dataTransfer.effectAllowed = "move";
+  event.dataTransfer.setData("text/plain", card.dataset.blockType || "blog-block");
+});
+
+adminBlogList.addEventListener("dragover", (event) => {
+  const list = event.target.closest("[data-blog-builder-list]");
+  if (!list || !draggedBlogBlock) return;
+  event.preventDefault();
+  const nextBlock = getDragAfterBlock(list, event.clientY);
+  if (nextBlock) {
+    list.insertBefore(draggedBlogBlock, nextBlock);
+  } else {
+    list.appendChild(draggedBlogBlock);
+  }
+});
+
+adminBlogList.addEventListener("drop", (event) => {
+  const list = event.target.closest("[data-blog-builder-list]");
+  if (!list || !draggedBlogBlock) return;
+  event.preventDefault();
+  const form = list.closest("[data-post-id]");
+  draggedBlogBlock.classList.remove("is-dragging");
+  draggedBlogBlock = null;
+  updateBuilderOrder(form);
+  syncBlogBuilderFields(form);
+});
+
+adminBlogList.addEventListener("dragend", () => {
+  const card = draggedBlogBlock || adminBlogList.querySelector("[data-blog-block].is-dragging");
+  const form = card?.closest("[data-post-id]");
+  card?.classList.remove("is-dragging");
+  draggedBlogBlock = null;
+  if (form) {
+    updateBuilderOrder(form);
+    syncBlogBuilderFields(form);
+  }
 });
 
 reloadBlogPosts.addEventListener("click", () => loadBlogPosts());

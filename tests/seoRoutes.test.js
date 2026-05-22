@@ -92,6 +92,7 @@ test("blog page renders Valeska-style single post functionality", async () => {
     assert.match(response.headers.get("x-robots-tag") || "", /noindex/);
     assert.match(html, /Fashion Is Our Passion \| HOODYBOODY Blog/);
     assert.match(html, /data-blog-gallery/);
+    assert.match(html, /data-blog-gallery-status/);
     assert.match(html, /blog-builder-block/);
     assert.match(html, /blog-image-pair/);
     assert.match(html, /Process Of Making Fashion Items/);
@@ -111,8 +112,12 @@ test("blog page renders Valeska-style single post functionality", async () => {
     assert.match(html, /data-blog-comment-form/);
     assert.match(html, /<ol class="blog-comment-list">[\s\S]*data-blog-comment-id/);
     assert.match(html, /href="\/blog\/">Blog/);
+    assert.match(html, /blog-post-nav-card previous is-disabled/);
+    assert.match(html, /blog-post-nav-card next is-disabled/);
     assert.doesNotMatch(scriptText, /data-blog-newsletter/);
     assert.match(scriptText, /Slide \$\{activeIndex \+ 1\} of \$\{slides\.length\}/);
+    assert.match(scriptText, /data-blog-lightbox/);
+    assert.match(scriptText, /Escape/);
     assert.match(css, /\.blog-layout/);
     assert.match(css, /\.blog-sidebar-widget/);
     assert.match(css, /grid-template-columns: minmax\(270px, 31\.6%\) minmax\(0, 1fr\)/);
@@ -122,6 +127,9 @@ test("blog page renders Valeska-style single post functionality", async () => {
     assert.match(css, /min-height: 38px/);
     assert.match(css, /blog-block-style-accent/);
     assert.match(css, /blog-image-single/);
+    assert.match(css, /\.blog-divider/);
+    assert.match(css, /\.blog-lightbox/);
+    assert.match(css, /\.blog-post-nav-card\.is-disabled/);
     assert.doesNotMatch(css, /blog-newsletter/);
     assert.match(css, /\.blog-tags span\s*{\s*display: none/);
     assert.match(css, /\.blog-comment > ol/);
@@ -158,11 +166,18 @@ test("owner can create blog posts and upload blog photos", async () => {
     const cssResponse = await fetch(`${baseUrl}/styles.css`);
     const css = await cssResponse.text();
     assert.match(adminScript, /data-blog-builder/);
+    assert.match(adminScript, /admin-blog-live-page/);
     assert.match(adminScript, /data-add-blog-block/);
+    assert.match(adminScript, /data-add-blog-block="divider"/);
     assert.match(adminScript, /data-move-blog-block/);
     assert.match(adminScript, /data-block-style-select/);
+    assert.match(adminScript, /draggable="true"/);
+    assert.match(adminScript, /dragstart/);
+    assert.match(adminScript, /pointerdown/);
     assert.match(css, /admin-blog-builder/);
-    assert.match(css, /admin-builder-block/);
+    assert.match(css, /admin-blog-live-page/);
+    assert.match(css, /admin-page-block/);
+    assert.match(css, /admin-drag-handle/);
 
     const postsResponse = await fetch(`${baseUrl}/api/admin/blog/posts`, {
       headers: { Cookie: cookie }
@@ -246,6 +261,7 @@ test("owner can create blog posts and upload blog photos", async () => {
           { type: "paragraph", style: "large", text: "First paragraph for the studio note." },
           { type: "heading2", style: "default", text: "Process" },
           { type: "paragraph", style: "accent", text: "More text for the blog page." },
+          { type: "divider", style: "accent" },
           {
             type: "imagePair",
             style: "inset",
@@ -261,7 +277,7 @@ test("owner can create blog posts and upload blog photos", async () => {
     assert.equal(createResponse.status, 201);
     assert.equal(createdJson.post.status, "published");
     assert.match(createdJson.post.slug, /^studio-notes/);
-    assert.equal(createdJson.post.blocks.length, 4);
+    assert.equal(createdJson.post.blocks.length, 5);
 
     const tinyPng =
       "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+/p9sAAAAASUVORK5CYII=";
@@ -284,6 +300,7 @@ test("owner can create blog posts and upload blog photos", async () => {
     assert.match(publicHtml, /Studio Notes \| HOODYBOODY Blog/);
     assert.match(publicHtml, /First paragraph for the studio note/);
     assert.match(publicHtml, /blog-block-style-accent/);
+    assert.match(publicHtml, /blog-divider/);
     assert.match(publicHtml, /blog-image-pair/);
     assert.match(publicHtml, /\/api\/blog-images\//);
 
