@@ -113,7 +113,7 @@ test("blog page renders Valeska-style single post functionality", async () => {
     assert.match(html, /<ol class="blog-comment-list">[\s\S]*data-blog-comment-id/);
     assert.match(html, /href="\/blog\/">Blog/);
     assert.match(html, /blog-post-nav-card previous is-disabled/);
-    assert.match(html, /blog-post-nav-card next is-disabled/);
+    assert.match(html, /blog-post-nav-card next" href="\/blog\/machine-embroidery-for-clothes\//);
     assert.doesNotMatch(scriptText, /data-blog-newsletter/);
     assert.match(scriptText, /Slide \$\{activeIndex \+ 1\} of \$\{slides\.length\}/);
     assert.match(scriptText, /data-blog-lightbox/);
@@ -130,10 +130,48 @@ test("blog page renders Valeska-style single post functionality", async () => {
     assert.match(css, /\.blog-divider/);
     assert.match(css, /\.blog-lightbox/);
     assert.match(css, /\.blog-post-nav-card\.is-disabled/);
+    assert.match(css, /\.blog-rich-html/);
+    assert.match(css, /\.blog-rich-html table/);
     assert.doesNotMatch(css, /blog-newsletter/);
     assert.match(css, /\.blog-tags span\s*{\s*display: none/);
     assert.match(css, /\.blog-comment > ol/);
     assert.match(css, /overflow-wrap: anywhere/);
+  } finally {
+    server.close();
+  }
+});
+
+test("machine embroidery guide renders imported blog content with tables and no card icons", async () => {
+  const { server, baseUrl } = await startServer();
+  try {
+    const response = await fetch(`${baseUrl}/blog/machine-embroidery-for-clothes/`);
+    const html = await response.text();
+    const cssResponse = await fetch(`${baseUrl}/styles.css`);
+    const css = await cssResponse.text();
+
+    assert.equal(response.status, 200);
+    assert.match(html, /Machine Embroidery for Clothes: The Ultimate Guide \| 2024 \| HOODYBOODY Blog/);
+    assert.match(html, /blog-rich-html/);
+    assert.match(html, /Table of Contents/);
+    assert.match(html, /What Is Machine Embroidery for Clothes/);
+    assert.match(html, /Best Fabrics for Machine Embroidery/);
+    assert.match(html, /Choosing the Right Stabilizer/);
+    assert.match(html, /Thread Types & Colors/);
+    assert.match(html, /Common Mistakes & How to Avoid Them/);
+    assert.match(html, /Frequently Asked Questions/);
+    assert.match(html, /Ready to Start Embroidering/);
+    assert.match(html, /Shop Embroidery Supplies/);
+    assert.match(html, /Cotton \(denim, twill\)/);
+    assert.match(html, /Polyester \(40wt\)/);
+    assert.match(html, /Fabric puckering/);
+    assert.equal((html.match(/<table>/g) || []).length, 3);
+    assert.equal((html.match(/class="card"/g) || []).length, 11);
+    assert.equal((html.match(/class="card-icon"/g) || []).length, 0);
+    assert.match(html, /blog-post-nav-card previous" href="\/blog\/fashion-is-our-passion\//);
+    assert.match(html, /blog-post-nav-card next is-disabled/);
+    assert.match(css, /blog-rich-html \.card-grid/);
+    assert.match(css, /blog-rich-html \.table-wrap/);
+    assert.match(css, /blog-rich-html \.step-num/);
   } finally {
     server.close();
   }
@@ -169,6 +207,8 @@ test("owner can create blog posts and upload blog photos", async () => {
     assert.match(adminScript, /admin-blog-live-page/);
     assert.match(adminScript, /data-add-blog-block/);
     assert.match(adminScript, /data-add-blog-block="divider"/);
+    assert.match(adminScript, /HTML section/);
+    assert.match(adminScript, /data-block-html/);
     assert.match(adminScript, /data-move-blog-block/);
     assert.match(adminScript, /data-copy-blog-block/);
     assert.match(adminScript, /data-upload-block-photo/);
@@ -192,6 +232,7 @@ test("owner can create blog posts and upload blog photos", async () => {
     const postsJson = await postsResponse.json();
     assert.equal(postsResponse.status, 200);
     assert.ok(postsJson.posts.some((post) => post.slug === "fashion-is-our-passion"));
+    assert.ok(postsJson.posts.some((post) => post.slug === "machine-embroidery-for-clothes" && post.blocks.some((block) => block.type === "html")));
 
     const legacyCreateResponse = await fetch(`${baseUrl}/api/admin/blog/posts`, {
       method: "POST",

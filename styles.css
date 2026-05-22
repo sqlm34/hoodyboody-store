@@ -3635,10 +3635,31 @@ textarea:focus {
   margin-top: 12px;
 }
 
+.admin-html-source {
+  display: grid;
+  gap: 8px;
+  margin-top: 14px;
+  color: var(--muted);
+  font-size: 0.78rem;
+  font-weight: 760;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.admin-html-source textarea {
+  min-height: 180px;
+  font-family: Consolas, "Liberation Mono", monospace;
+  font-size: 0.82rem;
+  letter-spacing: 0;
+  line-height: 1.45;
+  text-transform: none;
+}
+
 .admin-page-block[data-block-type="paragraph"] .admin-builder-images,
 .admin-page-block[data-block-type="heading2"] .admin-builder-images,
 .admin-page-block[data-block-type="heading3"] .admin-builder-images,
 .admin-page-block[data-block-type="divider"] .admin-builder-images,
+.admin-page-block[data-block-type="html"] .admin-builder-images,
 .admin-page-block[data-block-type="image"] [data-block-text],
 .admin-page-block[data-block-type="imagePair"] [data-block-text] {
   display: none;
@@ -6758,6 +6779,264 @@ body.preloader-active {
   background: #e9e5d7;
 }
 
+.blog-rich-html {
+  display: grid;
+  gap: 28px;
+}
+
+.blog-rich-html .blog-guide-intro,
+.blog-rich-html .toc,
+.blog-rich-html .callout,
+.blog-rich-html .card,
+.blog-rich-html .blog-guide-cta {
+  border: 1px solid #d8d6ca;
+  background: #ffffff;
+}
+
+.blog-rich-html .blog-guide-intro {
+  display: grid;
+  gap: 16px;
+  padding: 28px 30px;
+  border-left: 4px solid #b59b52;
+}
+
+.blog-rich-html .blog-guide-eyebrow,
+.blog-rich-html .section-label,
+.blog-rich-html .blog-guide-meta,
+.blog-rich-html .toc a,
+.blog-rich-html .blog-guide-source-note {
+  color: #6f665b;
+  font-size: 0.75rem;
+  font-weight: 500;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+}
+
+.blog-rich-html .blog-guide-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px 22px;
+  padding-top: 2px;
+}
+
+.blog-rich-html .toc {
+  display: grid;
+  gap: 14px;
+  padding: 26px 30px;
+  border-left: 4px solid #b59b52;
+}
+
+.blog-rich-html .toc h2,
+.blog-rich-html h4,
+.blog-rich-html .faq-q {
+  margin: 0;
+  color: #050505;
+  font-family: "Cormorant Garamond", Georgia, serif;
+  font-weight: 300;
+  letter-spacing: 0;
+  text-transform: uppercase;
+}
+
+.blog-rich-html .toc ol,
+.blog-rich-html ul {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  padding-left: 22px;
+}
+
+.blog-rich-html .section {
+  display: grid;
+  gap: 17px;
+}
+
+.blog-rich-html .section-title {
+  margin: 0;
+}
+
+.blog-rich-html .sub-title {
+  margin: 10px 0 0;
+}
+
+.blog-rich-html blockquote {
+  margin: 12px 0 0;
+  border-left: 1px solid #050505;
+  padding: 4px 0 4px 24px;
+  color: #050505;
+  font-family: "Cormorant Garamond", Georgia, serif;
+  font-size: 1.42rem;
+  font-style: italic;
+  line-height: 1.2;
+}
+
+.blog-rich-html .blog-import-divider {
+  display: grid;
+  place-items: center;
+  height: 1px;
+  background: rgba(5, 5, 5, 0.18);
+}
+
+.blog-rich-html .card-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.blog-rich-html .card {
+  display: grid;
+  gap: 8px;
+  padding: 22px;
+}
+
+.blog-rich-html .card-icon {
+  display: none;
+}
+
+.blog-rich-html .card p,
+.blog-rich-html .step-content p,
+.blog-rich-html .faq-a {
+  color: #6f665b;
+  font-size: 0.94rem;
+}
+
+.blog-rich-html .table-wrap {
+  width: 100%;
+  overflow-x: auto;
+  border: 1px solid #d8d6ca;
+  background: #ffffff;
+}
+
+.blog-rich-html table {
+  width: 100%;
+  min-width: 640px;
+  border-collapse: collapse;
+  color: #353535;
+  font-family: "Yantramanav", Arial, sans-serif;
+  font-size: 0.92rem;
+}
+
+.blog-rich-html thead {
+  background: #050505;
+  color: #ffffff;
+}
+
+.blog-rich-html th,
+.blog-rich-html td {
+  border-bottom: 1px solid #d8d6ca;
+  padding: 13px 16px;
+  text-align: left;
+  vertical-align: top;
+}
+
+.blog-rich-html tbody tr:nth-child(even) td {
+  background: #f7f4ed;
+}
+
+.blog-rich-html .callout {
+  display: grid;
+  gap: 8px;
+  padding: 22px 26px;
+  border-left: 4px solid #6b8c6e;
+}
+
+.blog-rich-html .callout strong {
+  color: #4f7654;
+  font-size: 0.72rem;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+}
+
+.blog-rich-html .steps {
+  display: grid;
+  gap: 20px;
+}
+
+.blog-rich-html .step {
+  display: grid;
+  grid-template-columns: 42px minmax(0, 1fr);
+  gap: 16px;
+}
+
+.blog-rich-html .step-num {
+  display: grid;
+  width: 34px;
+  height: 34px;
+  place-items: center;
+  border: 1px solid #b59b52;
+  border-radius: 999px;
+  color: #b59b52;
+  font-size: 0;
+}
+
+.blog-rich-html .step:nth-child(1) .step-num::before {
+  content: "1";
+}
+
+.blog-rich-html .step:nth-child(2) .step-num::before {
+  content: "2";
+}
+
+.blog-rich-html .step:nth-child(3) .step-num::before {
+  content: "3";
+}
+
+.blog-rich-html .step:nth-child(4) .step-num::before {
+  content: "4";
+}
+
+.blog-rich-html .step:nth-child(5) .step-num::before {
+  content: "5";
+}
+
+.blog-rich-html .step:nth-child(6) .step-num::before {
+  content: "6";
+}
+
+.blog-rich-html .step-num::before {
+  font-size: 0.9rem;
+}
+
+.blog-rich-html .faq-item {
+  display: grid;
+  gap: 8px;
+  border-top: 1px solid #d8d6ca;
+  padding: 18px 0;
+}
+
+.blog-rich-html .faq-item:last-child {
+  border-bottom: 1px solid #d8d6ca;
+}
+
+.blog-rich-html .blog-guide-cta {
+  display: grid;
+  gap: 12px;
+  justify-items: start;
+  padding: 30px;
+  background: #050505;
+}
+
+.blog-rich-html .blog-guide-cta h2,
+.blog-rich-html .blog-guide-cta p {
+  color: #ffffff;
+}
+
+.blog-rich-html .blog-guide-cta .btn {
+  display: inline-flex;
+  min-height: 48px;
+  align-items: center;
+  border: 1px solid #b59b52;
+  padding: 0 18px;
+  color: #050505;
+  background: #b59b52;
+  font-size: 0.72rem;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+}
+
+.blog-rich-html .blog-guide-source-note {
+  margin-top: -8px;
+}
+
 .blog-image-single.blog-block-style-wide,
 .blog-image-pair.blog-block-style-wide {
   width: min(100%, 760px);
@@ -7388,7 +7667,8 @@ body.preloader-active {
   }
 
   .blog-image-pair,
-  .blog-post-nav {
+  .blog-post-nav,
+  .blog-rich-html .card-grid {
     grid-template-columns: 1fr;
   }
 
@@ -7426,6 +7706,14 @@ body.preloader-active {
 
   .blog-post-footer {
     display: grid;
+  }
+
+  .blog-rich-html .blog-guide-intro,
+  .blog-rich-html .toc,
+  .blog-rich-html .callout,
+  .blog-rich-html .card,
+  .blog-rich-html .blog-guide-cta {
+    padding: 22px;
   }
 
   .blog-sidebar-gallery-grid {

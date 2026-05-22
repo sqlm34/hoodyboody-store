@@ -6,7 +6,8 @@ const BLOG_BLOCK_TYPES = [
   ["heading3", "Subheading"],
   ["image", "Single photo"],
   ["imagePair", "Two photos"],
-  ["divider", "Divider"]
+  ["divider", "Divider"],
+  ["html", "HTML section"]
 ];
 const BLOG_BLOCK_STYLES = [
   ["default", "Default"],
@@ -180,6 +181,15 @@ function normalizeBuilderImage(value = {}, fallback = {}) {
   };
 }
 
+function htmlToBuilderText(value = "") {
+  return String(value || "")
+    .replace(/<br\s*\/?>/gi, "\n")
+    .replace(/<\/(p|div|section|article|h1|h2|h3|h4|li|tr)>/gi, "\n")
+    .replace(/<[^>]+>/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
 function getDefaultBlogBlocks(post = {}) {
   const photos = getPostPhotos(post);
   const first = photos[0] || { image: DEFAULT_BLOG_IMAGE, alt: "HOODYBOODY embroidered clothing", focus: "50% 50%" };
@@ -271,6 +281,10 @@ function getPostBlocks(post) {
         return { type, style, image: normalizeBuilderImage(block?.image || block, getCoverPhoto(post)) };
       }
 
+      if (type === "html") {
+        return { type, style, html: String(block?.html || block?.body || block?.content || "").trim() };
+      }
+
       if (type === "imagePair") {
         const photos = getPostPhotos(post);
         const images = Array.isArray(block?.images) ? block.images : [];
@@ -303,6 +317,7 @@ function builderBlocksToBody(blocks = []) {
       if (block.type === "heading2") return `## ${block.text || ""}`.trim();
       if (block.type === "heading3") return `### ${block.text || ""}`.trim();
       if (block.type === "paragraph") return String(block.text || "").trim();
+      if (block.type === "html") return htmlToBuilderText(block.html);
       return "";
     })
     .filter(Boolean)
@@ -418,6 +433,14 @@ function createEditorBlock(type, post = {}, seed = {}) {
     return { type: normalizedType, style };
   }
 
+  if (normalizedType === "html") {
+    return {
+      type: normalizedType,
+      style,
+      html: String(seed.html || "<p>Paste imported article HTML here.</p>").trim()
+    };
+  }
+
   return {
     type: normalizedType,
     style,
@@ -472,6 +495,13 @@ function renderEditorBlock(block, index, post) {
     content = renderEditorImagePairBlock(block, post);
   } else if (type === "divider") {
     content = `<div class="blog-divider blog-builder-block blog-block-style-${escapeHtml(style)}" aria-hidden="true"></div>`;
+  } else if (type === "html") {
+    content = `
+      <div class="blog-rich-html blog-builder-block blog-block-style-${escapeHtml(style)}">${block?.html || ""}</div>
+      <label class="admin-html-source">
+        Imported HTML
+        <textarea data-block-html rows="8">${escapeHtml(block?.html || "")}</textarea>
+      </label>`;
   } else {
     content = `<p class="blog-builder-block blog-block-style-${escapeHtml(style)}" contenteditable="true" data-block-text>${escapeHtml(text || "New paragraph text.")}</p>`;
   }
@@ -626,6 +656,14 @@ function collectBlogBlocks(form) {
         return { type, style };
       }
 
+      if (type === "html") {
+        return {
+          type,
+          style,
+          html: readValue(card.querySelector("[data-block-html]")) || card.querySelector(".blog-rich-html")?.innerHTML.trim() || ""
+        };
+      }
+
       if (type === "image") {
         return {
           type,
@@ -656,7 +694,7 @@ function collectBlogBlocks(form) {
         text: readValue(card.querySelector("[data-block-text]"))
       };
     })
-    .filter((block) => block.type === "divider" || block.type === "image" || block.type === "imagePair" || block.text);
+    .filter((block) => block.type === "divider" || block.type === "html" || block.type === "image" || block.type === "imagePair" || block.text);
 }
 
 function syncBlogBuilderFields(form) {
@@ -701,6 +739,7 @@ function getBlockFromCard(card, nextType = card?.dataset.blockType) {
   if (type === "image") return { type, style, image: images[0], text };
   if (type === "imagePair") return { type, style, images, text };
   if (type === "divider") return { type, style };
+  if (type === "html") return { type, style, html: String(card?.querySelector("[data-block-html]")?.value || card?.querySelector(".blog-rich-html")?.innerHTML || "").trim() };
   return { type, style, text };
 }
 

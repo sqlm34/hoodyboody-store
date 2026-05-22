@@ -312,6 +312,15 @@ const defaultCategories = [
     sortOrder: 30
   }
 ];
+function readStaticContentFile(relativePath) {
+  try {
+    return fs.readFileSync(path.join(root, relativePath), "utf8").trim();
+  } catch {
+    return "";
+  }
+}
+
+const machineEmbroideryGuideHtml = readStaticContentFile("content/blog/machine-embroidery-guide.html");
 const defaultBlogPosts = [
   {
     id: "fashion-is-our-passion",
@@ -396,6 +405,37 @@ The process moves from artwork review to thread direction, stitch sample, produc
     ],
     createdAt: "2026-05-19T00:00:00.000Z",
     updatedAt: "2026-05-19T00:00:00.000Z"
+  },
+  {
+    id: "machine-embroidery-for-clothes",
+    slug: "machine-embroidery-for-clothes",
+    title: "Machine Embroidery for Clothes: The Ultimate Guide | 2024",
+    excerpt:
+      "Discover everything about machine embroidery for clothes, from choosing the right fabrics and threads to digitizing designs and professional finishing.",
+    category: "Embroidery Journal",
+    author: "HOODYBOODY Studio",
+    date: "2024-01-01",
+    status: "published",
+    tags: ["Machine Embroidery", "Clothing", "Guide"],
+    body:
+      "From choosing the right stabilizer to placing intricate designs on curved seams, this guide explains how to transform plain garments into wearable art.",
+    gallery: [
+      { image: "/assets/embroidered-collection.png", alt: "Machine embroidery guide for clothing and fabric selection", focus: "33% 50%" },
+      { image: "/assets/embroidered-collection.png", alt: "Thread and stabilizer details for embroidered garments", focus: "50% 55%" },
+      { image: "/assets/embroidered-collection.png", alt: "Finished embroidered clothing and accessories", focus: "18% 52%" }
+    ],
+    blocks: [
+      {
+        type: "html",
+        style: "default",
+        html:
+          machineEmbroideryGuideHtml ||
+          "<p>From choosing the right stabilizer to placing intricate designs on curved seams, this guide explains how to transform plain garments into wearable art.</p>"
+      }
+    ],
+    comments: [],
+    createdAt: "2024-01-01T00:00:00.000Z",
+    updatedAt: "2024-01-01T00:00:00.000Z"
   }
 ];
 const emptyDb = {
@@ -585,6 +625,22 @@ function ensureDbDefaults(db) {
   } else if (!db.blogPosts.length) {
     db.blogPosts = JSON.parse(JSON.stringify(defaultBlogPosts));
     changed = true;
+  } else {
+    defaultBlogPosts.forEach((defaultPost) => {
+      const post = db.blogPosts.find((item) => item.id === defaultPost.id || item.slug === defaultPost.slug);
+      if (!post) {
+        db.blogPosts.push(JSON.parse(JSON.stringify(defaultPost)));
+        changed = true;
+        return;
+      }
+
+      Object.entries(defaultPost).forEach(([key, value]) => {
+        if (post[key] === undefined) {
+          post[key] = JSON.parse(JSON.stringify(value));
+          changed = true;
+        }
+      });
+    });
   }
 
   const blogPostsBefore = JSON.stringify(db.blogPosts);
@@ -1422,7 +1478,7 @@ function parseBlogBlocks(value) {
 
 function normalizeBlogBlockType(value) {
   const type = String(value || "paragraph").trim();
-  return ["paragraph", "heading2", "heading3", "image", "imagePair", "divider"].includes(type) ? type : "paragraph";
+  return ["paragraph", "heading2", "heading3", "image", "imagePair", "divider", "html"].includes(type) ? type : "paragraph";
 }
 
 function normalizeBlogBlockStyle(value) {
@@ -1441,6 +1497,29 @@ function normalizeBlogBlockImage(value = {}, fallback = {}) {
   const alt = String(source.alt || fallback.alt || "HOODYBOODY blog image").trim().slice(0, 160);
   const focus = String(source.focus || fallback.focus || "50% 50%").trim().slice(0, 40);
   return image ? { image, alt, focus } : null;
+}
+
+function sanitizeBlogBlockHtml(value = "") {
+  return String(value || "")
+    .replace(/<script[\s\S]*?<\/script>/gi, "")
+    .replace(/<style[\s\S]*?<\/style>/gi, "")
+    .replace(/<iframe[\s\S]*?<\/iframe>/gi, "")
+    .replace(/<object[\s\S]*?<\/object>/gi, "")
+    .replace(/<embed[\s\S]*?>/gi, "")
+    .replace(/<form[\s\S]*?<\/form>/gi, "")
+    .replace(/\son[a-z]+\s*=\s*("[^"]*"|'[^']*'|[^\s>]+)/gi, "")
+    .replace(/\s(href|src)\s*=\s*("javascript:[^"]*"|'javascript:[^']*')/gi, ' $1="#"')
+    .trim()
+    .slice(0, 90000);
+}
+
+function stripHtmlToText(value = "") {
+  return sanitizeBlogBlockHtml(value)
+    .replace(/<br\s*\/?>/gi, "\n")
+    .replace(/<\/(p|div|section|article|h1|h2|h3|h4|li|tr)>/gi, "\n")
+    .replace(/<[^>]+>/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
 }
 
 function getDefaultBlogImagePair(gallery) {
@@ -1527,6 +1606,11 @@ function normalizeBlogBlocks(value, body = "", gallery = []) {
         return { type, style };
       }
 
+      if (type === "html") {
+        const html = sanitizeBlogBlockHtml(block?.html || block?.body || block?.content || "");
+        return html ? { type, style, html } : null;
+      }
+
       if (type === "image") {
         const fallback = getBlogBlockGallery(gallery)[0] || {};
         const image = normalizeBlogBlockImage(block?.image || block, fallback);
@@ -1557,6 +1641,7 @@ function blogBlocksToBody(blocks = []) {
       if (block.type === "heading2") return `## ${block.text}`;
       if (block.type === "heading3") return `### ${block.text}`;
       if (block.type === "paragraph") return block.text;
+      if (block.type === "html") return stripHtmlToText(block.html);
       return "";
     })
     .filter(Boolean)
@@ -2340,6 +2425,7 @@ function renderBlogBlocksHtml(post) {
       if (block.type === "image") return renderBlogBlockSingleImage(block, post);
       if (block.type === "imagePair") return renderBlogBlockImagePair(block, post);
       if (block.type === "divider") return `<div class="blog-divider ${styleClass}" aria-hidden="true"></div>`;
+      if (block.type === "html") return `<div class="blog-rich-html ${styleClass}">${sanitizeBlogBlockHtml(block.html)}</div>`;
 
       return `<p class="${styleClass}">${escapeHtml(block.text).replace(/\n/g, "<br />")}</p>`;
     })
