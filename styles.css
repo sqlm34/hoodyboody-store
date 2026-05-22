@@ -6887,6 +6887,10 @@ body.preloader-active {
   padding: 22px;
 }
 
+.blog-rich-html .warning-card {
+  border-left: 4px solid #b85c5c;
+}
+
 .blog-rich-html .card-icon {
   display: none;
 }
@@ -6942,6 +6946,97 @@ body.preloader-active {
   color: #4f7654;
   font-size: 0.72rem;
   letter-spacing: 0.18em;
+  text-transform: uppercase;
+}
+
+.blog-rich-html .callout.warn {
+  border-left-color: #b85c5c;
+}
+
+.blog-rich-html .callout.warn strong {
+  color: #b85c5c;
+}
+
+.blog-rich-html .stabilizer-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.blog-rich-html .stabilizer-card,
+.blog-rich-html .brand-card {
+  border: 1px solid #d8d6ca;
+  background: #ffffff;
+}
+
+.blog-rich-html .stabilizer-header {
+  margin: 0;
+  border-bottom: 2px solid #b59b52;
+  padding: 15px 18px;
+  color: #050505;
+  font-family: "Cormorant Garamond", Georgia, serif;
+  font-size: 1.08rem;
+  font-weight: 300;
+  letter-spacing: 0;
+  text-transform: uppercase;
+}
+
+.blog-rich-html .stabilizer-header.cutaway {
+  border-bottom-color: #6b8c6e;
+  background: #eef5ef;
+  color: #4f7654;
+}
+
+.blog-rich-html .stabilizer-header.tearaway {
+  background: #f7f4ed;
+  color: #8a6d2f;
+}
+
+.blog-rich-html .stabilizer-header.watersoluble {
+  border-bottom-color: #6f879e;
+  background: #edf2f5;
+  color: #405d76;
+}
+
+.blog-rich-html .stabilizer-body {
+  display: grid;
+  gap: 12px;
+  padding: 18px;
+}
+
+.blog-rich-html .stabilizer-body p,
+.blog-rich-html .stabilizer-body ul {
+  margin: 0;
+}
+
+.blog-rich-html .brand-card {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 18px;
+  align-items: start;
+  padding: 22px 24px;
+}
+
+.blog-rich-html .brand-info {
+  display: grid;
+  gap: 6px;
+}
+
+.blog-rich-html .brand-info h4 {
+  margin: 0;
+}
+
+.blog-rich-html .brand-info p,
+.blog-rich-html .brand-price {
+  margin: 0;
+}
+
+.blog-rich-html .brand-price {
+  color: #6f665b;
+  font-size: 0.78rem;
+  font-weight: 500;
+  letter-spacing: 0.12em;
+  text-align: right;
   text-transform: uppercase;
 }
 
@@ -7638,8 +7733,14 @@ body.preloader-active {
 
   .blog-image-pair,
   .blog-post-nav,
-  .blog-rich-html .card-grid {
+  .blog-rich-html .card-grid,
+  .blog-rich-html .stabilizer-grid,
+  .blog-rich-html .brand-card {
     grid-template-columns: 1fr;
+  }
+
+  .blog-rich-html .brand-price {
+    text-align: left;
   }
 
   .blog-image-single.blog-block-style-inset,

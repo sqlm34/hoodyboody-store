@@ -321,6 +321,7 @@ function readStaticContentFile(relativePath) {
 }
 
 const machineEmbroideryGuideHtml = readStaticContentFile("content/blog/machine-embroidery-guide.html");
+const stabilizersKnitFabricGuideHtml = readStaticContentFile("content/blog/stabilizers-knit-fabric-guide.html");
 const defaultBlogPosts = [
   {
     id: "fashion-is-our-passion",
@@ -405,6 +406,37 @@ The process moves from artwork review to thread direction, stitch sample, produc
     ],
     createdAt: "2026-05-19T00:00:00.000Z",
     updatedAt: "2026-05-19T00:00:00.000Z"
+  },
+  {
+    id: "best-stabilizers-for-embroidery-on-knit-fabric",
+    slug: "best-stabilizers-for-embroidery-on-knit-fabric",
+    title: "Best Stabilizers for Embroidery on Knit Fabric | Complete Guide 2026",
+    excerpt:
+      "Struggling with puckering on knit fabric? Discover the best embroidery stabilizers for t-shirts, jersey, fleece, and stretch fabrics with brand reviews and expert tips.",
+    category: "Embroidery Journal",
+    author: "HOODYBOODY Studio",
+    date: "2026-05-25",
+    status: "published",
+    tags: ["Embroidery Stabilizers", "Knit Fabric", "Guide"],
+    body:
+      "No more puckering. Discover the exact stabilizers professional embroiderers use for t-shirts, jersey, fleece, and stretch fabrics.",
+    gallery: [
+      { image: "/assets/embroidered-collection.png", alt: "Embroidery stabilizers for knit fabric and t-shirt embroidery", focus: "33% 50%" },
+      { image: "/assets/embroidered-collection.png", alt: "Cut-away stabilizer and water-soluble topping for knit embroidery", focus: "50% 55%" },
+      { image: "/assets/embroidered-collection.png", alt: "Finished embroidered hoodie and knit garments", focus: "18% 52%" }
+    ],
+    blocks: [
+      {
+        type: "html",
+        style: "default",
+        html:
+          stabilizersKnitFabricGuideHtml ||
+          "<p>No more puckering. Discover the exact stabilizers professional embroiderers use for t-shirts, jersey, fleece, and stretch fabrics.</p>"
+      }
+    ],
+    comments: [],
+    createdAt: "2026-05-25T00:00:00.000Z",
+    updatedAt: "2026-05-25T00:00:00.000Z"
   },
   {
     id: "machine-embroidery-for-clothes",

@@ -169,12 +169,52 @@ test("machine embroidery guide renders imported blog content with tables and no 
     assert.equal((html.match(/<table>/g) || []).length, 3);
     assert.equal((html.match(/class="card"/g) || []).length, 11);
     assert.equal((html.match(/class="card-icon"/g) || []).length, 0);
-    assert.match(html, /blog-post-nav-card previous is-disabled/);
+    assert.match(html, /blog-post-nav-card previous" href="\/blog\/best-stabilizers-for-embroidery-on-knit-fabric\//);
     assert.match(html, /blog-post-nav-card next" href="\/blog\/fashion-is-our-passion\//);
     assert.match(css, /blog-rich-html \.card-grid/);
     assert.match(css, /blog-rich-html \.table-wrap/);
     assert.match(css, /blog-rich-html \.step-num/);
     assert.match(css, /padding: 28px 30px/);
+  } finally {
+    server.close();
+  }
+});
+
+test("third stabilizer guide renders with SEO date, imported layout, and no icons", async () => {
+  const { server, baseUrl } = await startServer();
+  try {
+    const latestResponse = await fetch(`${baseUrl}/blog/`);
+    const latestHtml = await latestResponse.text();
+    const response = await fetch(`${baseUrl}/blog/best-stabilizers-for-embroidery-on-knit-fabric/`);
+    const html = await response.text();
+    const cssResponse = await fetch(`${baseUrl}/styles.css`);
+    const css = await cssResponse.text();
+
+    assert.equal(latestResponse.status, 200);
+    assert.match(latestHtml, /Best Stabilizers for Embroidery on Knit Fabric \| Complete Guide 2026 \| HOODYBOODY Blog/);
+    assert.equal(response.status, 200);
+    assert.match(html, /Best Stabilizers for Embroidery on Knit Fabric \| Complete Guide 2026 \| HOODYBOODY Blog/);
+    assert.match(html, /<time datetime="2026-05-25">May 25, 2026<\/time>/);
+    assert.match(html, /"datePublished":"2026-05-25"/);
+    assert.match(html, /"dateModified":"2026-05-25T00:00:00.000Z"/);
+    assert.match(html, /Materials Guide · 2026/);
+    assert.match(html, /Updated May 25, 2026/);
+    assert.match(html, /Why Knit Fabric Needs Special Stabilization/);
+    assert.match(html, /The 3 Stabilizer Types Explained/);
+    assert.match(html, /Best Stabilizer Brands for Knit Fabric/);
+    assert.match(html, /Fabric-to-Stabilizer Chart/);
+    assert.match(html, /How to Apply Stabilizer on Knit Fabric/);
+    assert.match(html, /Frequently Asked Questions/);
+    assert.equal((html.match(/class="stabilizer-card"/g) || []).length, 3);
+    assert.equal((html.match(/class="brand-card"/g) || []).length, 5);
+    assert.equal((html.match(/<table>/g) || []).length, 1);
+    assert.doesNotMatch(html, /class="card-icon"/);
+    assert.doesNotMatch(html, /class="stars"/);
+    assert.doesNotMatch(html, /📋|✂|🧻|💧|💡|★|⭐|⚠/u);
+    assert.match(html, /blog-post-nav-card previous is-disabled/);
+    assert.match(html, /blog-post-nav-card next" href="\/blog\/machine-embroidery-for-clothes\//);
+    assert.match(css, /blog-rich-html \.stabilizer-grid/);
+    assert.match(css, /blog-rich-html \.brand-card/);
   } finally {
     server.close();
   }
