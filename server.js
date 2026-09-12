@@ -2224,12 +2224,11 @@ function renderPageShell(req, options) {
     ...(options.structuredData || [])
   ];
 
-  return applyNoIndexToHtml(`<!DOCTYPE html>
+  return `<!DOCTYPE html>
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <meta name="robots" content="noindex, nofollow, noarchive" />
     <title>${escapeHtmlAttribute(title)}</title>
     <meta name="description" content="${escapeHtmlAttribute(description)}" />
     <link rel="canonical" href="${escapeHtmlAttribute(canonicalUrl)}" />
@@ -2257,7 +2256,7 @@ function renderPageShell(req, options) {
     ${renderSeoFooter()}
     <script src="/session-nav.js"></script>
   </body>
-</html>`);
+</html>`;
 }
 
 function productMatchesLanding(product, page) {
@@ -2353,7 +2352,7 @@ async function tryRenderSeoRoute(req, res, pathname) {
   const productPage = productPages.find((page) => cleanPath === `/${page.slug}`);
   if (productPage) {
     const html = await renderProductLandingPage(req, productPage);
-    res.writeHead(200, { "Content-Type": "text/html; charset=utf-8", ...noIndexHeader });
+    res.writeHead(200, { "Content-Type": "text/html; charset=utf-8" });
     res.end(html);
     return true;
   }
@@ -2627,12 +2626,11 @@ function renderBlogPostPage(req, post, posts = []) {
   const gallery = normalizeBlogGallery(post.gallery);
   const primaryImage = gallery[0]?.image || "/assets/embroidered-collection.png";
 
-  return applyNoIndexToHtml(`<!DOCTYPE html>
+  return `<!DOCTYPE html>
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <meta name="robots" content="noindex, nofollow, noarchive" />
     <title>${escapeHtml(title)}</title>
     <meta name="description" content="${escapeHtmlAttribute(description)}" />
     <link rel="canonical" href="${escapeHtmlAttribute(absoluteUrl(req, canonicalPath))}" />
@@ -2749,7 +2747,7 @@ function renderBlogPostPage(req, post, posts = []) {
     <script src="/session-nav.js"></script>
     <script src="/blog.js"></script>
   </body>
-</html>`);
+</html>`;
 }
 
 function renderSitemapXml(req) {
@@ -4659,6 +4657,18 @@ async function handleApi(req, res) {
   }
 }
 
+function shouldNoIndexPath(pathname = "") {
+  const cleanPath = stripTrailingSlash(pathname || "/") || "/";
+  return (
+    cleanPath.startsWith("/api") ||
+    cleanPath.startsWith("/admin") ||
+    cleanPath.startsWith("/account") ||
+    cleanPath.startsWith("/auth") ||
+    cleanPath.startsWith("/checkout") ||
+    cleanPath.startsWith("/dist")
+  );
+}
+
 function applyNoIndexToHtml(html) {
   const noIndexMeta = '<meta name="robots" content="noindex, nofollow, noarchive" />';
   if (/<meta\s+name=["']robots["'][^>]*>/i.test(html)) {
@@ -4668,9 +4678,14 @@ function applyNoIndexToHtml(html) {
   return html.replace(/<head([^>]*)>/i, `<head$1>\n    ${noIndexMeta}`);
 }
 
+function removeNoIndexFromHtml(html) {
+  return html.replace(/\s*<meta\s+name=["']robots["'][^>]*content=["'][^"']*noindex[^"']*["'][^>]*>\s*/gi, "\n    ");
+}
+
 async function serveStatic(req, res) {
   const urlPath = decodeURIComponent(req.url.split("?")[0]);
   const requestedPath = urlPath === "/" ? "/index.html" : urlPath;
+  const shouldNoIndex = shouldNoIndexPath(requestedPath);
   const filePath = path.resolve(root, `.${requestedPath}`);
   const safeRoot = root.endsWith(path.sep) ? root : `${root}${path.sep}`;
 
@@ -4691,10 +4706,14 @@ async function serveStatic(req, res) {
     let responseContent = content;
 
     if (ext === ".html") {
-      responseContent = Buffer.from(applyNoIndexToHtml(responseContent.toString("utf8")));
+      const html = responseContent.toString("utf8");
+      responseContent = Buffer.from(shouldNoIndex ? applyNoIndexToHtml(html) : removeNoIndexFromHtml(html));
     }
 
-    res.writeHead(200, { "Content-Type": types[ext] || "application/octet-stream", ...noIndexHeader });
+    res.writeHead(200, {
+      "Content-Type": types[ext] || "application/octet-stream",
+      ...(shouldNoIndex ? noIndexHeader : {})
+    });
     res.end(responseContent);
   });
 }
@@ -4708,14 +4727,14 @@ async function appHandler(req, res) {
   const pathname = new URL(req.url, getRequestOrigin(req)).pathname;
   if (pathname === "/robots.txt") {
     const robotsPath = path.join(root, "robots.txt");
-    const robots = fs.existsSync(robotsPath) ? fs.readFileSync(robotsPath, "utf8") : "User-agent: *\nDisallow: /";
-    res.writeHead(200, { "Content-Type": "text/plain; charset=utf-8", ...noIndexHeader });
+    const robots = fs.existsSync(robotsPath) ? fs.readFileSync(robotsPath, "utf8") : `User-agent: *\nAllow: /\n\nSitemap: ${primarySiteOrigin}/sitemap.xml`;
+    res.writeHead(200, { "Content-Type": "text/plain; charset=utf-8" });
     res.end(robots);
     return;
   }
 
   if (pathname === "/sitemap.xml") {
-    res.writeHead(200, { "Content-Type": "application/xml; charset=utf-8", ...noIndexHeader });
+    res.writeHead(200, { "Content-Type": "application/xml; charset=utf-8" });
     res.end(renderSitemapXml(req));
     return;
   }
@@ -4724,7 +4743,7 @@ async function appHandler(req, res) {
     const db = await readDbAsync();
     const posts = publicBlogPosts(db);
     const post = posts[0] || publicBlogPost(defaultBlogPosts[0]);
-    res.writeHead(200, { "Content-Type": "text/html; charset=utf-8", ...noIndexHeader });
+    res.writeHead(200, { "Content-Type": "text/html; charset=utf-8" });
     res.end(renderBlogPostPage(req, post, posts.length ? posts : [post]));
     return;
   }
@@ -4741,7 +4760,7 @@ async function appHandler(req, res) {
       return;
     }
 
-    res.writeHead(200, { "Content-Type": "text/html; charset=utf-8", ...noIndexHeader });
+    res.writeHead(200, { "Content-Type": "text/html; charset=utf-8" });
     res.end(renderBlogPostPage(req, post, posts));
     return;
   }
