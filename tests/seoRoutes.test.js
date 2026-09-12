@@ -28,8 +28,8 @@ test("homepage removes featured categories, service coverage, and thread palette
     const capImage = await fetch(`${baseUrl}/assets/custom-order-cap.png`);
 
     assert.equal(response.status, 200);
-    assert.equal(response.headers.get("x-robots-tag"), null);
-    assert.doesNotMatch(html, /noindex, nofollow, noarchive/);
+    assert.match(response.headers.get("x-robots-tag") || "", /noindex/);
+    assert.match(html, /<meta name="robots" content="noindex, nofollow, noarchive" \/>/);
     assert.match(css, /custom-order-cap\.png/);
     assert.match(css, /width: min\(400px, 100%\)/);
     assert.match(css, /grid-template-columns: 25\.25% 74\.75%/);
@@ -89,8 +89,8 @@ test("blog page renders Valeska-style single post functionality", async () => {
     const css = await cssResponse.text();
 
     assert.equal(response.status, 200);
-    assert.equal(response.headers.get("x-robots-tag"), null);
-    assert.doesNotMatch(html, /noindex, nofollow, noarchive/);
+    assert.match(response.headers.get("x-robots-tag") || "", /noindex/);
+    assert.match(html, /<meta name="robots" content="noindex, nofollow, noarchive" \/>/);
     assert.match(html, /Fashion Is Our Passion \| HOODYBOODY Blog/);
     assert.match(html, /<link rel="canonical" href="https:\/\/byirishka\.com\/blog\/fashion-is-our-passion\/" \/>/);
     assert.match(html, /<meta property="og:url" content="https:\/\/byirishka\.com\/blog\/fashion-is-our-passion\/" \/>/);
@@ -435,7 +435,7 @@ test("customer can log in with phone and keep account session", async () => {
   }
 });
 
-test("sitemap architecture is generated for the byirishka domain", async () => {
+test("sitemap architecture is generated without opening indexing", async () => {
   const { server, baseUrl } = await startServer();
   try {
     const sitemap = await fetch(`${baseUrl}/sitemap.xml`);
@@ -444,16 +444,15 @@ test("sitemap architecture is generated for the byirishka domain", async () => {
     const robotsTxt = await robots.text();
 
     assert.equal(sitemap.status, 200);
-    assert.equal(sitemap.headers.get("x-robots-tag"), null);
+    assert.match(sitemap.headers.get("x-robots-tag") || "", /noindex/);
     assert.match(sitemapXml, /<loc>https:\/\/byirishka\.com\/<\/loc>/);
     assert.match(sitemapXml, /<loc>https:\/\/byirishka\.com\/blog\/<\/loc>/);
     assert.doesNotMatch(sitemapXml, /127\.0\.0\.1|localhost|hoodyboody\.com/i);
     assert.doesNotMatch(sitemapXml, /\/locations\//);
     assert.match(sitemapXml, /\/blog\//);
     assert.match(sitemapXml, /\/embroidered-hoodies\//);
-    assert.match(robotsTxt, /Allow: \//);
-    assert.match(robotsTxt, /Sitemap: https:\/\/byirishka\.com\/sitemap\.xml/);
-    assert.equal(robots.headers.get("x-robots-tag"), null);
+    assert.match(robotsTxt, /Disallow: \//);
+    assert.match(robots.headers.get("x-robots-tag") || "", /noindex/);
   } finally {
     server.close();
   }

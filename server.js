@@ -2224,7 +2224,7 @@ function renderPageShell(req, options) {
     ...(options.structuredData || [])
   ];
 
-  return `<!DOCTYPE html>
+  return applyNoIndexToHtml(`<!DOCTYPE html>
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
@@ -2256,7 +2256,7 @@ function renderPageShell(req, options) {
     ${renderSeoFooter()}
     <script src="/session-nav.js"></script>
   </body>
-</html>`;
+</html>`);
 }
 
 function productMatchesLanding(product, page) {
@@ -2352,7 +2352,7 @@ async function tryRenderSeoRoute(req, res, pathname) {
   const productPage = productPages.find((page) => cleanPath === `/${page.slug}`);
   if (productPage) {
     const html = await renderProductLandingPage(req, productPage);
-    res.writeHead(200, { "Content-Type": "text/html; charset=utf-8" });
+    res.writeHead(200, { "Content-Type": "text/html; charset=utf-8", ...noIndexHeader });
     res.end(html);
     return true;
   }
@@ -2626,7 +2626,7 @@ function renderBlogPostPage(req, post, posts = []) {
   const gallery = normalizeBlogGallery(post.gallery);
   const primaryImage = gallery[0]?.image || "/assets/embroidered-collection.png";
 
-  return `<!DOCTYPE html>
+  return applyNoIndexToHtml(`<!DOCTYPE html>
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
@@ -2747,7 +2747,7 @@ function renderBlogPostPage(req, post, posts = []) {
     <script src="/session-nav.js"></script>
     <script src="/blog.js"></script>
   </body>
-</html>`;
+</html>`);
 }
 
 function renderSitemapXml(req) {
@@ -4657,16 +4657,8 @@ async function handleApi(req, res) {
   }
 }
 
-function shouldNoIndexPath(pathname = "") {
-  const cleanPath = stripTrailingSlash(pathname || "/") || "/";
-  return (
-    cleanPath.startsWith("/api") ||
-    cleanPath.startsWith("/admin") ||
-    cleanPath.startsWith("/account") ||
-    cleanPath.startsWith("/auth") ||
-    cleanPath.startsWith("/checkout") ||
-    cleanPath.startsWith("/dist")
-  );
+function shouldNoIndexPath() {
+  return true;
 }
 
 function applyNoIndexToHtml(html) {
@@ -4727,14 +4719,14 @@ async function appHandler(req, res) {
   const pathname = new URL(req.url, getRequestOrigin(req)).pathname;
   if (pathname === "/robots.txt") {
     const robotsPath = path.join(root, "robots.txt");
-    const robots = fs.existsSync(robotsPath) ? fs.readFileSync(robotsPath, "utf8") : `User-agent: *\nAllow: /\n\nSitemap: ${primarySiteOrigin}/sitemap.xml`;
-    res.writeHead(200, { "Content-Type": "text/plain; charset=utf-8" });
+    const robots = fs.existsSync(robotsPath) ? fs.readFileSync(robotsPath, "utf8") : "User-agent: *\nDisallow: /";
+    res.writeHead(200, { "Content-Type": "text/plain; charset=utf-8", ...noIndexHeader });
     res.end(robots);
     return;
   }
 
   if (pathname === "/sitemap.xml") {
-    res.writeHead(200, { "Content-Type": "application/xml; charset=utf-8" });
+    res.writeHead(200, { "Content-Type": "application/xml; charset=utf-8", ...noIndexHeader });
     res.end(renderSitemapXml(req));
     return;
   }
@@ -4743,7 +4735,7 @@ async function appHandler(req, res) {
     const db = await readDbAsync();
     const posts = publicBlogPosts(db);
     const post = posts[0] || publicBlogPost(defaultBlogPosts[0]);
-    res.writeHead(200, { "Content-Type": "text/html; charset=utf-8" });
+    res.writeHead(200, { "Content-Type": "text/html; charset=utf-8", ...noIndexHeader });
     res.end(renderBlogPostPage(req, post, posts.length ? posts : [post]));
     return;
   }
@@ -4760,7 +4752,7 @@ async function appHandler(req, res) {
       return;
     }
 
-    res.writeHead(200, { "Content-Type": "text/html; charset=utf-8" });
+    res.writeHead(200, { "Content-Type": "text/html; charset=utf-8", ...noIndexHeader });
     res.end(renderBlogPostPage(req, post, posts));
     return;
   }
