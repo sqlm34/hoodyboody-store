@@ -1,41 +1,25 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
-  "rewrites": [
+  "version": 2,
+  "builds": [
     {
-      "source": "/api/:path*",
-      "destination": "/api?__path=/api/:path*"
-    },
-    {
-      "source": "/:path*",
-      "destination": "/api?__path=/:path*"
+      "src": "server.js",
+      "use": "@vercel/node",
+      "config": {
+        "includeFiles": "{*.html,*.css,*.js,robots.txt,assets/**,content/**,controllers/**,models/**,routes/**,services/**,dist/**,package.json}"
+      }
     }
   ],
-  "headers": [
+  "routes": [
     {
-      "source": "/(.*)",
-      "headers": [
-        {
-          "key": "X-Robots-Tag",
-          "value": "noindex, nofollow, noarchive"
-        }
-      ]
+      "src": "/(.*)",
+      "headers": {
+        "X-Robots-Tag": "noindex, nofollow, noarchive"
+      },
+      "dest": "server.js"
     }
   ],
   "env": {
     "SITE_ORIGIN": "https://byirishka.com"
-  },
-  "functions": {
-    "server.js": {
-      "maxDuration": 30,
-      "includeFiles": "{*.html,*.css,*.js,robots.txt,assets/**,content/**,controllers/**,models/**,routes/**,services/**,dist/**,package.json}"
-    },
-    "api/index.js": {
-      "maxDuration": 30,
-      "includeFiles": "{*.html,*.css,*.js,robots.txt,assets/**,content/**,controllers/**,models/**,routes/**,services/**,dist/**,package.json}"
-    },
-    "api/[...path].js": {
-      "maxDuration": 30,
-      "includeFiles": "{*.html,*.css,*.js,robots.txt,assets/**,content/**,controllers/**,models/**,routes/**,services/**,dist/**,package.json}"
-    }
   }
 }
