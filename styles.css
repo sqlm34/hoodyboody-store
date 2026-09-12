@@ -5956,6 +5956,77 @@ textarea:focus {
   font-size: 0.98rem;
 }
 
+.product-landing-page .location-section {
+  padding: 124px 0 120px;
+}
+
+.product-landing-page .location-section > .section-head,
+.product-landing-page .location-section > .seo-split {
+  width: min(1180px, calc(100% - 64px));
+  margin-inline: auto;
+}
+
+.product-landing-page .location-grid {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  align-items: start;
+  gap: 30px 0;
+  width: 100%;
+}
+
+.product-landing-page .location-product-card {
+  display: block;
+  min-width: 0;
+  border: 0;
+  border-radius: 0;
+  padding: 0;
+  color: #050505;
+  text-align: center;
+  background: transparent;
+  box-shadow: none;
+}
+
+.product-landing-page .location-product-card:hover,
+.product-landing-page .location-product-card:focus-visible {
+  color: #050505;
+  outline: none;
+}
+
+.product-landing-page .location-product-photo {
+  display: block;
+  width: calc(100% - 32px);
+  height: auto;
+  min-height: 0;
+  margin-inline: auto;
+  aspect-ratio: 254 / 296;
+  border-radius: 0;
+  background-color: #ffffff;
+  background-position: var(--focus, center);
+  background-repeat: no-repeat;
+  background-size: contain;
+}
+
+.product-landing-page .location-product-card strong {
+  display: block;
+  max-width: min(100%, 220px);
+  margin: 15px auto 0;
+  color: #050505;
+  font-family: "Yantramanav", Arial, sans-serif;
+  font-size: 0.82rem;
+  font-weight: 700;
+  line-height: 1.22;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+}
+
+.product-landing-page .location-product-card p {
+  display: none;
+}
+
+.product-landing-page .location-product-card .price {
+  display: block;
+  margin-top: 8px;
+}
+
 @media (max-width: 1180px) {
   .hero h1 {
     font-size: 6rem;
@@ -5967,6 +6038,11 @@ textarea:focus {
   }
 
   .catalog-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 30px 0;
+  }
+
+  .product-landing-page .location-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: 30px 0;
   }
@@ -6051,6 +6127,20 @@ textarea:focus {
     gap: 38px 0;
   }
 
+  .product-landing-page .location-section {
+    padding: 72px 20px 92px;
+  }
+
+  .product-landing-page .location-section > .section-head,
+  .product-landing-page .location-section > .seo-split {
+    width: 100%;
+  }
+
+  .product-landing-page .location-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 38px 0;
+  }
+
   .product-image {
     height: auto;
   }
@@ -6079,7 +6169,8 @@ textarea:focus {
   }
 
   .catalog-sections,
-  .catalog-grid {
+  .catalog-grid,
+  .product-landing-page .location-grid {
     grid-template-columns: 1fr;
   }
 

@@ -471,6 +471,26 @@ test("shop navigation exposes Rubi-style mega menu markup", async () => {
   }
 });
 
+test("product landing cards use catalog-style grid sizing", async () => {
+  const { server, baseUrl } = await startServer();
+  try {
+    const pageResponse = await fetch(`${baseUrl}/embroidered-hoodies/`);
+    const html = await pageResponse.text();
+    const cssResponse = await fetch(`${baseUrl}/styles.css`);
+    const css = await cssResponse.text();
+
+    assert.equal(pageResponse.status, 200);
+    assert.match(html, /product-landing-page/);
+    assert.match(html, /<h2>Product cards<\/h2>/);
+    assert.match(html, /class="location-grid"/);
+    assert.match(css, /\.product-landing-page \.location-grid \{[\s\S]*grid-template-columns: repeat\(4, minmax\(0, 1fr\)\);/);
+    assert.match(css, /\.product-landing-page \.location-product-photo \{[\s\S]*aspect-ratio: 254 \/ 296;[\s\S]*background-size: contain;/);
+    assert.match(css, /\.product-landing-page \.location-product-card p \{[\s\S]*display: none;/);
+  } finally {
+    server.close();
+  }
+});
+
 test("live chat validates composer fields and contains long attachment names", async () => {
   const { server, baseUrl } = await startServer();
   try {
