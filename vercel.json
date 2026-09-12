@@ -21,6 +21,9 @@
       ]
     }
   ],
+  "env": {
+    "SITE_ORIGIN": "https://byirishka.com"
+  },
   "functions": {
     "server.js": {
       "maxDuration": 30,

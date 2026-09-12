@@ -38,7 +38,7 @@ let currentPushToken = "";
 let replyDraftAttachments = [];
 const MAX_ATTACHMENT_BYTES = 5_000_000;
 
-serverUrlInput.value = localStorage.getItem(SERVER_KEY) || "https://www.hoodyboody.com";
+serverUrlInput.value = localStorage.getItem(SERVER_KEY) || "https://byirishka.com";
 adminTokenInput.value = localStorage.getItem(TOKEN_KEY) || "";
 
 function escapeHtml(value) {

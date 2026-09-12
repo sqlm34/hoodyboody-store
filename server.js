@@ -63,6 +63,7 @@ const redisRestToken =
   process.env.UPSTASH_REDIS_REST_TOKEN || process.env.KV_REST_API_TOKEN || localEnv.UPSTASH_REDIS_REST_TOKEN || localEnv.KV_REST_API_TOKEN || "";
 const redisDbKey = process.env.NITKA_REDIS_DB_KEY || localEnv.NITKA_REDIS_DB_KEY || "nitka:db";
 const hasRedisDb = Boolean(redisRestUrl && redisRestToken);
+const primarySiteOrigin = normalizeSiteOrigin(process.env.SITE_ORIGIN || localEnv.SITE_ORIGIN || "https://byirishka.com");
 const maxJsonBodyBytes = 8_500_000;
 const maxProductImageBytes = 2_500_000;
 const maxBlogImageBytes = 3_500_000;
@@ -2075,6 +2076,13 @@ function getRequestOrigin(req) {
   return req.headers.origin || `${proto}://${req.headers.host}`;
 }
 
+function normalizeSiteOrigin(value) {
+  const text = String(value || "").trim().replace(/\/+$/, "");
+  if (!text) return "https://byirishka.com";
+  if (/^https?:\/\//i.test(text)) return text;
+  return `https://${text}`;
+}
+
 function escapeHtmlAttribute(value) {
   return String(value || "").replace(/[&<>"']/g, (char) => {
     const entities = {
@@ -2096,7 +2104,7 @@ function absoluteUrl(req, value) {
   const text = String(value || "").trim();
   if (!text) return "";
   if (/^https?:\/\//i.test(text)) return text;
-  return `${getRequestOrigin(req).replace(/\/$/, "")}/${text.replace(/^\//, "")}`;
+  return `${primarySiteOrigin}/${text.replace(/^\//, "")}`;
 }
 
 function readContentJson(fileName, fallback) {

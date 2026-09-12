@@ -46,7 +46,7 @@ Copy-Item "android/app/build/outputs/apk/debug/app-debug.apk" "../dist/hoodybood
 Then deploy the website so the new APK is downloadable from:
 
 ```text
-https://www.hoodyboody.com/dist/hoodyboody-live-chat-debug.apk
+https://byirishka.com/dist/hoodyboody-live-chat-debug.apk
 ```
 
 ## 3. Create Firebase service account for Vercel
@@ -90,7 +90,7 @@ npx vercel --prod --yes
 4. Enter:
 
 ```text
-Site URL: https://www.hoodyboody.com
+Site URL: https://byirishka.com
 Admin token: CHAT_ADMIN_TOKEN
 ```
 

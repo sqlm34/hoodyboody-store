@@ -91,6 +91,8 @@ test("blog page renders Valeska-style single post functionality", async () => {
     assert.equal(response.status, 200);
     assert.match(response.headers.get("x-robots-tag") || "", /noindex/);
     assert.match(html, /Fashion Is Our Passion \| HOODYBOODY Blog/);
+    assert.match(html, /<link rel="canonical" href="https:\/\/byirishka\.com\/blog\/fashion-is-our-passion\/" \/>/);
+    assert.match(html, /<meta property="og:url" content="https:\/\/byirishka\.com\/blog\/fashion-is-our-passion\/" \/>/);
     assert.match(html, /data-blog-gallery/);
     assert.match(html, /data-blog-gallery-status/);
     assert.match(html, /blog-builder-block/);
@@ -151,6 +153,7 @@ test("machine embroidery guide renders imported blog content with tables and no 
 
     assert.equal(response.status, 200);
     assert.match(html, /Machine Embroidery for Clothes: The Ultimate Guide \| 2026 \| HOODYBOODY Blog/);
+    assert.match(html, /<link rel="canonical" href="https:\/\/byirishka\.com\/blog\/machine-embroidery-for-clothes\/" \/>/);
     assert.match(html, /<time datetime="2026-05-22">May 22, 2026<\/time>/);
     assert.match(html, /Updated May 22, 2026/);
     assert.match(html, /blog-rich-html/);
@@ -197,6 +200,7 @@ test("third stabilizer guide renders with SEO date, imported layout, and no icon
     assert.match(html, /<time datetime="2026-05-25">May 25, 2026<\/time>/);
     assert.match(html, /"datePublished":"2026-05-25"/);
     assert.match(html, /"dateModified":"2026-05-25T00:00:00.000Z"/);
+    assert.match(html, /"mainEntityOfPage":"https:\/\/byirishka\.com\/blog\/best-stabilizers-for-embroidery-on-knit-fabric\/"/);
     assert.match(html, /Materials Guide · 2026/);
     assert.match(html, /Updated May 25, 2026/);
     assert.match(html, /Why Knit Fabric Needs Special Stabilization/);
@@ -440,6 +444,9 @@ test("sitemap architecture is generated without opening indexing", async () => {
 
     assert.equal(sitemap.status, 200);
     assert.match(sitemap.headers.get("x-robots-tag") || "", /noindex/);
+    assert.match(sitemapXml, /<loc>https:\/\/byirishka\.com\/<\/loc>/);
+    assert.match(sitemapXml, /<loc>https:\/\/byirishka\.com\/blog\/<\/loc>/);
+    assert.doesNotMatch(sitemapXml, /127\.0\.0\.1|localhost|hoodyboody\.com/i);
     assert.doesNotMatch(sitemapXml, /\/locations\//);
     assert.match(sitemapXml, /\/blog\//);
     assert.match(sitemapXml, /\/embroidered-hoodies\//);
