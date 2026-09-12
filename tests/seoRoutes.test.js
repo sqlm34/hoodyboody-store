@@ -70,7 +70,7 @@ test("location pages and automatic geo targeting remain removed", async () => {
       }
     });
     const homeHtml = await homeWithHeaders.text();
-    assert.match(homeHtml, /<title>HOODYBOODY \| Embroidery clothes<\/title>/);
+    assert.match(homeHtml, /<title>byIrishka \| Embroidery clothes<\/title>/);
     assert.match(homeHtml, /Too Cool <span class="hero-title-for">for<\/span> Stitches/);
     assert.doesNotMatch(homeHtml, /hero-title-location/);
     assert.doesNotMatch(homeHtml, /geo-location-link/);
@@ -93,7 +93,7 @@ test("blog page renders Valeska-style single post functionality", async () => {
     assert.equal(response.status, 200);
     assert.match(response.headers.get("x-robots-tag") || "", /noindex/);
     assert.match(html, /<meta name="robots" content="noindex, nofollow, noarchive" \/>/);
-    assert.match(html, /Fashion Is Our Passion \| HOODYBOODY Blog/);
+    assert.match(html, /Fashion Is Our Passion \| byIrishka Blog/);
     assert.match(html, /<link rel="canonical" href="https:\/\/byirishka\.com\/blog\/fashion-is-our-passion\/" \/>/);
     assert.match(html, /<meta property="og:url" content="https:\/\/byirishka\.com\/blog\/fashion-is-our-passion\/" \/>/);
     assert.match(html, /data-blog-gallery/);
@@ -155,7 +155,7 @@ test("machine embroidery guide renders imported blog content with tables and no 
     const css = await cssResponse.text();
 
     assert.equal(response.status, 200);
-    assert.match(html, /Machine Embroidery for Clothes: The Ultimate Guide \| 2026 \| HOODYBOODY Blog/);
+    assert.match(html, /Machine Embroidery for Clothes: The Ultimate Guide \| 2026 \| byIrishka Blog/);
     assert.match(html, /<link rel="canonical" href="https:\/\/byirishka\.com\/blog\/machine-embroidery-for-clothes\/" \/>/);
     assert.match(html, /<time datetime="2026-05-22">May 22, 2026<\/time>/);
     assert.match(html, /Updated May 22, 2026/);
@@ -197,9 +197,9 @@ test("third stabilizer guide renders with SEO date, imported layout, and no icon
     const css = await cssResponse.text();
 
     assert.equal(latestResponse.status, 200);
-    assert.match(latestHtml, /Best Stabilizers for Embroidery on Knit Fabric \| Complete Guide 2026 \| HOODYBOODY Blog/);
+    assert.match(latestHtml, /Best Stabilizers for Embroidery on Knit Fabric \| Complete Guide 2026 \| byIrishka Blog/);
     assert.equal(response.status, 200);
-    assert.match(html, /Best Stabilizers for Embroidery on Knit Fabric \| Complete Guide 2026 \| HOODYBOODY Blog/);
+    assert.match(html, /Best Stabilizers for Embroidery on Knit Fabric \| Complete Guide 2026 \| byIrishka Blog/);
     assert.match(html, /<time datetime="2026-05-25">May 25, 2026<\/time>/);
     assert.match(html, /"datePublished":"2026-05-25"/);
     assert.match(html, /"dateModified":"2026-05-25T00:00:00.000Z"/);
@@ -363,6 +363,18 @@ test("owner can upload and switch product cover photos", async () => {
     assert.match(adminScriptText, /data-upload-cover/);
     assert.match(adminScriptText, /api\/admin\/products\/cover/);
 
+    const productScript = await fetch(`${baseUrl}/product.js`);
+    const productScriptText = await productScript.text();
+    assert.match(productScriptText, /getProductGalleryPhotos/);
+    assert.match(productScriptText, /thumbnailRow\.hidden/);
+
+    const initialProductsResponse = await fetch(`${baseUrl}/api/products`);
+    const initialProductsJson = await initialProductsResponse.json();
+    assert.equal(
+      initialProductsJson.products.some((product) => product.gallery?.some((item) => /general view/i.test(item.label || ""))),
+      false
+    );
+
     const coverResponse = await fetch(`${baseUrl}/api/admin/products/photo`, {
       method: "POST",
       headers: { "Content-Type": "application/json", Cookie: cookie },
@@ -378,6 +390,8 @@ test("owner can upload and switch product cover photos", async () => {
     const coverProduct = coverJson.product;
     assert.match(coverProduct.image, /^\/api\/product-images\//);
     assert.equal(coverProduct.imageName, "cover-photo.jpg");
+    assert.equal(coverProduct.gallery.some((item) => item.image === coverProduct.image), false);
+    assert.equal(coverProduct.gallery.some((item) => /general view/i.test(item.label || "")), false);
 
     const detailResponse = await fetch(`${baseUrl}/api/admin/products/photo`, {
       method: "POST",
@@ -394,6 +408,7 @@ test("owner can upload and switch product cover photos", async () => {
     const detailImage = afterDetail.gallery.find((item) => item.label === "detail-photo")?.image;
     assert.equal(afterDetail.image, coverProduct.image);
     assert.ok(detailImage);
+    assert.equal(afterDetail.gallery.some((item) => item.image === afterDetail.image), false);
 
     const switchResponse = await fetch(`${baseUrl}/api/admin/products/cover`, {
       method: "PATCH",
@@ -409,11 +424,13 @@ test("owner can upload and switch product cover photos", async () => {
     assert.equal(switchJson.product.image, detailImage);
     assert.equal(switchJson.product.imageName, "detail-photo");
     assert.equal(switchJson.product.focus, "50% 20%");
+    assert.equal(switchJson.product.gallery.some((item) => item.image === detailImage), false);
 
     const publicProductsResponse = await fetch(`${baseUrl}/api/products`);
     const publicProductsJson = await publicProductsResponse.json();
     const publicProduct = publicProductsJson.products.find((product) => product.id === "cotton-hoodie");
     assert.equal(publicProduct.image, detailImage);
+    assert.equal(publicProduct.gallery.some((item) => item.image === detailImage), false);
   } finally {
     server.close();
   }

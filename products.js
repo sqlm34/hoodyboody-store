@@ -15,11 +15,7 @@ window.NITKA_PRODUCTS = [
     ],
     longDescription:
       "Light linen jacket with soft fit and iris embroidery. Suitable for capsule wardrobe, summer events and everyday looks.",
-    gallery: [
-      { label: "General view", focus: "38% 45%" },
-      { label: "Embroidery", focus: "32% 36%" },
-      { label: "Texture", focus: "48% 61%" }
-    ]
+    gallery: []
   },
   {
     id: "cotton-hoodie",
@@ -37,11 +33,7 @@ window.NITKA_PRODUCTS = [
     ],
     longDescription:
       "Hoodie from dense cotton fleece with botanical embroidery and small monogram. Holds shape well and remains soft after washing.",
-    gallery: [
-      { label: "General view", focus: "56% 35%" },
-      { label: "Embroidery", focus: "60% 43%" },
-      { label: "Hood", focus: "51% 29%" }
-    ]
+    gallery: []
   },
   {
     id: "denim-shirt",
@@ -59,11 +51,7 @@ window.NITKA_PRODUCTS = [
     ],
     longDescription:
       "Shirt from soft denim with contrast embroidery on pocket and collar. Accent piece for everyday look.",
-    gallery: [
-      { label: "General view", focus: "72% 52%" },
-      { label: "Pocket", focus: "68% 43%" },
-      { label: "Collar", focus: "75% 34%" }
-    ]
+    gallery: []
   },
   {
     id: "canvas-tote",
@@ -81,11 +69,7 @@ window.NITKA_PRODUCTS = [
     ],
     longDescription:
       "Shopper from dense canvas with botanical motif. Holds laptop, documents and daily items.",
-    gallery: [
-      { label: "General view", focus: "44% 68%" },
-      { label: "Embroidery", focus: "39% 62%" },
-      { label: "Handles", focus: "49% 52%" }
-    ]
+    gallery: []
   },
   {
     id: "linen-shirt",
@@ -103,11 +87,7 @@ window.NITKA_PRODUCTS = [
     ],
     longDescription:
       "Linen shirt with embroidery along the placket line. Breathable fabric, loose fit and calm decorative accent.",
-    gallery: [
-      { label: "General view", focus: "28% 58%" },
-      { label: "Placket", focus: "31% 48%" },
-      { label: "Cuff", focus: "23% 67%" }
-    ]
+    gallery: []
   },
   {
     id: "soft-bomber",
@@ -125,10 +105,6 @@ window.NITKA_PRODUCTS = [
     ],
     longDescription:
       "Soft bomber with large embroidery on the back to order. You can adapt the motif, scale and placement.",
-    gallery: [
-      { label: "General view", focus: "64% 62%" },
-      { label: "Back", focus: "66% 55%" },
-      { label: "Cuff", focus: "58% 72%" }
-    ]
+    gallery: []
   }
 ];

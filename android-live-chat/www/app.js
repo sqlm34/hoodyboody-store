@@ -168,7 +168,7 @@ async function ensurePushNotifications(options = {}) {
       });
       push.addListener("pushNotificationReceived", async (notification) => {
         await loadConversations();
-        const title = notification.title || notification.data?.title || "HOODYBOODY live chat";
+        const title = notification.title || notification.data?.title || "byIrishka live chat";
         const body = notification.body || notification.data?.body || "New customer message";
         await notify(title, body);
       });
@@ -227,7 +227,7 @@ async function ensureNotifications() {
     await localNotifications.createChannel({
       id: getNotificationChannelId(),
       name: "Customer messages",
-      description: "Sound alerts for new HOODYBOODY customer chat messages.",
+      description: "Sound alerts for new byIrishka customer chat messages.",
       importance: 5,
       visibility: 1,
       lights: true,
@@ -257,7 +257,7 @@ async function openSoundSettings() {
       if (currentPushToken) registerPushToken(currentPushToken).catch(() => {});
       const soundName = result.soundTitle ? `: ${result.soundTitle}` : "";
       setStatus(`Notification sound selected${soundName}.`);
-      await notify("HOODYBOODY notifications", "Selected sound is active.");
+      await notify("byIrishka notifications", "Selected sound is active.");
     } else {
       setStatus("Sound selection canceled.");
     }
@@ -542,7 +542,7 @@ connectButton.addEventListener("click", () => connect().catch((error) => setStat
 notificationsButton.addEventListener("click", async () => {
   const enabled = await ensureNotifications();
   const pushEnabled = enabled ? await ensurePushNotifications() : false;
-  if (enabled) await notify("HOODYBOODY notifications", pushEnabled ? "Background push setup was started." : "Sound is enabled.");
+  if (enabled) await notify("byIrishka notifications", pushEnabled ? "Background push setup was started." : "Sound is enabled.");
   if (!enabled) {
     setStatus("Notifications are off. Allow them in Android settings.");
   } else if (!pushEnabled) {

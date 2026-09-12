@@ -269,7 +269,7 @@
     if (!message || message.senderType !== "admin") return;
     if (!("Notification" in window) || Notification.permission !== "granted") return;
     if (document.visibilityState === "visible" && root.classList.contains("open")) return;
-    new Notification("HOODYBOODY live chat", { body: message.text || "New attachment", tag: message.id });
+    new Notification("byIrishka live chat", { body: message.text || "New attachment", tag: message.id });
   }
 
   function renderComposerAttachments() {

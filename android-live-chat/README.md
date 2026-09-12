@@ -1,4 +1,4 @@
-# HOODYBOODY Chat Android
+# byIrishka Chat Android
 
 Owner chat app for Android. It connects to the store chat and supports Firebase Cloud Messaging push notifications, so customer messages can notify the phone even when the app is closed.
 

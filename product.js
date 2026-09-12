@@ -81,6 +81,41 @@ const escapeHtml = (value) =>
     return entities[char];
   });
 
+function isGalleryPlaceholder(item) {
+  const label = String(item?.label || "").trim().toLowerCase();
+  const image = String(item?.image || "").trim();
+  return label === "general view" && (!image || image === DEFAULT_IMAGE_URL || image === product?.image);
+}
+
+function getProductGalleryPhotos() {
+  const gallery = Array.isArray(product?.gallery) ? product.gallery : [];
+  const seen = new Set();
+  const photos = gallery
+    .filter((item) => item?.image && item.image !== product.image && !isGalleryPlaceholder(item))
+    .filter((item) => {
+      if (seen.has(item.image)) return false;
+      seen.add(item.image);
+      return true;
+    })
+    .map((item, index) => ({
+      image: item.image,
+      label: item.label || `Photo ${index + 1}`,
+      focus: item.focus || product.focus || "center",
+      isFallbackCover: false
+    }));
+
+  if (photos.length) return photos;
+
+  return [
+    {
+      image: product?.image || DEFAULT_IMAGE_URL,
+      label: "Cover photo",
+      focus: product?.focus || "center",
+      isFallbackCover: true
+    }
+  ];
+}
+
 async function api(path, options = {}) {
   const response = await fetch(path, {
     headers: { "Content-Type": "application/json", ...(options.headers || {}) },
@@ -395,9 +430,8 @@ async function loadInventory() {
 }
 
 function renderPhoto() {
-  const gallery = product.gallery?.length
-    ? product.gallery
-    : [{ label: "Photo", focus: product.focus, image: product.image }];
+  const gallery = getProductGalleryPhotos();
+  selectedPhoto = Math.max(0, Math.min(selectedPhoto, gallery.length - 1));
   const photo = gallery[selectedPhoto];
   const imageUrl = photo?.image || product.image || DEFAULT_IMAGE_URL;
   isZoomed = false;
@@ -405,8 +439,11 @@ function renderPhoto() {
   mainPhoto.style.backgroundImage = `url("${imageUrl}")`;
   mainPhoto.style.backgroundPosition = photo?.focus || product.focus || "center";
   zoomHint.textContent = "Click to zoom";
+  thumbnailRow.hidden = gallery.every((item) => item.isFallbackCover);
+  prevPhoto.closest(".carousel-controls").hidden = gallery.length <= 1;
 
   thumbnailRow.innerHTML = gallery
+    .filter((item) => !item.isFallbackCover)
     .map((item, index) => {
       const itemImage = item.image || product.image || DEFAULT_IMAGE_URL;
       const itemFocus = item.focus || product.focus || "center";
@@ -435,7 +472,7 @@ function setMeta(name, content, property = false) {
 }
 
 function updatePageMeta() {
-  const pageTitle = `${product.title} | HOODYBOODY`;
+  const pageTitle = `${product.title} | byIrishka`;
   const pageDescription = product.longDescription || product.description;
   document.title = pageTitle;
   setMeta("description", pageDescription);
@@ -447,7 +484,8 @@ function updatePageMeta() {
 }
 
 function setPhoto(index) {
-  const gallery = product.gallery || [];
+  const gallery = getProductGalleryPhotos();
+  if (!gallery.length) return;
   selectedPhoto = (index + gallery.length) % gallery.length;
   renderPhoto();
 }
@@ -653,8 +691,8 @@ mainPhoto.addEventListener("click", toggleZoom);
 mainPhoto.addEventListener("mousemove", handleZoomMove);
 mainPhoto.addEventListener("mouseleave", () => {
   if (!isZoomed) return;
-  const photo = product.gallery[selectedPhoto];
-  mainPhoto.style.backgroundPosition = photo.focus;
+  const photo = getProductGalleryPhotos()[selectedPhoto];
+  mainPhoto.style.backgroundPosition = photo?.focus || product.focus || "center";
 });
 
 productSizeChoices.addEventListener("click", (event) => {

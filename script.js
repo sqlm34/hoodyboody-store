@@ -544,10 +544,10 @@ function updateCatalogViewHead(visibleCount) {
     categoryCatalogTitle.textContent = `${meta.title} products`;
   }
   if (isCategoryPage) {
-    document.title = `${meta.title} | HOODYBOODY`;
+    document.title = `${meta.title} | byIrishka`;
     const descriptionTag = document.querySelector('meta[name="description"]') || document.head.appendChild(document.createElement("meta"));
     descriptionTag.setAttribute("name", "description");
-    descriptionTag.setAttribute("content", meta.copy || `${meta.title} products from HOODYBOODY.`);
+    descriptionTag.setAttribute("content", meta.copy || `${meta.title} products from byIrishka.`);
   }
 }
 

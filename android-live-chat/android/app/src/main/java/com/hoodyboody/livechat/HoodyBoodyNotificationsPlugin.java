@@ -186,7 +186,7 @@ public class HoodyBoodyNotificationsPlugin extends Plugin {
             .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
             .build();
         NotificationChannel channel = new NotificationChannel(channelId, "Customer messages", NotificationManager.IMPORTANCE_HIGH);
-        channel.setDescription("Sound alerts for new HOODYBOODY customer chat messages.");
+        channel.setDescription("Sound alerts for new byIrishka customer chat messages.");
         channel.setSound(soundUri, audioAttributes);
         channel.enableVibration(true);
         channel.enableLights(true);

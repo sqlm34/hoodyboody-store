@@ -135,7 +135,7 @@ test("label purchase is blocked before payment", async () => {
   const shippo = createShippoService({
     apiKey: "test-key",
     shippingOrigin: {
-      name: "HoodyBoody",
+      name: "byIrishka",
       street1: "1 Main St",
       city: "Indianapolis",
       state: "IN",
@@ -174,7 +174,7 @@ test("label purchase refreshes stale saved Shippo rate before retrying", async (
   const shippo = createShippoService({
     apiKey: "test-key",
     shippingOrigin: {
-      name: "HoodyBoody",
+      name: "byIrishka",
       street1: "6463 Bayside South Drive",
       city: "Indianapolis",
       state: "IN",

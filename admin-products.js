@@ -102,6 +102,12 @@ function getProductPhotos(product) {
   const photos = [];
   const seen = new Set();
 
+  function isGeneralViewPlaceholder(item) {
+    const label = String(item?.label || "").trim().toLowerCase();
+    const image = String(item?.image || "").trim();
+    return label === "general view" && (!image || image === DEFAULT_IMAGE_URL || image === product.image);
+  }
+
   function addPhoto(image, label, focus) {
     const url = image || DEFAULT_IMAGE_URL;
     if (seen.has(url)) return;
@@ -120,7 +126,7 @@ function getProductPhotos(product) {
   }
 
   gallery
-    .filter((item) => item?.image)
+    .filter((item) => item?.image && item.image !== product.image && !isGeneralViewPlaceholder(item))
     .forEach((item) => {
       addPhoto(item.image, item.label, item.focus);
     });
@@ -156,7 +162,7 @@ function getBlankProduct() {
     imageName: "",
     colors: [{ name: "Black", value: "#202326" }],
     longDescription: "Detailed product description.",
-    gallery: [{ label: "General view", focus: "50% 50%", image: DEFAULT_IMAGE_URL }],
+    gallery: [],
     isDigital: false,
     shipping: {
       weight_value: 18,

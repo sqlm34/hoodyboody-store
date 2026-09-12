@@ -105,7 +105,7 @@ function renderCommentModerationCard(comment) {
         <button class="button ghost dark danger-button" type="button" data-delete-comment data-post-id="${escapeHtml(comment.postId)}" data-comment-id="${escapeHtml(comment.commentId)}">Delete</button>
       </div>
       <div class="admin-comment-reply">
-        <textarea rows="2" placeholder="Reply as HOODYBOODY Studio" data-comment-reply-text></textarea>
+        <textarea rows="2" placeholder="Reply as byIrishka Studio" data-comment-reply-text></textarea>
         <button class="button primary" type="button" data-send-comment-reply data-post-id="${escapeHtml(comment.postId)}" data-comment-id="${escapeHtml(comment.commentId)}">Reply</button>
       </div>
     </article>

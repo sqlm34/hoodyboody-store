@@ -73,7 +73,7 @@ const defaultChatSettings = {
   accentColor: "#263b73",
   timeColor: "#59616a",
   pushColor: "#1f6b5a",
-  logoText: "HOODYBOODY",
+  logoText: "byIrishka",
   logoImage: "",
   welcomeText: "Ask us about size, delivery or your order."
 };
@@ -99,7 +99,7 @@ const sessionMaxAgeSeconds = 60 * 60 * 24 * 30;
 const productDiscountThreshold = 20000;
 const productDiscountRate = 0.1;
 const shippingOrigin = {
-  name: process.env.SHIPPING_FROM_NAME || localEnv.SHIPPING_FROM_NAME || "HOODYBOODY",
+  name: process.env.SHIPPING_FROM_NAME || localEnv.SHIPPING_FROM_NAME || "byIrishka",
   street1: process.env.SHIPPING_FROM_STREET1 || localEnv.SHIPPING_FROM_STREET1 || "6463 Bayside South Drive",
   street2: process.env.SHIPPING_FROM_STREET2 || localEnv.SHIPPING_FROM_STREET2 || "",
   city: process.env.SHIPPING_FROM_CITY || localEnv.SHIPPING_FROM_CITY || "Indianapolis",
@@ -159,11 +159,7 @@ const defaultProducts = [
     ],
     longDescription:
       "Light linen jacket with soft fit and iris embroidery. Suitable for capsule wardrobe, summer events and everyday looks.",
-    gallery: [
-      { label: "General view", focus: "38% 45%" },
-      { label: "Embroidery", focus: "32% 36%" },
-      { label: "Texture", focus: "48% 61%" }
-    ]
+    gallery: []
   },
   {
     id: "cotton-hoodie",
@@ -182,11 +178,7 @@ const defaultProducts = [
     ],
     longDescription:
       "Hoodie from dense cotton fleece with botanical embroidery and small monogram. Holds shape well and remains soft after washing.",
-    gallery: [
-      { label: "General view", focus: "56% 35%" },
-      { label: "Embroidery", focus: "60% 43%" },
-      { label: "Hood", focus: "51% 29%" }
-    ]
+    gallery: []
   },
   {
     id: "denim-shirt",
@@ -205,11 +197,7 @@ const defaultProducts = [
     ],
     longDescription:
       "Shirt from soft denim with contrast embroidery on pocket and collar. Accent piece for everyday look.",
-    gallery: [
-      { label: "General view", focus: "72% 52%" },
-      { label: "Pocket", focus: "68% 43%" },
-      { label: "Collar", focus: "75% 34%" }
-    ]
+    gallery: []
   },
   {
     id: "canvas-tote",
@@ -228,11 +216,7 @@ const defaultProducts = [
     ],
     longDescription:
       "Shopper from dense canvas with botanical motif. Holds laptop, documents and daily items.",
-    gallery: [
-      { label: "General view", focus: "44% 68%" },
-      { label: "Embroidery", focus: "39% 62%" },
-      { label: "Handles", focus: "49% 52%" }
-    ]
+    gallery: []
   },
   {
     id: "linen-shirt",
@@ -251,11 +235,7 @@ const defaultProducts = [
     ],
     longDescription:
       "Linen shirt with embroidery along the placket line. Breathable fabric, loose fit and calm decorative accent.",
-    gallery: [
-      { label: "General view", focus: "28% 58%" },
-      { label: "Placket", focus: "31% 48%" },
-      { label: "Cuff", focus: "23% 67%" }
-    ]
+    gallery: []
   },
   {
     id: "soft-bomber",
@@ -274,11 +254,7 @@ const defaultProducts = [
     ],
     longDescription:
       "Soft bomber with large embroidery on the back to order. You can adapt the motif, scale and placement.",
-    gallery: [
-      { label: "General view", focus: "64% 62%" },
-      { label: "Back", focus: "66% 55%" },
-      { label: "Cuff", focus: "58% 72%" }
-    ]
+    gallery: []
   }
 ];
 const defaultCategories = [
@@ -329,13 +305,13 @@ const defaultBlogPosts = [
     slug: "fashion-is-our-passion",
     title: "Fashion Is Our Passion",
     excerpt:
-      "HOODYBOODY blog post about custom embroidered clothing, authentic design, and the process of making wardrobe pieces with clean stitch detail.",
+      "byIrishka blog post about custom embroidered clothing, authentic design, and the process of making wardrobe pieces with clean stitch detail.",
     category: "Embroidery Journal",
-    author: "HOODYBOODY Studio",
+    author: "byIrishka Studio",
     date: "2026-05-19",
     status: "published",
     tags: ["Outfit", "Stylish"],
-    body: `Custom clothing feels strongest when the stitch work looks intentional, balanced, and quiet enough to live with every day. At HOODYBOODY, each piece begins with a simple wardrobe idea and grows into embroidery that feels personal without becoming loud.
+    body: `Custom clothing feels strongest when the stitch work looks intentional, balanced, and quiet enough to live with every day. At byIrishka, each piece begins with a simple wardrobe idea and grows into embroidery that feels personal without becoming loud.
 
 The best embroidered garments are not only decorative. They hold a memory, a brand mark, a small drawing, or a seasonal motif in a way that still feels wearable after the first impression passes.
 
@@ -357,7 +333,7 @@ The process moves from artwork review to thread direction, stitch sample, produc
       {
         type: "paragraph",
         style: "default",
-        text: "Custom clothing feels strongest when the stitch work looks intentional, balanced, and quiet enough to live with every day. At HOODYBOODY, each piece begins with a simple wardrobe idea and grows into embroidery that feels personal without becoming loud."
+        text: "Custom clothing feels strongest when the stitch work looks intentional, balanced, and quiet enough to live with every day. At byIrishka, each piece begins with a simple wardrobe idea and grows into embroidery that feels personal without becoming loud."
       },
       {
         type: "paragraph",
@@ -398,7 +374,7 @@ The process moves from artwork review to thread direction, stitch sample, produc
         replies: [
           {
             id: "comment-hoodyboody-studio",
-            name: "HOODYBOODY Studio",
+            name: "byIrishka Studio",
             text: "That is the sweet spot: enough detail to feel special, enough restraint to keep wearing it.",
             alt: true
           }
@@ -415,7 +391,7 @@ The process moves from artwork review to thread direction, stitch sample, produc
     excerpt:
       "Struggling with puckering on knit fabric? Discover the best embroidery stabilizers for t-shirts, jersey, fleece, and stretch fabrics with brand reviews and expert tips.",
     category: "Embroidery Journal",
-    author: "HOODYBOODY Studio",
+    author: "byIrishka Studio",
     date: "2026-05-25",
     status: "published",
     tags: ["Embroidery Stabilizers", "Knit Fabric", "Guide"],
@@ -446,7 +422,7 @@ The process moves from artwork review to thread direction, stitch sample, produc
     excerpt:
       "Discover everything about machine embroidery for clothes, from choosing the right fabrics and threads to digitizing designs and professional finishing.",
     category: "Embroidery Journal",
-    author: "HOODYBOODY Studio",
+    author: "byIrishka Studio",
     date: "2026-05-22",
     status: "published",
     tags: ["Machine Embroidery", "Clothing", "Guide"],
@@ -1155,12 +1131,15 @@ function sanitizeHexColor(value, fallback) {
 }
 
 function sanitizeChatSettings(input = {}, current = defaultChatSettings) {
+  const rawLogoText = String(input.logoText || current.logoText || defaultChatSettings.logoText).trim();
+  const logoText = rawLogoText.toUpperCase() === "HOODYBOODY" ? defaultChatSettings.logoText : rawLogoText;
+
   return {
     chatColor: sanitizeHexColor(input.chatColor, current.chatColor || defaultChatSettings.chatColor),
     accentColor: sanitizeHexColor(input.accentColor, current.accentColor || defaultChatSettings.accentColor),
     timeColor: sanitizeHexColor(input.timeColor, current.timeColor || defaultChatSettings.timeColor),
     pushColor: sanitizeHexColor(input.pushColor, current.pushColor || defaultChatSettings.pushColor),
-    logoText: String(input.logoText || current.logoText || defaultChatSettings.logoText).trim().slice(0, 60) || defaultChatSettings.logoText,
+    logoText: logoText.slice(0, 60) || defaultChatSettings.logoText,
     logoImage: sanitizeChatLogo(input.logoImage || current.logoImage || ""),
     welcomeText: String(input.welcomeText || current.welcomeText || defaultChatSettings.welcomeText).trim().slice(0, 180) || defaultChatSettings.welcomeText
   };
@@ -1345,7 +1324,7 @@ function addChatMessage(db, conversation, senderType, text, senderName = "", att
     id: crypto.randomUUID(),
     conversationId: conversation.id,
     senderType,
-    senderName: String(senderName || (senderType === "admin" ? "HOODYBOODY" : conversation.customer?.name || "Customer")).slice(0, 80),
+    senderName: String(senderName || (senderType === "admin" ? "byIrishka" : conversation.customer?.name || "Customer")).slice(0, 80),
     text: cleanText,
     attachments: cleanAttachments,
     createdAt: now
@@ -1477,7 +1456,10 @@ function publicProduct(product) {
     imageName: normalizedProduct.imageName || "",
     colors: Array.isArray(normalizedProduct.colors) ? normalizedProduct.colors : [],
     longDescription: normalizedProduct.longDescription || normalizedProduct.description,
-    gallery: Array.isArray(normalizedProduct.gallery) ? normalizedProduct.gallery : [],
+    gallery: normalizeProductGalleryItems(normalizedProduct.gallery, normalizedProduct.focus, {
+      coverImage: normalizedProduct.image,
+      excludeCover: true
+    }),
     isDigital: normalizedProduct.isDigital === true,
     shipping: normalizedProduct.shipping
   };
@@ -1504,7 +1486,7 @@ function normalizeBlogGallery(value) {
   return gallery
     .map((item) => ({
       image: String(item?.image || "").trim().slice(0, 600),
-      alt: String(item?.alt || item?.label || "HOODYBOODY blog image").trim().slice(0, 160),
+      alt: String(item?.alt || item?.label || "byIrishka blog image").trim().slice(0, 160),
       focus: String(item?.focus || "50% 50%").trim().slice(0, 40)
     }))
     .filter((item) => item.image)
@@ -1544,7 +1526,7 @@ function getBlogBlockGallery(gallery) {
 function normalizeBlogBlockImage(value = {}, fallback = {}) {
   const source = typeof value === "string" ? { image: value } : value || {};
   const image = String(source.image || source.url || fallback.image || "").trim().slice(0, 600);
-  const alt = String(source.alt || fallback.alt || "HOODYBOODY blog image").trim().slice(0, 160);
+  const alt = String(source.alt || fallback.alt || "byIrishka blog image").trim().slice(0, 160);
   const focus = String(source.focus || fallback.focus || "50% 50%").trim().slice(0, 40);
   return image ? { image, alt, focus } : null;
 }
@@ -1759,7 +1741,7 @@ function sanitizeBlogPost(body = {}, currentPost = {}) {
   const slug = slugifyBlogSlug(body.slug || currentPost.slug || title);
   const excerpt = String(body.excerpt ?? currentPost.excerpt ?? "").trim().slice(0, 420);
   const category = String(body.category ?? currentPost.category ?? "Embroidery Journal").trim().slice(0, 80);
-  const author = String(body.author ?? currentPost.author ?? "HOODYBOODY Studio").trim().slice(0, 90);
+  const author = String(body.author ?? currentPost.author ?? "byIrishka Studio").trim().slice(0, 90);
   const date = String(body.date ?? currentPost.date ?? new Date().toISOString().slice(0, 10)).trim().slice(0, 10);
   const status = String(body.status ?? currentPost.status ?? "draft").toLowerCase() === "published" ? "published" : "draft";
   const tags = parseList(body.tags ?? currentPost.tags, currentPost.tags || ["Embroidery"]).slice(0, 12);
@@ -1947,9 +1929,19 @@ function nextFocusFallback(focus) {
   return String(focus || "center").trim().slice(0, 40) || "center";
 }
 
-function normalizeProductGalleryItems(gallery, fallbackFocus = "center") {
+function isProductGalleryPlaceholder(item, coverImage = "") {
+  const label = String(item?.label || item?.alt || "").trim().toLowerCase();
+  const image = String(item?.image || "").trim();
+  return label === "general view" && (!image || image === DEFAULT_PRODUCT_IMAGE || image === coverImage);
+}
+
+function normalizeProductGalleryItems(gallery, fallbackFocus = "center", options = {}) {
   const safeFocus = nextFocusFallback(fallbackFocus);
+  const coverImage = String(options.coverImage || "").trim();
+  const excludeCover = options.excludeCover === true;
+
   return (Array.isArray(gallery) ? gallery : [])
+    .filter((item) => !isProductGalleryPlaceholder(item, coverImage))
     .map((item, index) => {
       const label = String(item?.label || item?.alt || `Photo ${index + 1}`).trim().slice(0, 120);
       const focus = nextFocusFallback(item?.focus || safeFocus);
@@ -1962,20 +1954,23 @@ function normalizeProductGalleryItems(gallery, fallbackFocus = "center") {
       if (image) nextItem.image = image;
       return nextItem;
     })
-    .filter((item) => item.label || item.image)
+    .filter((item) => item.image && (!excludeCover || item.image !== coverImage))
     .slice(0, 20);
 }
 
 function getProductPhotoLabel(product, imageUrl, fallback = "") {
   const image = String(imageUrl || "").trim();
-  const gallery = normalizeProductGalleryItems(product?.gallery, product?.focus);
+  const gallery = normalizeProductGalleryItems(product?.gallery, product?.focus, { coverImage: product?.image });
   const galleryMatch = gallery.find((item) => item.image === image);
   const label = galleryMatch?.label || (product?.image === image ? product?.imageName : "") || fallback;
   return String(label || "").trim().slice(0, 120);
 }
 
 function buildProductPatchGallery(body, currentProduct, selectedImage, selectedFocus) {
-  const currentGallery = normalizeProductGalleryItems(currentProduct.gallery, selectedFocus);
+  const currentGallery = normalizeProductGalleryItems(currentProduct.gallery, selectedFocus, {
+    coverImage: selectedImage,
+    excludeCover: true
+  });
   const labels = parseList(body.galleryLabels, []);
   const focuses = parseList(body.galleryFocus, []);
   const selected = String(selectedImage || "").trim().slice(0, 500);
@@ -1996,37 +1991,16 @@ function buildProductPatchGallery(body, currentProduct, selectedImage, selectedF
     }).filter((item) => item.label || item.image);
   }
 
-  if (selected) {
-    const coverIndex = gallery.findIndex((item) => item.image === selected);
-    if (coverIndex === -1) {
-      gallery = [
-        {
-          label: getProductPhotoLabel(currentProduct, selected, currentProduct.imageName || "Cover photo"),
-          focus: nextFocusFallback(selectedFocus),
-          image: selected
-        },
-        ...gallery
-      ];
-    } else {
-      gallery[coverIndex] = {
-        ...gallery[coverIndex],
-        focus: gallery[coverIndex].focus || nextFocusFallback(selectedFocus)
-      };
-    }
-  }
-
-  if (!gallery.length) {
-    gallery = [{ label: "General view", focus: nextFocusFallback(selectedFocus), image: selected || DEFAULT_PRODUCT_IMAGE }];
-  }
-
-  return gallery.slice(0, 20);
+  return gallery
+    .filter((item) => item.image && item.image !== selected && !isProductGalleryPlaceholder(item, selected))
+    .slice(0, 20);
 }
 
 function isProductImageAttached(product, db, imageUrl) {
   const image = String(imageUrl || "").trim();
   if (!image) return false;
   if (image === DEFAULT_PRODUCT_IMAGE || image === product.image) return true;
-  if (normalizeProductGalleryItems(product.gallery, product.focus).some((item) => item.image === image)) return true;
+  if (normalizeProductGalleryItems(product.gallery, product.focus, { coverImage: product.image }).some((item) => item.image === image)) return true;
 
   const imageId = getProductImageIdFromUrl(image);
   return Boolean(imageId && db.productImages?.[imageId]?.productId === product.id);
@@ -2219,9 +2193,8 @@ function jsonLdScript(data) {
 function renderSiteTopbar() {
   return `
     <header class="topbar checkout-topbar" aria-label="Site navigation">
-      <a class="brand" href="/" aria-label="HOODYBOODY">
-        <span class="brand-mark">HB</span>
-        <span>HOODYBOODY</span>
+      <a class="brand" href="/" aria-label="byIrishka">
+        <span>byIrishka</span>
       </a>
       <nav class="nav-links" aria-label="Site sections"></nav>
       <div class="top-actions">
@@ -2239,7 +2212,7 @@ function renderSeoFooter() {
     <footer class="site-footer" data-footer-ready="true">
       <div class="site-footer-inner">
         <div class="site-footer-brand">
-          <a class="brand footer-brand" href="/" aria-label="HOODYBOODY"><span>HOODYBOODY</span></a>
+          <a class="brand footer-brand" href="/" aria-label="byIrishka"><span>byIrishka</span></a>
           <p>Premium custom embroidery for clean wardrobe pieces, logo apparel and small batch orders.</p>
         </div>
         <nav class="footer-links" aria-label="Product pages">
@@ -2278,8 +2251,8 @@ function renderBreadcrumbsHtml(items) {
 }
 
 function renderPageShell(req, options) {
-  const title = options.title || "HOODYBOODY";
-  const description = options.description || "Premium custom embroidery by HOODYBOODY.";
+  const title = options.title || "byIrishka";
+  const description = options.description || "Premium custom embroidery from byIrishka.";
   const canonicalPath = normalizeCleanHref(options.canonicalPath || "/");
   const canonicalUrl = absoluteUrl(req, canonicalPath);
   const breadcrumbs = options.breadcrumbs || [{ name: "Home", url: "/" }];
@@ -2287,7 +2260,7 @@ function renderPageShell(req, options) {
     {
       "@context": "https://schema.org",
       "@type": "Organization",
-      name: "HOODYBOODY",
+      name: "byIrishka",
       url: absoluteUrl(req, "/"),
       logo: absoluteUrl(req, "/assets/embroidered-collection.png")
     },
@@ -2316,9 +2289,9 @@ function renderPageShell(req, options) {
     <meta property="og:description" content="${escapeHtmlAttribute(description)}" />
     <meta property="og:type" content="website" />
     <meta property="og:url" content="${escapeHtmlAttribute(canonicalUrl)}" />
-    <meta property="og:site_name" content="HOODYBOODY" />
+    <meta property="og:site_name" content="byIrishka" />
     <meta property="og:image" content="${escapeHtmlAttribute(absoluteUrl(req, "/assets/embroidered-collection.png"))}" />
-    <meta property="og:image:alt" content="HOODYBOODY embroidered clothing" />
+    <meta property="og:image:alt" content="byIrishka embroidered clothing" />
     <meta name="twitter:card" content="summary_large_image" />
     <meta name="twitter:title" content="${escapeHtmlAttribute(title)}" />
     <meta name="twitter:description" content="${escapeHtmlAttribute(description)}" />
@@ -2385,7 +2358,7 @@ async function renderProductLandingPage(req, page) {
   ];
 
   return renderPageShell(req, {
-    title: page.seoTitle || `${page.title} | HOODYBOODY`,
+    title: page.seoTitle || `${page.title} | byIrishka`,
     description: page.metaDescription,
     canonicalPath,
     mainClass: "seo-page product-landing-page",
@@ -2418,7 +2391,7 @@ async function renderProductLandingPage(req, page) {
       <section class="location-section">
         <div class="section-head"><div><p class="eyebrow">custom work</p><h2>Logo and design embroidery</h2></div></div>
         <div class="seo-split">
-          <p>Upload a logo, artwork or reference image, choose the base product and add notes about quantity and placement. HOODYBOODY reviews the request before confirming the final quote.</p>
+          <p>Upload a logo, artwork or reference image, choose the base product and add notes about quantity and placement. byIrishka reviews the request before confirming the final quote.</p>
           <a class="button primary" href="/#custom">Upload design</a>
         </div>
       </section>
@@ -2701,8 +2674,8 @@ function renderBlogComments(comments = []) {
 
 function renderBlogPostPage(req, post, posts = []) {
   const canonicalPath = `/blog/${post.slug}/`;
-  const title = `${post.title} | HOODYBOODY Blog`;
-  const description = post.excerpt || "HOODYBOODY blog post about custom embroidered clothing and design.";
+  const title = `${post.title} | byIrishka Blog`;
+  const description = post.excerpt || "byIrishka blog post about custom embroidered clothing and design.";
   const gallery = normalizeBlogGallery(post.gallery);
   const primaryImage = gallery[0]?.image || "/assets/embroidered-collection.png";
 
@@ -2719,14 +2692,14 @@ function renderBlogPostPage(req, post, posts = []) {
     <meta property="og:type" content="article" />
     <meta property="og:url" content="${escapeHtmlAttribute(absoluteUrl(req, canonicalPath))}" />
     <meta property="og:image" content="${escapeHtmlAttribute(absoluteUrl(req, primaryImage))}" />
-    <link rel="icon" href='data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><rect width="64" height="64" fill="black"/><text x="32" y="39" font-size="22" text-anchor="middle" fill="white" font-family="serif">HB</text></svg>' />
+    <link rel="icon" href='data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><rect width="64" height="64" fill="black"/><text x="32" y="39" font-size="22" text-anchor="middle" fill="white" font-family="serif">BI</text></svg>' />
     ${jsonLdScript({
       "@context": "https://schema.org",
       "@type": "BlogPosting",
       headline: post.title,
       description,
       image: absoluteUrl(req, primaryImage),
-      author: { "@type": "Organization", name: post.author || "HOODYBOODY Studio" },
+      author: { "@type": "Organization", name: post.author || "byIrishka Studio" },
       datePublished: post.date,
       dateModified: post.updatedAt || post.date,
       mainEntityOfPage: absoluteUrl(req, canonicalPath)
@@ -2736,7 +2709,7 @@ function renderBlogPostPage(req, post, posts = []) {
   </head>
   <body class="blog-page-body">
     <header class="topbar checkout-topbar blog-topbar" aria-label="Site navigation">
-      <a class="brand" href="/" aria-label="HOODYBOODY"><span class="brand-mark">HB</span><span>HOODYBOODY</span></a>
+      <a class="brand" href="/" aria-label="byIrishka"><span>byIrishka</span></a>
       <nav class="nav-links" aria-label="Site sections">
         <a href="/#catalog">Shop</a>
         <a href="/#custom">Embroidery</a>
@@ -2779,10 +2752,10 @@ function renderBlogPostPage(req, post, posts = []) {
               </div>
             </article>
             <section class="blog-author" aria-labelledby="blog-author-title">
-              <a class="blog-author-photo" href="/blog/" aria-label="${escapeHtmlAttribute(post.author || "HOODYBOODY Studio")}"></a>
+              <a class="blog-author-photo" href="/blog/" aria-label="${escapeHtmlAttribute(post.author || "byIrishka Studio")}"></a>
               <div>
-                <h4 id="blog-author-title"><a href="/blog/">${escapeHtml(post.author || "HOODYBOODY Studio")}</a></h4>
-                <p>Embroidery notes, product decisions, and quiet wardrobe ideas from the HOODYBOODY worktable.</p>
+                <h4 id="blog-author-title"><a href="/blog/">${escapeHtml(post.author || "byIrishka Studio")}</a></h4>
+                <p>Embroidery notes, product decisions, and quiet wardrobe ideas from the byIrishka worktable.</p>
                 <div class="blog-author-links">
                   <a href="/#custom">Custom</a>
                   <a href="/#catalog">Catalog</a>
@@ -3590,7 +3563,7 @@ async function handleApi(req, res) {
       if (action === "messages" && method === "POST") {
         const user = getSessionUser(req, db);
         const body = await readJson(req, maxJsonBodyBytes);
-        const message = addChatMessage(db, conversation, "admin", body.text || body.message, user?.name || "HOODYBOODY", body.attachments);
+        const message = addChatMessage(db, conversation, "admin", body.text || body.message, user?.name || "byIrishka", body.attachments);
 
         if (!message) {
           sendChatJson(req, res, 400, { message: "Write a message before sending." });
@@ -4268,7 +4241,7 @@ async function handleApi(req, res) {
       }
 
       const replyPatch = sanitizeBlogCommentInput(body, {
-        name: user.name || "HOODYBOODY Studio",
+        name: user.name || "byIrishka Studio",
         status: "published",
         alt: true,
         allowMissingEmail: true,
@@ -4335,7 +4308,7 @@ async function handleApi(req, res) {
         isDigital: false,
         shipping: getDefaultProductShipping({ type: "tops" }),
         colors: [{ name: "Black", value: "#202326" }],
-        gallery: [{ label: "General view", focus: "50% 50%", image: DEFAULT_PRODUCT_IMAGE }]
+        gallery: []
       };
       const productPatch = sanitizeProductPatch(body, baseProduct);
       const nextProduct = productPatch.product;
@@ -4500,31 +4473,24 @@ async function handleApi(req, res) {
       const fileName = safeFileName(body.fileName, extension);
       const product = db.products[productIndex];
       const imageUrl = `/api/product-images/${encodeURIComponent(imageId)}`;
-      const currentGallery = Array.isArray(product.gallery) ? product.gallery : [];
+      const currentGallery = normalizeProductGalleryItems(product.gallery, product.focus, {
+        coverImage: product.image,
+        excludeCover: true
+      });
       const hasGalleryImages = currentGallery.some((item) => item?.image);
-      const currentImageId = getProductImageIdFromUrl(product.image);
       const makeCover = body.makeCover === true || String(body.makeCover || "").toLowerCase() === "true";
-      const shouldUseAsCover = makeCover || (!hasGalleryImages && !currentImageId);
-      const galleryBase =
-        hasGalleryImages
-          ? currentGallery
-          : currentImageId
-            ? [
-                {
-                  label: product.imageName || "Photo 1",
-                  focus: product.focus || "center",
-                  image: product.image
-                }
-              ]
-            : [];
-      const nextGallery = [
-        ...galleryBase,
-        {
-          label: fileName.replace(/\.[^.]+$/, ""),
-          focus: product.focus || "center",
-          image: imageUrl
-        }
-      ].slice(0, 20);
+      const shouldUseAsCover = makeCover || (!product.image || product.image === DEFAULT_PRODUCT_IMAGE);
+      const galleryBase = hasGalleryImages ? currentGallery : [];
+      const nextGallery = makeCover
+        ? galleryBase
+        : [
+            ...galleryBase,
+            {
+              label: fileName.replace(/\.[^.]+$/, ""),
+              focus: product.focus || "center",
+              image: imageUrl
+            }
+          ].slice(0, 20);
 
       db.productImages[imageId] = {
         id: imageId,
@@ -4580,7 +4546,10 @@ async function handleApi(req, res) {
       }
 
       const product = db.products[productIndex];
-      const currentGallery = Array.isArray(product.gallery) ? product.gallery : [];
+      const currentGallery = normalizeProductGalleryItems(product.gallery, product.focus, {
+        coverImage: product.image,
+        excludeCover: true
+      });
       const nextGallery = currentGallery.filter((item) => item?.image !== imageUrl);
       const wasInGallery = nextGallery.length !== currentGallery.length;
 
@@ -4589,16 +4558,15 @@ async function handleApi(req, res) {
         return;
       }
 
-      const nextCover = nextGallery.find((item) => item?.image);
-      const nextImage = product.image === imageUrl ? nextCover?.image || DEFAULT_PRODUCT_IMAGE : product.image;
-      const nextImageName = product.image === imageUrl ? nextCover?.label || "" : product.imageName || "";
+      const nextImage = product.image === imageUrl ? DEFAULT_PRODUCT_IMAGE : product.image;
+      const nextImageName = product.image === imageUrl ? "" : product.imageName || "";
 
       delete db.productImages[imageId];
       db.products[productIndex] = {
         ...product,
         image: nextImage,
         imageName: nextImageName,
-        gallery: nextGallery.length ? nextGallery : [{ label: "General view", focus: product.focus || "center" }],
+        gallery: nextGallery,
         updatedAt: new Date().toISOString(),
         updatedBy: user.id
       };
@@ -5045,7 +5013,7 @@ function attachChatSocket(httpServer) {
           conversation,
           senderType,
           payload.text || payload.message,
-          senderType === "admin" ? user?.name || "HOODYBOODY" : conversation.customer?.name || user?.name || "Customer",
+          senderType === "admin" ? user?.name || "byIrishka" : conversation.customer?.name || user?.name || "Customer",
           payload.attachments
         );
 

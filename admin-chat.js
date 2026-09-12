@@ -163,7 +163,7 @@ function applySettings(settings = {}) {
   chatAccentColor.value = chatSettings.accentColor || "#263b73";
   chatTimeColor.value = chatSettings.timeColor || "#59616a";
   chatPushColor.value = chatSettings.pushColor || "#1f6b5a";
-  chatLogoText.value = chatSettings.logoText || "HOODYBOODY";
+  chatLogoText.value = chatSettings.logoText || "byIrishka";
   chatWelcomeText.value = chatSettings.welcomeText || "";
   document.documentElement.style.setProperty("--chat-color", chatColor.value);
   document.documentElement.style.setProperty("--chat-accent", chatAccentColor.value);

@@ -10,7 +10,7 @@ function getEmailConfig(env = process.env) {
     user: String(env.SMTP_USER || "").trim(),
     pass: String(env.SMTP_PASS || ""),
     from: String(env.EMAIL_FROM || env.SMTP_FROM || "").trim(),
-    fromName: String(env.EMAIL_FROM_NAME || "HOODYBOODY").trim(),
+    fromName: String(env.EMAIL_FROM_NAME || "byIrishka").trim(),
     enabled: String(env.EMAIL_NOTIFICATIONS_ENABLED || "true").toLowerCase() !== "false"
   };
 }
@@ -53,7 +53,7 @@ function buildOrderStatusEmail(order = {}, statusLabel = "") {
   if (tracking.number) lines.push(`Tracking number: ${tracking.number}`);
   if (tracking.url) lines.push(`Tracking link: ${tracking.url}`);
 
-  lines.push("", "Thank you for shopping with HOODYBOODY.");
+  lines.push("", "Thank you for shopping with byIrishka.");
 
   return {
     subject: `Order ${orderNumber}: ${statusLabel}`,

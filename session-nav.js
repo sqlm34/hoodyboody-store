@@ -34,8 +34,8 @@ function initSitePreloader() {
   preloader.dataset.sitePreloader = "true";
   preloader.setAttribute("aria-live", "polite");
   preloader.innerHTML = `
-    <div class="site-preloader-logo" aria-label="HOODYBOODY">
-      <span class="site-preloader-word" data-text="HOODYBOODY">HOODYBOODY</span>
+    <div class="site-preloader-logo" aria-label="byIrishka">
+      <span class="site-preloader-word" data-text="byIrishka">byIrishka</span>
     </div>
     <div class="site-preloader-percent" data-preloader-percent>0%</div>
   `;
@@ -120,7 +120,7 @@ function enhanceSiteNavigation() {
             <section class="shop-mega-column shop-mega-feature">
               <h3><a href="/#catalog">New Collection</a></h3>
               <a class="shop-mega-image" href="/#catalog" aria-label="Open new collection">
-                <img src="/assets/embroidered-collection.png" alt="HOODYBOODY embroidered clothing collection" />
+                <img src="/assets/embroidered-collection.png" alt="byIrishka embroidered clothing collection" />
               </a>
             </section>
           </div>
@@ -288,7 +288,7 @@ function enhanceSiteFooter() {
       <footer class="site-footer" data-footer-ready="true">
         <div class="site-footer-inner">
           <div class="site-footer-brand">
-            <a class="brand footer-brand" href="/" aria-label="HOODYBOODY"><span>HOODYBOODY</span></a>
+            <a class="brand footer-brand" href="/" aria-label="byIrishka"><span>byIrishka</span></a>
             <p>Premium embroidery for clean wardrobe pieces, custom logo apparel and small batch orders.</p>
           </div>
           <nav class="footer-links" aria-label="Product pages">

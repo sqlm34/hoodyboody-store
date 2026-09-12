@@ -1,4 +1,4 @@
-# Firebase Push Setup for HOODYBOODY Chat
+# Firebase Push Setup for byIrishka Chat
 
 This app already has Firebase Cloud Messaging support in the Android app and in the website backend. Closed-app notifications will work only after both the APK and Vercel are connected to the same Firebase project.
 
@@ -84,7 +84,7 @@ npx vercel --prod --yes
 
 ## 5. Install and register phone
 
-1. Delete the old HOODYBOODY Chat app from the phone.
+1. Delete the old byIrishka Chat app from the phone.
 2. Install the new APK.
 3. Open the app.
 4. Enter:

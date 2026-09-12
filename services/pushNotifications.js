@@ -301,7 +301,7 @@ async function sendChatPushNotifications(db, conversation, message, options = {}
 async function sendTestPush(db, options = {}) {
   const fakeConversation = {
     id: "test",
-    customer: { name: "HOODYBOODY" }
+    customer: { name: "byIrishka" }
   };
   const fakeMessage = {
     id: crypto.randomUUID(),
@@ -311,7 +311,7 @@ async function sendTestPush(db, options = {}) {
 
   return sendChatPushNotifications(db, fakeConversation, fakeMessage, {
     ...options,
-    title: "HOODYBOODY test"
+    title: "byIrishka test"
   });
 }
 
