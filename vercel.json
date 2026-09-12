@@ -32,6 +32,10 @@
     "api/index.js": {
       "maxDuration": 30,
       "includeFiles": "{*.html,*.css,*.js,robots.txt,assets/**,content/**,controllers/**,models/**,routes/**,services/**,dist/**,package.json}"
+    },
+    "api/[...path].js": {
+      "maxDuration": 30,
+      "includeFiles": "{*.html,*.css,*.js,robots.txt,assets/**,content/**,controllers/**,models/**,routes/**,services/**,dist/**,package.json}"
     }
   }
 }

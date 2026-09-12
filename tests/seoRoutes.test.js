@@ -6,6 +6,7 @@ process.env.NITKA_DB_PATH = ":memory:";
 
 const app = require("../server");
 const vercelApiHandler = require("../api");
+const vercelApiCatchAllHandler = require("../api/[...path].js");
 
 function startServer(handler = app) {
   const server = http.createServer(handler);
@@ -480,6 +481,20 @@ test("vercel rewrite shim preserves public and api paths", async () => {
     assert.equal(robots.status, 200);
     assert.match(robotsTxt, /Disallow: \//);
     assert.equal(products.status, 200);
+    assert.ok(Array.isArray(productsJson.products));
+  } finally {
+    server.close();
+  }
+});
+
+test("vercel api catch-all preserves api paths", async () => {
+  const { server, baseUrl } = await startServer(vercelApiCatchAllHandler);
+  try {
+    const products = await fetch(`${baseUrl}/api/products`);
+    const productsJson = await products.json();
+
+    assert.equal(products.status, 200);
+    assert.match(products.headers.get("x-robots-tag") || "", /noindex/);
     assert.ok(Array.isArray(productsJson.products));
   } finally {
     server.close();
