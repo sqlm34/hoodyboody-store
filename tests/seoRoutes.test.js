@@ -5,9 +5,10 @@ const test = require("node:test");
 process.env.NITKA_DB_PATH = ":memory:";
 
 const app = require("../server");
+const vercelApiHandler = require("../api");
 
-function startServer() {
-  const server = http.createServer(app);
+function startServer(handler = app) {
+  const server = http.createServer(handler);
   return new Promise((resolve) => {
     server.listen(0, () => {
       const { port } = server.address();
@@ -453,6 +454,33 @@ test("sitemap architecture is generated without opening indexing", async () => {
     assert.match(sitemapXml, /\/embroidered-hoodies\//);
     assert.match(robotsTxt, /Disallow: \//);
     assert.match(robots.headers.get("x-robots-tag") || "", /noindex/);
+  } finally {
+    server.close();
+  }
+});
+
+test("vercel rewrite shim preserves public and api paths", async () => {
+  const { server, baseUrl } = await startServer(vercelApiHandler);
+  try {
+    const blog = await fetch(`${baseUrl}/api?__path=/blog/`);
+    const blogHtml = await blog.text();
+    const sitemap = await fetch(`${baseUrl}/api?__path=/sitemap.xml`);
+    const sitemapXml = await sitemap.text();
+    const robots = await fetch(`${baseUrl}/api?__path=/robots.txt`);
+    const robotsTxt = await robots.text();
+    const products = await fetch(`${baseUrl}/api?__path=/api/products`);
+    const productsJson = await products.json();
+
+    assert.equal(blog.status, 200);
+    assert.match(blog.headers.get("x-robots-tag") || "", /noindex/);
+    assert.match(blogHtml, /<meta name="robots" content="noindex, nofollow, noarchive" \/>/);
+    assert.equal(sitemap.status, 200);
+    assert.match(sitemap.headers.get("x-robots-tag") || "", /noindex/);
+    assert.match(sitemapXml, /<loc>https:\/\/byirishka\.com\/blog\/<\/loc>/);
+    assert.equal(robots.status, 200);
+    assert.match(robotsTxt, /Disallow: \//);
+    assert.equal(products.status, 200);
+    assert.ok(Array.isArray(productsJson.products));
   } finally {
     server.close();
   }
