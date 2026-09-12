@@ -1453,7 +1453,7 @@ function publicProduct(product) {
     sizes: Array.isArray(normalizedProduct.sizes) ? normalizedProduct.sizes : [],
     focus: normalizedProduct.focus || "center",
     image: normalizedProduct.image || DEFAULT_PRODUCT_IMAGE,
-    imageName: normalizedProduct.imageName || "",
+    imageName: cleanProductImageName(normalizedProduct.imageName),
     colors: Array.isArray(normalizedProduct.colors) ? normalizedProduct.colors : [],
     longDescription: normalizedProduct.longDescription || normalizedProduct.description,
     gallery: normalizeProductGalleryItems(normalizedProduct.gallery, normalizedProduct.focus, {
@@ -1937,6 +1937,11 @@ function isProductGalleryPlaceholder(item, coverImage = "") {
   return label === "general view" && (!image || image === DEFAULT_PRODUCT_IMAGE || image === coverImage);
 }
 
+function cleanProductImageName(value) {
+  const label = String(value || "").trim();
+  return label.toLowerCase() === "general view" ? "" : label.slice(0, 120);
+}
+
 function normalizeProductGalleryItems(gallery, fallbackFocus = "center", options = {}) {
   const safeFocus = nextFocusFallback(fallbackFocus);
   const coverImage = String(options.coverImage || "").trim();
@@ -1965,7 +1970,7 @@ function getProductPhotoLabel(product, imageUrl, fallback = "") {
   const gallery = normalizeProductGalleryItems(product?.gallery, product?.focus, { coverImage: product?.image });
   const galleryMatch = gallery.find((item) => item.image === image);
   const label = galleryMatch?.label || (product?.image === image ? product?.imageName : "") || fallback;
-  return String(label || "").trim().slice(0, 120);
+  return cleanProductImageName(label);
 }
 
 function buildProductPatchGallery(body, currentProduct, selectedImage, selectedFocus) {
