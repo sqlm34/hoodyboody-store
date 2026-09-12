@@ -495,6 +495,7 @@ function renderProductForm(product, mode = "edit") {
           </label>
           <div class="admin-photo-upload full-span">
             <input name="image" type="hidden" value="${escapeHtml(product.image || "")}" />
+            <input type="file" accept="image/jpeg,image/png,image/webp" data-cover-input hidden />
             <input type="file" accept="image/jpeg,image/png,image/webp" data-photo-input multiple hidden />
             <div class="admin-photo-header">
               <span>Product photos</span>
@@ -502,6 +503,7 @@ function renderProductForm(product, mode = "edit") {
             </div>
             ${renderPhotoTiles(product)}
             <div class="admin-photo-actions">
+              <button class="button primary" type="button" data-upload-cover ${isCreate ? "disabled" : ""}>Upload cover</button>
               <button class="button ghost dark" type="button" data-upload-photo ${isCreate ? "disabled" : ""}>Upload photos</button>
               <small>${escapeHtml(isCreate ? "Photos are available after saving." : product.imageName || "No uploaded photos yet")}</small>
             </div>
@@ -575,6 +577,7 @@ function renderLegacyProductsEditor() {
               </label>
               <div class="admin-photo-upload full-span">
                 <input name="image" type="hidden" value="${escapeHtml(product.image || "")}" />
+                <input type="file" accept="image/jpeg,image/png,image/webp" data-cover-input hidden />
                 <input type="file" accept="image/jpeg,image/png,image/webp" data-photo-input multiple hidden />
                 <div class="admin-photo-header">
                   <span>Product photos</span>
@@ -582,6 +585,7 @@ function renderLegacyProductsEditor() {
                 </div>
                 ${renderPhotoTiles(product)}
                 <div class="admin-photo-actions">
+                  <button class="button primary" type="button" data-upload-cover>Upload cover</button>
                   <button class="button ghost dark" type="button" data-upload-photo>Upload photos</button>
                   <small>${escapeHtml(product.imageName || "No uploaded photos yet")}</small>
                 </div>
@@ -672,35 +676,68 @@ async function prepareProductImage(file) {
   };
 }
 
-async function uploadProductPhotos(form, files) {
-  const productId = form.dataset.productId;
-  const selectedFiles = Array.from(files || []);
+function setCoverPhotoPreview(form, image) {
+  form.querySelector('input[name="image"]').value = image;
+  form.querySelector(".admin-product-preview").style.setProperty("--product-image", `url('${image}')`);
+  form.querySelectorAll(".admin-photo-tile").forEach((tile) => tile.classList.remove("active"));
+  Array.from(form.querySelectorAll("[data-cover-photo]"))
+    .find((button) => button.dataset.coverPhoto === image)
+    ?.closest(".admin-photo-tile")
+    ?.classList.add("active");
+}
+
+async function saveProductCover(form, image) {
   const note = form.querySelector(".admin-photo-actions small");
-  const uploadButton = form.querySelector("[data-upload-photo]");
+  const productId = form.dataset.productId;
+  const focus = form.querySelector('input[name="focus"]')?.value || "center";
+
+  note.textContent = "Saving cover photo...";
+  const response = await api("/api/admin/products/cover", {
+    method: "PATCH",
+    body: JSON.stringify({ productId, image, focus })
+  });
+
+  products = response.products || products;
+  renderProductsEditor();
+  setProductsStatus("Cover photo updated successfully.");
+}
+
+async function uploadProductPhotos(form, files, options = {}) {
+  const productId = form.dataset.productId;
+  const makeCover = options.makeCover === true;
+  const selectedFiles = (makeCover ? Array.from(files || []).slice(0, 1) : Array.from(files || []));
+  const note = form.querySelector(".admin-photo-actions small");
+  const uploadButtons = form.querySelectorAll("[data-upload-photo], [data-upload-cover]");
   let latestResponse = null;
 
   if (!selectedFiles.length) return;
 
-  uploadButton.disabled = true;
-  note.textContent = `Uploading ${selectedFiles.length} photo${selectedFiles.length === 1 ? "" : "s"}...`;
+  uploadButtons.forEach((button) => {
+    button.disabled = true;
+  });
+  note.textContent = makeCover ? "Uploading cover photo..." : `Uploading ${selectedFiles.length} photo${selectedFiles.length === 1 ? "" : "s"}...`;
 
   for (const [index, file] of selectedFiles.entries()) {
-    note.textContent = `Uploading ${index + 1} of ${selectedFiles.length}: ${file.name}`;
+    note.textContent = makeCover ? `Uploading cover: ${file.name}` : `Uploading ${index + 1} of ${selectedFiles.length}: ${file.name}`;
     const prepared = await prepareProductImage(file);
     latestResponse = await api("/api/admin/products/photo", {
       method: "POST",
       body: JSON.stringify({
         productId,
         fileName: prepared.fileName,
-        dataUrl: prepared.dataUrl
+        dataUrl: prepared.dataUrl,
+        makeCover
       })
     });
     products = latestResponse.products || products;
   }
 
-  uploadButton.disabled = false;
+  uploadButtons.forEach((button) => {
+    button.disabled = false;
+  });
   products = latestResponse?.products || products;
   renderProductsEditor();
+  setProductsStatus(makeCover ? "Cover photo updated successfully." : "Product photos uploaded successfully.");
 }
 
 function updateSizePicker(picker) {
@@ -814,6 +851,14 @@ adminProductsList.addEventListener("click", (event) => {
     return;
   }
 
+  const uploadCoverButton = event.target.closest("[data-upload-cover]");
+  if (uploadCoverButton) {
+    const form = uploadCoverButton.closest("[data-product-id]");
+    form.querySelector(".admin-photo-actions small").textContent = "Choose a cover photo from your computer.";
+    form.querySelector("[data-cover-input]").click();
+    return;
+  }
+
   const sizeButton = event.target.closest("[data-size-option]");
   if (sizeButton) {
     const picker = sizeButton.closest("[data-size-picker]");
@@ -876,11 +921,11 @@ adminProductsList.addEventListener("click", (event) => {
   if (photoTile) {
     const form = photoTile.closest("[data-product-id]");
     const image = photoTile.dataset.coverPhoto;
-    form.querySelector('input[name="image"]').value = image;
-    form.querySelector(".admin-product-preview").style.setProperty("--product-image", `url('${image}')`);
-    form.querySelectorAll(".admin-photo-tile").forEach((tile) => tile.classList.remove("active"));
-    photoTile.closest(".admin-photo-tile").classList.add("active");
-    form.querySelector(".admin-photo-actions small").textContent = "Click Save product to save cover photo.";
+    setCoverPhotoPreview(form, image);
+    saveProductCover(form, image).catch((error) => {
+      form.querySelector(".admin-photo-actions small").textContent = error.message;
+      setProductsStatus(error.message, true);
+    });
     return;
   }
 
@@ -952,15 +997,33 @@ adminProductsList.addEventListener("change", (event) => {
     return;
   }
 
+  const coverInput = event.target.closest("[data-cover-input]");
+  if (coverInput && coverInput.files.length) {
+    const form = coverInput.closest("[data-product-id]");
+    uploadProductPhotos(form, coverInput.files, { makeCover: true })
+      .catch((error) => {
+        const note = form.querySelector(".admin-photo-actions small");
+        form.querySelectorAll("[data-upload-photo], [data-upload-cover]").forEach((button) => {
+          button.disabled = false;
+        });
+        note.textContent = error.message;
+      })
+      .finally(() => {
+        coverInput.value = "";
+      });
+    return;
+  }
+
   const input = event.target.closest("[data-photo-input]");
   if (!input || !input.files.length) return;
 
   const form = input.closest("[data-product-id]");
   uploadProductPhotos(form, input.files)
     .catch((error) => {
-      const uploadButton = form.querySelector("[data-upload-photo]");
       const note = form.querySelector(".admin-photo-actions small");
-      uploadButton.disabled = false;
+      form.querySelectorAll("[data-upload-photo], [data-upload-cover]").forEach((button) => {
+        button.disabled = false;
+      });
       note.textContent = error.message;
     })
     .finally(() => {

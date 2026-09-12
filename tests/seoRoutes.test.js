@@ -344,6 +344,81 @@ test("owner can moderate blog comments while blog editing stays disabled", async
   }
 });
 
+test("owner can upload and switch product cover photos", async () => {
+  const { server, baseUrl } = await startServer();
+  try {
+    const login = await fetch(`${baseUrl}/api/login`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        login: "owner@nitka.local",
+        password: "owner123"
+      })
+    });
+    const cookie = login.headers.get("set-cookie") || "";
+    assert.equal(login.status, 200);
+
+    const adminScript = await fetch(`${baseUrl}/admin-products.js`);
+    const adminScriptText = await adminScript.text();
+    assert.match(adminScriptText, /data-upload-cover/);
+    assert.match(adminScriptText, /api\/admin\/products\/cover/);
+
+    const coverResponse = await fetch(`${baseUrl}/api/admin/products/photo`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Cookie: cookie },
+      body: JSON.stringify({
+        productId: "cotton-hoodie",
+        fileName: "cover-photo.jpg",
+        dataUrl: `data:image/jpeg;base64,${Buffer.from("cover-photo").toString("base64")}`,
+        makeCover: true
+      })
+    });
+    const coverJson = await coverResponse.json();
+    assert.equal(coverResponse.status, 200);
+    const coverProduct = coverJson.product;
+    assert.match(coverProduct.image, /^\/api\/product-images\//);
+    assert.equal(coverProduct.imageName, "cover-photo.jpg");
+
+    const detailResponse = await fetch(`${baseUrl}/api/admin/products/photo`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Cookie: cookie },
+      body: JSON.stringify({
+        productId: "cotton-hoodie",
+        fileName: "detail-photo.jpg",
+        dataUrl: `data:image/jpeg;base64,${Buffer.from("detail-photo").toString("base64")}`
+      })
+    });
+    const detailJson = await detailResponse.json();
+    assert.equal(detailResponse.status, 200);
+    const afterDetail = detailJson.product;
+    const detailImage = afterDetail.gallery.find((item) => item.label === "detail-photo")?.image;
+    assert.equal(afterDetail.image, coverProduct.image);
+    assert.ok(detailImage);
+
+    const switchResponse = await fetch(`${baseUrl}/api/admin/products/cover`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json", Cookie: cookie },
+      body: JSON.stringify({
+        productId: "cotton-hoodie",
+        image: detailImage,
+        focus: "50% 20%"
+      })
+    });
+    const switchJson = await switchResponse.json();
+    assert.equal(switchResponse.status, 200);
+    assert.equal(switchJson.product.image, detailImage);
+    assert.equal(switchJson.product.imageName, "detail-photo");
+    assert.equal(switchJson.product.focus, "50% 20%");
+
+    const publicProductsResponse = await fetch(`${baseUrl}/api/products`);
+    const publicProductsJson = await publicProductsResponse.json();
+    const publicProduct = publicProductsJson.products.find((product) => product.id === "cotton-hoodie");
+    assert.equal(publicProduct.image, detailImage);
+  } finally {
+    server.close();
+  }
+});
+
 test("shop navigation exposes Rubi-style mega menu markup", async () => {
   const { server, baseUrl } = await startServer();
   try {

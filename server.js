@@ -1943,6 +1943,95 @@ function parseList(value, fallback = []) {
   return items.length ? items : fallback;
 }
 
+function nextFocusFallback(focus) {
+  return String(focus || "center").trim().slice(0, 40) || "center";
+}
+
+function normalizeProductGalleryItems(gallery, fallbackFocus = "center") {
+  const safeFocus = nextFocusFallback(fallbackFocus);
+  return (Array.isArray(gallery) ? gallery : [])
+    .map((item, index) => {
+      const label = String(item?.label || item?.alt || `Photo ${index + 1}`).trim().slice(0, 120);
+      const focus = nextFocusFallback(item?.focus || safeFocus);
+      const image = String(item?.image || "").trim().slice(0, 500);
+      const nextItem = {
+        label: label || `Photo ${index + 1}`,
+        focus
+      };
+
+      if (image) nextItem.image = image;
+      return nextItem;
+    })
+    .filter((item) => item.label || item.image)
+    .slice(0, 20);
+}
+
+function getProductPhotoLabel(product, imageUrl, fallback = "") {
+  const image = String(imageUrl || "").trim();
+  const gallery = normalizeProductGalleryItems(product?.gallery, product?.focus);
+  const galleryMatch = gallery.find((item) => item.image === image);
+  const label = galleryMatch?.label || (product?.image === image ? product?.imageName : "") || fallback;
+  return String(label || "").trim().slice(0, 120);
+}
+
+function buildProductPatchGallery(body, currentProduct, selectedImage, selectedFocus) {
+  const currentGallery = normalizeProductGalleryItems(currentProduct.gallery, selectedFocus);
+  const labels = parseList(body.galleryLabels, []);
+  const focuses = parseList(body.galleryFocus, []);
+  const selected = String(selectedImage || "").trim().slice(0, 500);
+  let gallery = currentGallery;
+
+  if (labels.length || focuses.length) {
+    const count = Math.min(Math.max(labels.length, focuses.length, currentGallery.length), 20);
+    gallery = Array.from({ length: count }, (_, index) => {
+      const current = currentGallery[index] || {};
+      const image = current.image || (index === 0 ? selected : "");
+      const nextItem = {
+        label: String(labels[index] || current.label || `Photo ${index + 1}`).trim().slice(0, 120),
+        focus: nextFocusFallback(focuses[index] || current.focus || selectedFocus)
+      };
+
+      if (image) nextItem.image = image;
+      return nextItem;
+    }).filter((item) => item.label || item.image);
+  }
+
+  if (selected) {
+    const coverIndex = gallery.findIndex((item) => item.image === selected);
+    if (coverIndex === -1) {
+      gallery = [
+        {
+          label: getProductPhotoLabel(currentProduct, selected, currentProduct.imageName || "Cover photo"),
+          focus: nextFocusFallback(selectedFocus),
+          image: selected
+        },
+        ...gallery
+      ];
+    } else {
+      gallery[coverIndex] = {
+        ...gallery[coverIndex],
+        focus: gallery[coverIndex].focus || nextFocusFallback(selectedFocus)
+      };
+    }
+  }
+
+  if (!gallery.length) {
+    gallery = [{ label: "General view", focus: nextFocusFallback(selectedFocus), image: selected || DEFAULT_PRODUCT_IMAGE }];
+  }
+
+  return gallery.slice(0, 20);
+}
+
+function isProductImageAttached(product, db, imageUrl) {
+  const image = String(imageUrl || "").trim();
+  if (!image) return false;
+  if (image === DEFAULT_PRODUCT_IMAGE || image === product.image) return true;
+  if (normalizeProductGalleryItems(product.gallery, product.focus).some((item) => item.image === image)) return true;
+
+  const imageId = getProductImageIdFromUrl(image);
+  return Boolean(imageId && db.productImages?.[imageId]?.productId === product.id);
+}
+
 function slugifyProductId(value) {
   const slug = String(value || "")
     .trim()
@@ -1956,6 +2045,8 @@ function slugifyProductId(value) {
 
 function sanitizeProductPatch(body, currentProduct) {
   const price = Math.round(Number(body.price));
+  const image = String(body.image || currentProduct.image || DEFAULT_PRODUCT_IMAGE).trim().slice(0, 500);
+  const focus = nextFocusFallback(body.focus || currentProduct.focus);
   let shippingValidation;
 
   try {
@@ -1985,31 +2076,20 @@ function sanitizeProductPatch(body, currentProduct) {
     badge: String(body.badge || "").trim().slice(0, 40),
     description: String(body.description || "").trim().slice(0, 260),
     longDescription: String(body.longDescription || "").trim().slice(0, 1200),
-    image: String(body.image || "").trim().slice(0, 500),
-    focus: String(body.focus || "center").trim().slice(0, 40),
+    image,
+    imageName: getProductPhotoLabel(currentProduct, image, currentProduct.imageName || ""),
+    focus,
     price,
     isDigital: shippingValidation.isDigital,
     shipping: shippingValidation.shipping,
     sizes: parseList(body.sizes, currentProduct.sizes),
-    gallery: parseList(body.galleryLabels, []).map((label, index) => ({
-      label,
-      focus: parseList(body.galleryFocus, [])[index] || currentProduct.gallery?.[index]?.focus || nextFocusFallback(body.focus)
-    }))
+    gallery: buildProductPatchGallery(body, currentProduct, image, focus)
   };
 
   if (!next.title || !next.description || !next.longDescription || !Number.isInteger(price) || price < 0) {
     return { product: null, message: "Fill product title, descriptions, and price correctly." };
   }
-
-  if (!next.gallery.length) {
-    next.gallery = Array.isArray(currentProduct.gallery) && currentProduct.gallery.length ? currentProduct.gallery : [{ label: "General view", focus: next.focus }];
-  }
-
   return { product: next };
-}
-
-function nextFocusFallback(focus) {
-  return String(focus || "center").trim().slice(0, 40) || "center";
 }
 
 function parseProductImageDataUrl(value) {
@@ -4343,6 +4423,50 @@ async function handleApi(req, res) {
       return;
     }
 
+    if (url.pathname === "/api/admin/products/cover" && method === "PATCH") {
+      const user = getSessionUser(req, db);
+      if (!user) {
+        sendJson(res, 401, { message: "You must be logged in as the store owner." });
+        return;
+      }
+
+      if (!isAdmin(user)) {
+        sendJson(res, 403, { message: "Only the store owner can edit products." });
+        return;
+      }
+
+      const body = await readJson(req);
+      const productId = String(body.productId || "").trim();
+      const image = String(body.image || body.imageUrl || "").trim().slice(0, 500);
+      const productIndex = db.products.findIndex((product) => product.id === productId);
+
+      if (productIndex === -1) {
+        sendJson(res, 404, { message: "Product not found." });
+        return;
+      }
+
+      const product = db.products[productIndex];
+      if (!isProductImageAttached(product, db, image)) {
+        sendJson(res, 400, { message: "Choose a photo attached to this product." });
+        return;
+      }
+
+      const focus = nextFocusFallback(body.focus || product.focus);
+      db.products[productIndex] = {
+        ...product,
+        image,
+        imageName: getProductPhotoLabel(product, image, product.imageName || "Cover photo"),
+        focus,
+        gallery: buildProductPatchGallery({}, product, image, focus),
+        updatedAt: new Date().toISOString(),
+        updatedBy: user.id
+      };
+
+      await writeDbAsync(db);
+      sendJson(res, 200, { product: publicProduct(db.products[productIndex]), products: publicProducts(db) });
+      return;
+    }
+
     if (url.pathname === "/api/admin/products/photo" && method === "POST") {
       const user = getSessionUser(req, db);
       if (!user) {
@@ -4379,6 +4503,8 @@ async function handleApi(req, res) {
       const currentGallery = Array.isArray(product.gallery) ? product.gallery : [];
       const hasGalleryImages = currentGallery.some((item) => item?.image);
       const currentImageId = getProductImageIdFromUrl(product.image);
+      const makeCover = body.makeCover === true || String(body.makeCover || "").toLowerCase() === "true";
+      const shouldUseAsCover = makeCover || (!hasGalleryImages && !currentImageId);
       const galleryBase =
         hasGalleryImages
           ? currentGallery
@@ -4413,8 +4539,8 @@ async function handleApi(req, res) {
 
       db.products[productIndex] = {
         ...product,
-        image: hasGalleryImages || currentImageId ? product.image : imageUrl,
-        imageName: fileName,
+        image: shouldUseAsCover ? imageUrl : product.image,
+        imageName: shouldUseAsCover ? fileName : product.imageName || "",
         gallery: nextGallery,
         updatedAt: new Date().toISOString(),
         updatedBy: user.id
