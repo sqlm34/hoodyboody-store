@@ -122,14 +122,16 @@ function getProductPhotos(product) {
   }
 
   if (product.image) {
-    addPhoto(product.image, product.imageName || "Cover photo", product.focus);
+    addPhoto(product.image, "Cover", product.focus);
   }
 
-  gallery
+  const editedBack = gallery
     .filter((item) => item?.image && item.image !== product.image && !isGeneralViewPlaceholder(item))
-    .forEach((item) => {
-      addPhoto(item.image, item.label, item.focus);
-    });
+    .at(0);
+
+  if (editedBack) {
+    addPhoto(editedBack.image, "Edited back", editedBack.focus);
+  }
 
   if (!photos.length) {
     addPhoto(DEFAULT_IMAGE_URL, "Default photo", product.focus);
@@ -201,23 +203,22 @@ function getProductReviews(productId) {
 
 function renderPhotoTiles(product) {
   return `
-    <div class="admin-photo-grid" aria-label="Product photos">
+    <div class="admin-photo-grid" aria-label="Cover and edited back photos">
       ${getProductPhotos(product)
         .map(
           (photo) => `
             <div class="admin-photo-tile ${photo.isCover ? "active" : ""}">
-              <button
+              <div
                 class="admin-photo-cover"
-                type="button"
-                data-cover-photo="${escapeHtml(photo.image)}"
-                title="Use as cover photo"
+                role="img"
+                aria-label="${escapeHtml(photo.isCover ? "Cover" : "Edited back")}"
               >
                 <span
                   class="admin-photo-thumb"
                   style="--product-image: url('${escapeHtml(photo.image)}'); --focus: ${escapeHtml(photo.focus)}"
                 ></span>
                 <small>${escapeHtml(photo.isCover ? "Cover" : photo.label)}</small>
-              </button>
+              </div>
               ${
                 photo.canDelete
                   ? `<button class="icon-button admin-photo-delete" type="button" data-delete-photo="${escapeHtml(photo.image)}" aria-label="Delete photo"><i class="fa-solid fa-trash"></i></button>`
@@ -502,15 +503,15 @@ function renderProductForm(product, mode = "edit") {
           <div class="admin-photo-upload full-span">
             <input name="image" type="hidden" value="${escapeHtml(product.image || "")}" />
             <input type="file" accept="image/jpeg,image/png,image/webp" data-cover-input hidden />
-            <input type="file" accept="image/jpeg,image/png,image/webp" data-photo-input multiple hidden />
+            <input type="file" accept="image/jpeg,image/png,image/webp" data-edited-back-input hidden />
             <div class="admin-photo-header">
-              <span>Product photos</span>
-              <small>${isCreate ? "Save the card first, then upload photos." : "Choose one or more JPG, PNG or WEBP photos."}</small>
+              <span>Cover and edited back</span>
+              <small>${isCreate ? "Save the card first, then upload photos." : "Cover is used in catalog. Edited back is shown on the product page."}</small>
             </div>
             ${renderPhotoTiles(product)}
             <div class="admin-photo-actions">
               <button class="button primary" type="button" data-upload-cover ${isCreate ? "disabled" : ""}>Upload cover</button>
-              <button class="button ghost dark" type="button" data-upload-photo ${isCreate ? "disabled" : ""}>Upload photos</button>
+              <button class="button ghost dark" type="button" data-upload-edited-back ${isCreate ? "disabled" : ""}>Upload edited back</button>
               <small>${escapeHtml(isCreate ? "Photos are available after saving." : product.imageName || "No uploaded photos yet")}</small>
             </div>
           </div>
@@ -584,15 +585,15 @@ function renderLegacyProductsEditor() {
               <div class="admin-photo-upload full-span">
                 <input name="image" type="hidden" value="${escapeHtml(product.image || "")}" />
                 <input type="file" accept="image/jpeg,image/png,image/webp" data-cover-input hidden />
-                <input type="file" accept="image/jpeg,image/png,image/webp" data-photo-input multiple hidden />
+                <input type="file" accept="image/jpeg,image/png,image/webp" data-edited-back-input hidden />
                 <div class="admin-photo-header">
-                  <span>Product photos</span>
-                  <small>Choose one or more JPG, PNG or WEBP photos.</small>
+                  <span>Cover and edited back</span>
+                  <small>Cover is used in catalog. Edited back is shown on the product page.</small>
                 </div>
                 ${renderPhotoTiles(product)}
                 <div class="admin-photo-actions">
                   <button class="button primary" type="button" data-upload-cover>Upload cover</button>
-                  <button class="button ghost dark" type="button" data-upload-photo>Upload photos</button>
+                  <button class="button ghost dark" type="button" data-upload-edited-back>Upload edited back</button>
                   <small>${escapeHtml(product.imageName || "No uploaded photos yet")}</small>
                 </div>
               </div>
@@ -682,38 +683,13 @@ async function prepareProductImage(file) {
   };
 }
 
-function setCoverPhotoPreview(form, image) {
-  form.querySelector('input[name="image"]').value = image;
-  form.querySelector(".admin-product-preview").style.setProperty("--product-image", `url('${image}')`);
-  form.querySelectorAll(".admin-photo-tile").forEach((tile) => tile.classList.remove("active"));
-  Array.from(form.querySelectorAll("[data-cover-photo]"))
-    .find((button) => button.dataset.coverPhoto === image)
-    ?.closest(".admin-photo-tile")
-    ?.classList.add("active");
-}
-
-async function saveProductCover(form, image) {
-  const note = form.querySelector(".admin-photo-actions small");
-  const productId = form.dataset.productId;
-  const focus = form.querySelector('input[name="focus"]')?.value || "center";
-
-  note.textContent = "Saving cover photo...";
-  const response = await api("/api/admin/products/cover", {
-    method: "PATCH",
-    body: JSON.stringify({ productId, image, focus })
-  });
-
-  products = response.products || products;
-  renderProductsEditor();
-  setProductsStatus("Cover photo updated successfully.");
-}
-
 async function uploadProductPhotos(form, files, options = {}) {
   const productId = form.dataset.productId;
-  const makeCover = options.makeCover === true;
-  const selectedFiles = (makeCover ? Array.from(files || []).slice(0, 1) : Array.from(files || []));
+  const slot = options.slot === "cover" ? "cover" : "editedBack";
+  const makeCover = slot === "cover";
+  const selectedFiles = Array.from(files || []).slice(0, 1);
   const note = form.querySelector(".admin-photo-actions small");
-  const uploadButtons = form.querySelectorAll("[data-upload-photo], [data-upload-cover]");
+  const uploadButtons = form.querySelectorAll("[data-upload-cover], [data-upload-edited-back]");
   let latestResponse = null;
 
   if (!selectedFiles.length) return;
@@ -721,10 +697,10 @@ async function uploadProductPhotos(form, files, options = {}) {
   uploadButtons.forEach((button) => {
     button.disabled = true;
   });
-  note.textContent = makeCover ? "Uploading cover photo..." : `Uploading ${selectedFiles.length} photo${selectedFiles.length === 1 ? "" : "s"}...`;
+  note.textContent = makeCover ? "Uploading cover photo..." : "Uploading edited back photo...";
 
   for (const [index, file] of selectedFiles.entries()) {
-    note.textContent = makeCover ? `Uploading cover: ${file.name}` : `Uploading ${index + 1} of ${selectedFiles.length}: ${file.name}`;
+    note.textContent = makeCover ? `Uploading cover: ${file.name}` : `Uploading edited back: ${file.name}`;
     const prepared = await prepareProductImage(file);
     latestResponse = await api("/api/admin/products/photo", {
       method: "POST",
@@ -732,6 +708,7 @@ async function uploadProductPhotos(form, files, options = {}) {
         productId,
         fileName: prepared.fileName,
         dataUrl: prepared.dataUrl,
+        slot,
         makeCover
       })
     });
@@ -743,7 +720,7 @@ async function uploadProductPhotos(form, files, options = {}) {
   });
   products = latestResponse?.products || products;
   renderProductsEditor();
-  setProductsStatus(makeCover ? "Cover photo updated successfully." : "Product photos uploaded successfully.");
+  setProductsStatus(makeCover ? "Cover photo updated successfully." : "Edited back photo updated successfully.");
 }
 
 function updateSizePicker(picker) {
@@ -849,11 +826,11 @@ adminProductsList.addEventListener("click", (event) => {
     return;
   }
 
-  const uploadButton = event.target.closest("[data-upload-photo]");
-  if (uploadButton) {
-    const form = uploadButton.closest("[data-product-id]");
-    form.querySelector(".admin-photo-actions small").textContent = "Choose photos from your computer.";
-    form.querySelector("[data-photo-input]").click();
+  const uploadEditedBackButton = event.target.closest("[data-upload-edited-back]");
+  if (uploadEditedBackButton) {
+    const form = uploadEditedBackButton.closest("[data-product-id]");
+    form.querySelector(".admin-photo-actions small").textContent = "Choose the edited back photo from your computer.";
+    form.querySelector("[data-edited-back-input]").click();
     return;
   }
 
@@ -920,18 +897,6 @@ adminProductsList.addEventListener("click", (event) => {
         deletePhotoButton.disabled = false;
         note.textContent = error.message;
       });
-    return;
-  }
-
-  const photoTile = event.target.closest("[data-cover-photo]");
-  if (photoTile) {
-    const form = photoTile.closest("[data-product-id]");
-    const image = photoTile.dataset.coverPhoto;
-    setCoverPhotoPreview(form, image);
-    saveProductCover(form, image).catch((error) => {
-      form.querySelector(".admin-photo-actions small").textContent = error.message;
-      setProductsStatus(error.message, true);
-    });
     return;
   }
 
@@ -1006,10 +971,10 @@ adminProductsList.addEventListener("change", (event) => {
   const coverInput = event.target.closest("[data-cover-input]");
   if (coverInput && coverInput.files.length) {
     const form = coverInput.closest("[data-product-id]");
-    uploadProductPhotos(form, coverInput.files, { makeCover: true })
+    uploadProductPhotos(form, coverInput.files, { slot: "cover" })
       .catch((error) => {
         const note = form.querySelector(".admin-photo-actions small");
-        form.querySelectorAll("[data-upload-photo], [data-upload-cover]").forEach((button) => {
+        form.querySelectorAll("[data-upload-cover], [data-upload-edited-back]").forEach((button) => {
           button.disabled = false;
         });
         note.textContent = error.message;
@@ -1020,14 +985,14 @@ adminProductsList.addEventListener("change", (event) => {
     return;
   }
 
-  const input = event.target.closest("[data-photo-input]");
+  const input = event.target.closest("[data-edited-back-input]");
   if (!input || !input.files.length) return;
 
   const form = input.closest("[data-product-id]");
-  uploadProductPhotos(form, input.files)
+  uploadProductPhotos(form, input.files, { slot: "editedBack" })
     .catch((error) => {
       const note = form.querySelector(".admin-photo-actions small");
-      form.querySelectorAll("[data-upload-photo], [data-upload-cover]").forEach((button) => {
+      form.querySelectorAll("[data-upload-cover], [data-upload-edited-back]").forEach((button) => {
         button.disabled = false;
       });
       note.textContent = error.message;

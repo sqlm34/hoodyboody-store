@@ -1459,7 +1459,9 @@ function publicProduct(product) {
     gallery: normalizeProductGalleryItems(normalizedProduct.gallery, normalizedProduct.focus, {
       coverImage: normalizedProduct.image,
       excludeCover: true
-    }),
+    })
+      .slice(0, 1)
+      .map((item) => ({ ...item, label: "Edited back" })),
     isDigital: normalizedProduct.isDigital === true,
     shipping: normalizedProduct.shipping
   };
@@ -1993,7 +1995,8 @@ function buildProductPatchGallery(body, currentProduct, selectedImage, selectedF
 
   return gallery
     .filter((item) => item.image && item.image !== selected && !isProductGalleryPlaceholder(item, selected))
-    .slice(0, 20);
+    .map((item) => ({ ...item, label: "Edited back" }))
+    .slice(0, 1);
 }
 
 function isProductImageAttached(product, db, imageUrl) {
@@ -4478,19 +4481,22 @@ async function handleApi(req, res) {
         excludeCover: true
       });
       const hasGalleryImages = currentGallery.some((item) => item?.image);
+      const slot = String(body.slot || "").trim();
+      const isCoverSlot = slot === "cover";
+      const isEditedBackSlot = slot === "editedBack";
       const makeCover = body.makeCover === true || String(body.makeCover || "").toLowerCase() === "true";
-      const shouldUseAsCover = makeCover || (!product.image || product.image === DEFAULT_PRODUCT_IMAGE);
+      const shouldUseAsCover = isCoverSlot || makeCover || (!isEditedBackSlot && (!product.image || product.image === DEFAULT_PRODUCT_IMAGE));
       const galleryBase = hasGalleryImages ? currentGallery : [];
-      const nextGallery = makeCover
+      const uploadedGalleryItem = {
+        label: isEditedBackSlot ? "Edited back" : fileName.replace(/\.[^.]+$/, ""),
+        focus: product.focus || "center",
+        image: imageUrl
+      };
+      const nextGallery = shouldUseAsCover
         ? galleryBase
-        : [
-            ...galleryBase,
-            {
-              label: fileName.replace(/\.[^.]+$/, ""),
-              focus: product.focus || "center",
-              image: imageUrl
-            }
-          ].slice(0, 20);
+        : isEditedBackSlot
+          ? [uploadedGalleryItem]
+          : [...galleryBase, uploadedGalleryItem].slice(0, 1);
 
       db.productImages[imageId] = {
         id: imageId,

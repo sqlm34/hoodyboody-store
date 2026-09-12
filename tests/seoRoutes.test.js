@@ -344,7 +344,7 @@ test("owner can moderate blog comments while blog editing stays disabled", async
   }
 });
 
-test("owner can upload and switch product cover photos", async () => {
+test("owner can upload product cover and edited back photos", async () => {
   const { server, baseUrl } = await startServer();
   try {
     const login = await fetch(`${baseUrl}/api/login`, {
@@ -361,7 +361,9 @@ test("owner can upload and switch product cover photos", async () => {
     const adminScript = await fetch(`${baseUrl}/admin-products.js`);
     const adminScriptText = await adminScript.text();
     assert.match(adminScriptText, /data-upload-cover/);
-    assert.match(adminScriptText, /api\/admin\/products\/cover/);
+    assert.match(adminScriptText, /data-upload-edited-back/);
+    assert.match(adminScriptText, /data-edited-back-input/);
+    assert.match(adminScriptText, /slot/);
 
     const productScript = await fetch(`${baseUrl}/product.js`);
     const productScriptText = await productScript.text();
@@ -382,6 +384,7 @@ test("owner can upload and switch product cover photos", async () => {
         productId: "cotton-hoodie",
         fileName: "cover-photo.jpg",
         dataUrl: `data:image/jpeg;base64,${Buffer.from("cover-photo").toString("base64")}`,
+        slot: "cover",
         makeCover: true
       })
     });
@@ -399,15 +402,17 @@ test("owner can upload and switch product cover photos", async () => {
       body: JSON.stringify({
         productId: "cotton-hoodie",
         fileName: "detail-photo.jpg",
-        dataUrl: `data:image/jpeg;base64,${Buffer.from("detail-photo").toString("base64")}`
+        dataUrl: `data:image/jpeg;base64,${Buffer.from("detail-photo").toString("base64")}`,
+        slot: "editedBack"
       })
     });
     const detailJson = await detailResponse.json();
     assert.equal(detailResponse.status, 200);
     const afterDetail = detailJson.product;
-    const detailImage = afterDetail.gallery.find((item) => item.label === "detail-photo")?.image;
+    const detailImage = afterDetail.gallery.find((item) => item.label === "Edited back")?.image;
     assert.equal(afterDetail.image, coverProduct.image);
     assert.ok(detailImage);
+    assert.equal(afterDetail.gallery.length, 1);
     assert.equal(afterDetail.gallery.some((item) => item.image === afterDetail.image), false);
 
     const switchResponse = await fetch(`${baseUrl}/api/admin/products/cover`, {
@@ -422,7 +427,7 @@ test("owner can upload and switch product cover photos", async () => {
     const switchJson = await switchResponse.json();
     assert.equal(switchResponse.status, 200);
     assert.equal(switchJson.product.image, detailImage);
-    assert.equal(switchJson.product.imageName, "detail-photo");
+    assert.equal(switchJson.product.imageName, "Edited back");
     assert.equal(switchJson.product.focus, "50% 20%");
     assert.equal(switchJson.product.gallery.some((item) => item.image === detailImage), false);
 
